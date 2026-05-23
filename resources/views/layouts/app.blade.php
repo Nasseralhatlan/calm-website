@@ -11,6 +11,7 @@
     <link rel="icon" type="image/png" href="/favicon.png">
     <link rel="apple-touch-icon" href="/favicon.png">
     <title>@yield('title', 'Calm')</title>
+    @yield('meta')
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <style>
         * {

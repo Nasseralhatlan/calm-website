@@ -21,7 +21,7 @@
                 @csrf
                 <button type="submit"
                     style="border-radius: 14px;"
-                    class="text-sm font-semibold text-[#222] hover:bg-[#f7f7f7] px-4 py-3 transition-colors">
+                    class="text-sm font-semibold text-[#222] hover:bg-[#f7f7f7] px-4 py-3 transition-colors {{ $locale === 'en' ? 'font-arabic' : '' }}">
                     {{ $locale === 'ar' ? 'English' : 'العربية' }}
                 </button>
             </form>
@@ -31,8 +31,7 @@
     {{-- HERO --}}
     <section class="px-6 sm:px-10 lg:px-20 py-6 sm:py-8">
         <div
-            class="relative w-full overflow-hidden shadow-card min-h-[calc(100vh-12rem)] bg-[#0e3a44]"
-            style="border-radius: 100px;"
+            class="relative w-full overflow-hidden shadow-card min-h-[calc(100vh-12rem)] bg-[#0e3a44] hero-box"
         >
             @if($heroImage)
                 <img
@@ -45,68 +44,147 @@
 
             {{-- text directly on the photo, with shadow for legibility --}}
             <div class="absolute inset-0 flex flex-col items-center justify-center text-center px-6" style="corner-shape: squircle">
-                <h1 class="text-white font-black tracking-tight leading-[0.9]
-                    text-[clamp(72px,16vw,220px)] {{ $arabicClass }}">
-                    {{ __('coming_soon') }}
+                <h1 class="text-white font-black tracking-tight leading-[0.95] {{ $arabicClass }}"
+                    style="font-size: clamp(44px, 9vw, 110px); text-shadow: 0 4px 24px rgba(0,0,0,0.35);">
+                    {{ __('hero_title') }}
                 </h1>
-                <p class="mt-10 sm:mt-14 text-white text-xl sm:text-3xl max-w-2xl font-medium {{ $arabicClass }}"
-                   style="text-shadow: 0 2px 16px rgba(0,0,0,0.55);">
-                    {{ __('tagline') }}
+                <p class="mt-8 sm:mt-12 text-white font-medium max-w-3xl {{ $arabicClass }}"
+                   style="font-size: clamp(20px, 3vw, 40px); line-height: 1.4; text-shadow: 0 2px 16px rgba(0,0,0,0.55);">
+                    {{ __('hero_subtitle') }}
                 </p>
             </div>
         </div>
     </section>
 
-    {{-- SHOWCASE: one image + three features --}}
+    {{-- ABOUT THE APP --}}
     <section class="px-6 sm:px-10 lg:px-20 py-20 sm:py-28">
-        <div class="max-w-6xl mx-auto">
-            <div class="text-center mb-14">
-                <h2 class="text-3xl sm:text-5xl font-bold tracking-tight text-[#222] {{ $arabicClass }}">
-                    {{ __('showcase_title') }}
-                </h2>
-                <p class="mt-5 text-base sm:text-xl text-[#717171] max-w-2xl mx-auto {{ $arabicClass }}">
-                    {{ __('showcase_sub') }}
-                </p>
+        <div class="max-w-4xl mx-auto text-center">
+            <img src="/assets/logo/logo.png"
+                 alt="Calm"
+                 class="mx-auto select-none"
+                 style="height: clamp(80px, 12vw, 160px); width: auto;"
+                 draggable="false">
+            <h2 class="sr-only">{{ __('about_app_title') }}</h2>
+            <p class="text-[#222] font-medium leading-relaxed {{ $arabicClass }}"
+               style="margin-top: 20px; font-size: clamp(20px, 3vw, 32px);">
+                {{ __('about_app_sub') }}
+            </p>
+            <p class="text-[#717171] leading-[1.85] max-w-2xl mx-auto {{ $arabicClass }}"
+               style="margin-top: 28px; font-size: clamp(15px, 1.6vw, 18px);">
+                {{ __('about_app_para') }}
+            </p>
+        </div>
+    </section>
+
+    {{-- FOR PROPERTY OWNERS — image on the start side --}}
+    <section class="px-6 sm:px-10 lg:px-20" style="padding-top: 96px; padding-bottom: 96px;">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-32 items-center">
+            {{-- mock app image in soft gray box --}}
+            <div class="lg:order-1">
+                <div class="w-full"
+                     style="background-color: #fafafa; border-radius: 56px; corner-shape: squircle; padding: 56px 32px; min-height: 560px; display: flex; align-items: center; justify-content: center;">
+                    <img src="/assets/mock-home.png"
+                         alt=""
+                         class="block h-auto select-none"
+                         style="width: 100%; max-width: 420px;"
+                         draggable="false"
+                         loading="lazy">
+                </div>
             </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-center">
-                {{-- image --}}
-                <div
-                    class="relative overflow-hidden shadow-card bg-[#0e3a44] aspect-[4/5] sm:aspect-[5/6] lg:aspect-[4/5] w-full"
-                    style="border-radius: 60px;"
-                >
-                    @if($showcaseImage)
-                        <img src="{{ $showcaseImage }}" alt="" class="absolute inset-0 w-full h-full object-cover" draggable="false">
-                    @elseif($heroImage)
-                        <img src="{{ $heroImage }}" alt="" class="absolute inset-0 w-full h-full object-cover" draggable="false">
-                    @endif
+            {{-- features (centered inside the column, text aligned to start) --}}
+            <div class="lg:order-2 {{ $arabicClass }} flex flex-col items-center justify-center" style="min-height: 560px;">
+                <div class="w-full" style="max-width: 460px;">
+                <div class="text-sm font-bold uppercase tracking-wider" style="color: #F88379;">
+                    {{ __('for_hosts_eyebrow') }}
                 </div>
+                <h2 class="mt-3 text-3xl sm:text-4xl font-bold tracking-tight text-[#222] leading-tight">
+                    {{ __('for_hosts_title') }}
+                </h2>
 
-                {{-- three features --}}
-                <div class="space-y-8">
+                <div class="flex flex-col" style="margin-top: 48px; gap: 48px;">
                     @php
-                        $features = [
-                            ['emoji' => '🤍', 'title' => 'feature_1_title', 'desc' => 'feature_1_desc'],
-                            ['emoji' => '👀', 'title' => 'feature_2_title', 'desc' => 'feature_2_desc'],
-                            ['emoji' => '💬', 'title' => 'feature_3_title', 'desc' => 'feature_3_desc'],
+                        $hostFeatures = [
+                            ['emoji' => '📸', 'title' => 'host_f1_title', 'desc' => 'host_f1_desc'],
+                            ['emoji' => '🕒', 'title' => 'host_f2_title', 'desc' => 'host_f2_desc'],
+                            ['emoji' => '💎', 'title' => 'host_f3_title', 'desc' => 'host_f3_desc'],
                         ];
                     @endphp
-                    @foreach($features as $i => $f)
+                    @foreach($hostFeatures as $f)
                         <div class="flex items-start gap-5">
-                            <div class="shrink-0 w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-[#fff5f4] flex items-center justify-center text-2xl"
-                                 style="box-shadow: 0px 10px 30px 0px rgba(0,0,0,0.05);">
+                            <div class="shrink-0 w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center text-2xl bg-[#fff5f4]"
+                                 style="border-radius: 999px; corner-shape: squircle;">
                                 {{ $f['emoji'] }}
                             </div>
                             <div>
-                                <h3 class="text-xl sm:text-2xl font-bold text-[#222] {{ $arabicClass }}">
-                                    {{ __($f['title']) }}
-                                </h3>
-                                <p class="mt-2 text-base text-[#717171] leading-relaxed {{ $arabicClass }}">
-                                    {{ __($f['desc']) }}
-                                </p>
+                                <h3 class="text-lg sm:text-xl font-bold text-[#222]">{{ __($f['title']) }}</h3>
+                                <p class="mt-1.5 text-[15px] sm:text-base text-[#717171] leading-relaxed">{{ __($f['desc']) }}</p>
                             </div>
                         </div>
                     @endforeach
+                </div>
+
+                {{-- CTA --}}
+                <a href="{{ route('hosts.create') }}"
+                   class="inline-flex items-center font-bold text-white bg-[#F88379] hover:bg-[#f56b60] active:scale-[0.98] transition-all"
+                   style="margin-top: 48px; padding: 16px 32px; gap: 10px; border-radius: 28px; corner-shape: squircle; box-shadow: 0 6px 14px rgba(248,131,121,0.3); font-size: 16px;">
+                    <span>{{ __('host_cta') }}</span>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transform: {{ $isRtl ? 'scaleX(-1)' : 'none' }};">
+                        <polyline points="9 18 15 12 9 6"></polyline>
+                    </svg>
+                </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    {{-- FOR GUESTS — image on the opposite side --}}
+    <section class="px-6 sm:px-10 lg:px-20" style="padding-top: 96px; padding-bottom: 96px;">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-32 items-center">
+            {{-- features (centered inside the column, text aligned to start) --}}
+            <div class="lg:order-1 {{ $arabicClass }} flex flex-col items-center justify-center" style="min-height: 560px;">
+                <div class="w-full" style="max-width: 460px;">
+                <div class="text-sm font-bold uppercase tracking-wider" style="color: #F88379;">
+                    {{ __('for_guests_eyebrow') }}
+                </div>
+                <h2 class="mt-3 text-3xl sm:text-4xl font-bold tracking-tight text-[#222] leading-tight">
+                    {{ __('for_guests_title') }}
+                </h2>
+
+                <div class="flex flex-col" style="margin-top: 48px; gap: 48px;">
+                    @php
+                        $guestFeatures = [
+                            ['emoji' => '⭐', 'title' => 'guest_f1_title', 'desc' => 'guest_f1_desc'],
+                            ['emoji' => '⚡', 'title' => 'guest_f2_title', 'desc' => 'guest_f2_desc'],
+                            ['emoji' => '💎', 'title' => 'guest_f3_title', 'desc' => 'guest_f3_desc'],
+                        ];
+                    @endphp
+                    @foreach($guestFeatures as $f)
+                        <div class="flex items-start gap-5">
+                            <div class="shrink-0 w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center text-2xl bg-[#fff5f4]"
+                                 style="border-radius: 999px; corner-shape: squircle;">
+                                {{ $f['emoji'] }}
+                            </div>
+                            <div>
+                                <h3 class="text-lg sm:text-xl font-bold text-[#222]">{{ __($f['title']) }}</h3>
+                                <p class="mt-1.5 text-[15px] sm:text-base text-[#717171] leading-relaxed">{{ __($f['desc']) }}</p>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+                </div>
+            </div>
+
+            {{-- mock app image (search) in soft gray box --}}
+            <div class="lg:order-2">
+                <div class="w-full"
+                     style="background-color: #fafafa; border-radius: 56px; corner-shape: squircle; padding: 56px 32px; min-height: 560px; display: flex; align-items: center; justify-content: center;">
+                    <img src="/assets/mock-search.png"
+                         alt=""
+                         class="block h-auto select-none"
+                         style="width: 100%; max-width: 420px;"
+                         draggable="false"
+                         loading="lazy">
                 </div>
             </div>
         </div>
@@ -130,8 +208,8 @@
                         {{ __('footer_contact') }}
                     </h4>
                     <ul class="mt-4 space-y-2 text-sm text-[#717171]">
-                        <li><a href="mailto:hello@calm.sa" class="hover:text-[#222]" dir="ltr">hello@calm.sa</a></li>
-                        <li><a href="https://wa.me/966500000000" target="_blank" rel="noopener" class="hover:text-[#222]" dir="ltr">+966 50 000 0000</a></li>
+                        <li><a href="mailto:khaled@calmapp.co" class="hover:text-[#222]" dir="ltr">khaled@calmapp.co</a></li>
+                        <li><a href="https://wa.me/966582727970" target="_blank" rel="noopener" class="hover:text-[#222]" dir="ltr">+966 58 272 7970</a></li>
                     </ul>
                 </div>
 
@@ -163,9 +241,16 @@
 
             <div class="mt-12 pt-6 border-t border-[#ebebeb] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[#717171]">
                 <span class="{{ $arabicClass }}">© {{ date('Y') }} Calm. {{ __('footer_rights') }}</span>
-                <span dir="ltr">hello@calm.sa</span>
+                <span dir="ltr">khaled@calmapp.co</span>
             </div>
         </div>
     </footer>
 </div>
+
+<style>
+    /* Hero box border-radius scales with viewport so it's not huge on mobile */
+    .hero-box { border-radius: 28px; }
+    @media (min-width: 640px) { .hero-box { border-radius: 60px; } }
+    @media (min-width: 1024px) { .hero-box { border-radius: 100px; } }
+</style>
 @endsection

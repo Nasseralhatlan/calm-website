@@ -35,7 +35,7 @@
                 @csrf
                 <button type="submit"
                     style="border-radius: 14px;"
-                    class="text-sm font-semibold text-[#222] hover:bg-[#f7f7f7] px-4 py-3 transition-colors">
+                    class="text-sm font-semibold text-[#222] hover:bg-[#f7f7f7] px-4 py-3 transition-colors {{ $locale === 'en' ? 'font-arabic' : '' }}">
                     {{ $locale === 'ar' ? 'English' : 'العربية' }}
                 </button>
             </form>
@@ -43,12 +43,17 @@
     </header>
 
     <main class="flex-1 flex justify-center px-5 sm:px-8 py-10 sm:py-14" dir="{{ $dirAttr }}">
+        {{-- Pass the catalog data through a JSON script tag (safe from HTML attribute escaping) --}}
+        <script id="register-init-data" type="application/json">
+            {!! json_encode([
+                'facilities'    => $alpineFacilities,
+                'amenityGroups' => $alpineAmenityGroups,
+            ], JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) !!}
+        </script>
+
         <div
             class="w-full max-w-2xl"
-            x-data='registerWizard(@json([
-                "facilities" => $alpineFacilities,
-                "amenityGroups" => $alpineAmenityGroups,
-            ], JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_TAG | JSON_HEX_AMP))'
+            x-data="registerWizard()"
             x-cloak
         >
             {{-- progress bar --}}
@@ -196,8 +201,55 @@
                     </div>
                 </section>
 
-                {{-- step 4: facilities --}}
+                {{-- step 4: location (paste Google Maps URL) --}}
                 <section x-show="step === 4" x-transition.opacity>
+                    <h2 class="text-3xl sm:text-[34px] font-bold tracking-tight text-[#222] {{ $arabicClass }}">{{ __('step_location_title') }}</h2>
+                    <p class="mt-2 text-[#717171] text-base {{ $arabicClass }}">{{ __('step_location_sub') }}</p>
+
+                    {{-- Maps URL paste --}}
+                    <div class="block mt-10">
+                        <label class="text-sm font-semibold text-[#222] {{ $arabicClass }}">{{ __('maps_url_label') }}</label>
+                        <div class="mt-3 flex items-stretch" style="gap: 10px;">
+                            <div class="flex-1 border border-[#dddddd] focus-within:border-[#222] transition-all bg-white shadow-card r-ios-lg overflow-hidden">
+                                <input name="maps_url"
+                                       x-model="mapsUrl"
+                                       type="url"
+                                       maxlength="500"
+                                       placeholder="{{ __('maps_url_placeholder') }}"
+                                       class="w-full bg-transparent outline-none text-[15px] text-[#222] py-4 px-5"
+                                       dir="ltr">
+                            </div>
+                            <a href="https://www.google.com/maps"
+                               target="_blank"
+                               rel="noopener"
+                               class="shrink-0 inline-flex items-center justify-center font-semibold text-white bg-[#222] hover:bg-black active:scale-95 transition-all whitespace-nowrap {{ $arabicClass }}"
+                               style="padding: 0 20px; border-radius: 14px; corner-shape: squircle; gap: 8px;">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                                    <circle cx="12" cy="10" r="3"></circle>
+                                </svg>
+                                <span class="hidden sm:inline">{{ __('open_in_maps') }}</span>
+                            </a>
+                        </div>
+                        <div class="mt-2 text-xs text-[#717171] {{ $arabicClass }}">{{ __('maps_url_hint') }}</div>
+                    </div>
+
+                    {{-- optional readable address --}}
+                    <label class="block mt-8">
+                        <span class="text-sm font-semibold text-[#222] {{ $arabicClass }}">{{ __('address_label') }}</span>
+                        <div class="mt-3 border border-[#dddddd] focus-within:border-[#222] transition-all bg-white shadow-card r-ios-lg overflow-hidden">
+                            <input name="address"
+                                   x-model="address"
+                                   type="text"
+                                   maxlength="255"
+                                   placeholder="{{ __('address_placeholder') }}"
+                                   class="w-full bg-transparent outline-none text-[16px] text-[#222] py-4 px-5 {{ $arabicClass }}">
+                        </div>
+                    </label>
+                </section>
+
+                {{-- step 5: facilities --}}
+                <section x-show="step === 5" x-transition.opacity>
                     <h2 class="text-3xl sm:text-[34px] font-bold tracking-tight text-[#222] {{ $arabicClass }}">{{ __('step_facilities_title') }}</h2>
                     <p class="mt-2 text-[#717171] text-base {{ $arabicClass }}">{{ __('step_facilities_sub') }}</p>
 
@@ -238,8 +290,8 @@
                     </div>
                 </section>
 
-                {{-- step 5: amenities --}}
-                <section x-show="step === 5" x-transition.opacity>
+                {{-- step 6: amenities --}}
+                <section x-show="step === 6" x-transition.opacity>
                     <h2 class="text-3xl sm:text-[34px] font-bold tracking-tight text-[#222] {{ $arabicClass }}">{{ __('step_amenities_title') }}</h2>
                     <p class="mt-2 text-[#717171] text-base {{ $arabicClass }}">{{ __('step_amenities_sub') }}</p>
 
@@ -268,8 +320,8 @@
                     </div>
                 </section>
 
-                {{-- step 6: images --}}
-                <section x-show="step === 6" x-transition.opacity>
+                {{-- step 7: images --}}
+                <section x-show="step === 7" x-transition.opacity>
                     <h2 class="text-3xl sm:text-[34px] font-bold tracking-tight text-[#222] {{ $arabicClass }}">{{ __('step_images_title') }}</h2>
                     <p class="mt-2 text-[#717171] text-base {{ $arabicClass }}">{{ __('step_images_sub') }}</p>
 
@@ -387,10 +439,23 @@
 </div>
 
 <script>
-    function registerWizard(initial) {
+    // Register the component on Alpine init so it's always available
+    // before the x-data attribute is evaluated.
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('registerWizard', registerWizard);
+    });
+
+    function registerWizard() {
+        let initial = {};
+        try {
+            const el = document.getElementById('register-init-data');
+            if (el) initial = JSON.parse(el.textContent) || {};
+        } catch (e) {
+            console.error('Failed to parse register-init-data', e);
+        }
         return {
             step: 1,
-            totalSteps: 6,
+            totalSteps: 7,
             submitting: false,
 
             phone: '',
@@ -398,9 +463,11 @@
             title: '',
             description: '',
             maxGuests: 4,
+            mapsUrl: '',
+            address: '',
 
-            facilities: initial.facilities,
-            amenityGroups: initial.amenityGroups,
+            facilities: initial.facilities || [],
+            amenityGroups: initial.amenityGroups || [],
 
             selectedFacilities: [],
             selectedAmenities: [],
@@ -452,8 +519,9 @@
                 if (this.step === 1) return this.phone.trim().length >= 6;
                 if (this.step === 2) return !!this.placeType;
                 if (this.step === 3) return this.title.trim().length >= 2 && parseInt(this.maxGuests) >= 1;
-                if (this.step === 4) return this.selectedFacilities.length > 0;
-                if (this.step === 5) return true;
+                if (this.step === 4) return /^https?:\/\/.+/i.test(this.mapsUrl.trim());
+                if (this.step === 5) return this.selectedFacilities.length > 0;
+                if (this.step === 6) return true;
                 return true;
             },
             next() {

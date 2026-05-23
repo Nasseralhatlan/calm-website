@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Host extends Model
 {
-    protected $fillable = ['slug', 'phone', 'place_type', 'title', 'description', 'max_guests'];
+    protected $fillable = ['slug', 'phone', 'place_type', 'title', 'description', 'max_guests', 'latitude', 'longitude', 'address', 'maps_url'];
 
     public function facilities(): HasMany
     {
