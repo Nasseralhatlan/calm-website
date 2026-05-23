@@ -29,6 +29,9 @@ class HostController extends Controller
         $data = $request->validate([
             'phone'                => ['required', 'string', 'min:6', 'max:30'],
             'place_type'           => ['required', 'in:chalet,resthouse,camp'],
+            'title'                => ['required', 'string', 'min:2', 'max:120'],
+            'description'          => ['nullable', 'string', 'max:5000'],
+            'max_guests'           => ['required', 'integer', 'min:1', 'max:200'],
             'facilities'           => ['required', 'array', 'min:1'],
             'facilities.*.key'     => ['required', 'string'],
             'facilities.*.count'   => ['required', 'integer', 'min:1', 'max:99'],
@@ -55,9 +58,12 @@ class HostController extends Controller
         }
 
         $host = Host::create([
-            'slug'       => Str::lower(Str::random(10)),
-            'phone'      => $data['phone'],
-            'place_type' => $data['place_type'],
+            'slug'        => Str::lower(Str::random(10)),
+            'phone'       => $data['phone'],
+            'place_type'  => $data['place_type'],
+            'title'       => $data['title'],
+            'description' => $data['description'] ?? null,
+            'max_guests'  => $data['max_guests'],
         ]);
 
         $facilityModels = [];

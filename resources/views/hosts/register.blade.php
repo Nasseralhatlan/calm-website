@@ -132,8 +132,72 @@
                     </div>
                 </section>
 
-                {{-- step 3: facilities --}}
+                {{-- step 3: basics (title + description + max guests) --}}
                 <section x-show="step === 3" x-transition.opacity>
+                    <h2 class="text-3xl sm:text-[34px] font-bold tracking-tight text-[#222] {{ $arabicClass }}">{{ __('step_basics_title') }}</h2>
+                    <p class="mt-2 text-[#717171] text-base {{ $arabicClass }}">{{ __('step_basics_sub') }}</p>
+
+                    {{-- title --}}
+                    <label class="block mt-10">
+                        <span class="text-sm font-semibold text-[#222] {{ $arabicClass }}">{{ __('title_label') }}</span>
+                        <div class="mt-3 border border-[#dddddd] focus-within:border-[#222] transition-all bg-white shadow-card r-ios-lg overflow-hidden">
+                            <input
+                                name="title"
+                                x-model="title"
+                                type="text"
+                                maxlength="120"
+                                placeholder="{{ __('title_placeholder') }}"
+                                class="w-full bg-transparent outline-none text-[17px] text-[#222] py-4 px-5 {{ $arabicClass }}"
+                            >
+                        </div>
+                    </label>
+
+                    {{-- description --}}
+                    <label class="block mt-8">
+                        <span class="text-sm font-semibold text-[#222] {{ $arabicClass }}">{{ __('description_label') }}</span>
+                        <div class="mt-3 border border-[#dddddd] focus-within:border-[#222] transition-all bg-white shadow-card r-ios-lg overflow-hidden">
+                            <textarea
+                                name="description"
+                                x-model="description"
+                                maxlength="5000"
+                                rows="6"
+                                placeholder="{{ __('description_placeholder') }}"
+                                class="w-full bg-transparent outline-none resize-none text-[16px] text-[#222] py-4 px-5 leading-relaxed {{ $arabicClass }}"
+                            ></textarea>
+                        </div>
+                        <div class="mt-1.5 text-xs text-[#717171] tabular-nums {{ $isRtl ? 'text-left' : 'text-right' }}">
+                            <span x-text="(description || '').length"></span> / 5000
+                        </div>
+                    </label>
+
+                    {{-- max guests --}}
+                    <div class="mt-8">
+                        <div class="flex items-center justify-between bg-white shadow-card r-ios-lg px-5 py-4 border border-[#dddddd]">
+                            <div class="{{ $arabicClass }}">
+                                <div class="text-sm font-semibold text-[#222]">{{ __('guests_label') }}</div>
+                                <div class="text-xs text-[#717171] mt-0.5">{{ __('guests_sub') }}</div>
+                            </div>
+                            <div class="flex items-center gap-4">
+                                <button type="button"
+                                        @click="maxGuests = Math.max(1, (parseInt(maxGuests) || 1) - 1)"
+                                        :disabled="(parseInt(maxGuests) || 1) <= 1"
+                                        class="cursor-pointer w-9 h-9 rounded-full border border-[#b0b0b0] text-[#222] hover:border-[#222] flex items-center justify-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-lg leading-none">
+                                    −
+                                </button>
+                                <span x-text="maxGuests" class="text-[18px] font-bold text-[#222] tabular-nums min-w-[2ch] text-center"></span>
+                                <button type="button"
+                                        @click="maxGuests = Math.min(200, (parseInt(maxGuests) || 0) + 1)"
+                                        class="cursor-pointer w-9 h-9 rounded-full border border-[#b0b0b0] text-[#222] hover:border-[#222] flex items-center justify-center transition-colors text-lg leading-none">
+                                    +
+                                </button>
+                            </div>
+                        </div>
+                        <input type="hidden" name="max_guests" :value="maxGuests">
+                    </div>
+                </section>
+
+                {{-- step 4: facilities --}}
+                <section x-show="step === 4" x-transition.opacity>
                     <h2 class="text-3xl sm:text-[34px] font-bold tracking-tight text-[#222] {{ $arabicClass }}">{{ __('step_facilities_title') }}</h2>
                     <p class="mt-2 text-[#717171] text-base {{ $arabicClass }}">{{ __('step_facilities_sub') }}</p>
 
@@ -174,8 +238,8 @@
                     </div>
                 </section>
 
-                {{-- step 4: amenities --}}
-                <section x-show="step === 4" x-transition.opacity>
+                {{-- step 5: amenities --}}
+                <section x-show="step === 5" x-transition.opacity>
                     <h2 class="text-3xl sm:text-[34px] font-bold tracking-tight text-[#222] {{ $arabicClass }}">{{ __('step_amenities_title') }}</h2>
                     <p class="mt-2 text-[#717171] text-base {{ $arabicClass }}">{{ __('step_amenities_sub') }}</p>
 
@@ -204,8 +268,8 @@
                     </div>
                 </section>
 
-                {{-- step 5: images --}}
-                <section x-show="step === 5" x-transition.opacity>
+                {{-- step 6: images --}}
+                <section x-show="step === 6" x-transition.opacity>
                     <h2 class="text-3xl sm:text-[34px] font-bold tracking-tight text-[#222] {{ $arabicClass }}">{{ __('step_images_title') }}</h2>
                     <p class="mt-2 text-[#717171] text-base {{ $arabicClass }}">{{ __('step_images_sub') }}</p>
 
@@ -326,11 +390,14 @@
     function registerWizard(initial) {
         return {
             step: 1,
-            totalSteps: 5,
+            totalSteps: 6,
             submitting: false,
 
             phone: '',
             placeType: '',
+            title: '',
+            description: '',
+            maxGuests: 4,
 
             facilities: initial.facilities,
             amenityGroups: initial.amenityGroups,
@@ -384,8 +451,9 @@
             canAdvance() {
                 if (this.step === 1) return this.phone.trim().length >= 6;
                 if (this.step === 2) return !!this.placeType;
-                if (this.step === 3) return this.selectedFacilities.length > 0;
-                if (this.step === 4) return true;
+                if (this.step === 3) return this.title.trim().length >= 2 && parseInt(this.maxGuests) >= 1;
+                if (this.step === 4) return this.selectedFacilities.length > 0;
+                if (this.step === 5) return true;
                 return true;
             },
             next() {
