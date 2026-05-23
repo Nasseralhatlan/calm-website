@@ -85,6 +85,7 @@
                 dir="{{ $dirAttr }}"
             >
                 @csrf
+                <input type="hidden" name="primary_image" :value="primaryImage">
 
                 {{-- step 1: phone --}}
                 <section x-show="step === 1" x-transition.opacity>
@@ -368,8 +369,22 @@
                                     >
                                 </label>
                                 <div class="mt-4 grid grid-cols-3 sm:grid-cols-4 gap-2" x-show="(facilityPreviews[f.key] || []).length > 0">
-                                    <template x-for="src in facilityPreviews[f.key] || []" :key="src">
-                                        <img :src="src" class="w-full aspect-square object-cover r-ios">
+                                    <template x-for="(src, i) in facilityPreviews[f.key] || []" :key="src">
+                                        <div class="relative">
+                                            <img :src="src"
+                                                 class="block w-full aspect-square object-cover r-ios"
+                                                 :class="primaryImage === `facility_images.${f.key}.${i}` ? 'ring-2 ring-[#F88379]' : ''">
+                                            <button type="button"
+                                                    @click="primaryImage = primaryImage === `facility_images.${f.key}.${i}` ? '' : `facility_images.${f.key}.${i}`"
+                                                    :title="primaryImage === `facility_images.${f.key}.${i}` ? '{{ __('cover_photo') }}' : '{{ __('set_as_cover') }}'"
+                                                    class="absolute top-1.5 {{ $isRtl ? 'left-1.5' : 'right-1.5' }} w-7 h-7 flex items-center justify-center transition-all"
+                                                    :class="primaryImage === `facility_images.${f.key}.${i}` ? 'bg-[#F88379] text-white' : 'bg-white/90 text-[#222] hover:bg-white'"
+                                                    style="border-radius: 999px; corner-shape: squircle; box-shadow: 0 2px 6px rgba(0,0,0,0.18);">
+                                                <svg width="14" height="14" viewBox="0 0 24 24" :fill="primaryImage === `facility_images.${f.key}.${i}` ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                                                </svg>
+                                            </button>
+                                        </div>
                                     </template>
                                 </div>
                             </div>
@@ -393,8 +408,22 @@
                                 >
                             </label>
                             <div class="mt-4 grid grid-cols-3 sm:grid-cols-4 gap-2" x-show="extraPreviews.length > 0">
-                                <template x-for="src in extraPreviews" :key="src">
-                                    <img :src="src" class="w-full aspect-square object-cover r-ios">
+                                <template x-for="(src, i) in extraPreviews" :key="src">
+                                    <div class="relative">
+                                        <img :src="src"
+                                             class="block w-full aspect-square object-cover r-ios"
+                                             :class="primaryImage === `extra_images.${i}` ? 'ring-2 ring-[#F88379]' : ''">
+                                        <button type="button"
+                                                @click="primaryImage = primaryImage === `extra_images.${i}` ? '' : `extra_images.${i}`"
+                                                :title="primaryImage === `extra_images.${i}` ? '{{ __('cover_photo') }}' : '{{ __('set_as_cover') }}'"
+                                                class="absolute top-1.5 {{ $isRtl ? 'left-1.5' : 'right-1.5' }} w-7 h-7 flex items-center justify-center transition-all"
+                                                :class="primaryImage === `extra_images.${i}` ? 'bg-[#F88379] text-white' : 'bg-white/90 text-[#222] hover:bg-white'"
+                                                style="border-radius: 999px; corner-shape: squircle; box-shadow: 0 2px 6px rgba(0,0,0,0.18);">
+                                            <svg width="14" height="14" viewBox="0 0 24 24" :fill="primaryImage === `extra_images.${i}` ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                                            </svg>
+                                        </button>
+                                    </div>
                                 </template>
                             </div>
                         </div>
@@ -475,6 +504,7 @@
             facilityPreviews: {},
             facilityFileCounts: {},
             extraPreviews: [],
+            primaryImage: '',
 
             hasFacility(key) {
                 return this.selectedFacilities.some(f => f.key === key);
@@ -492,6 +522,9 @@
                 const files = Array.from(e.target.files || []);
                 this.facilityFileCounts[key] = files.length;
                 this.facilityPreviews[key] = [];
+                if (this.primaryImage.startsWith(`facility_images.${key}.`)) {
+                    this.primaryImage = '';
+                }
                 files.forEach(file => {
                     const reader = new FileReader();
                     reader.onload = ev => {
@@ -503,6 +536,9 @@
             onExtraFiles(e) {
                 const files = Array.from(e.target.files || []);
                 this.extraPreviews = [];
+                if (this.primaryImage.startsWith('extra_images.')) {
+                    this.primaryImage = '';
+                }
                 files.forEach(file => {
                     const reader = new FileReader();
                     reader.onload = ev => {

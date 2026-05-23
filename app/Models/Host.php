@@ -21,6 +21,6 @@ class Host extends Model
 
     public function images(): HasMany
     {
-        return $this->hasMany(HostImage::class)->orderBy('sort');
+        return $this->hasMany(HostImage::class)->orderByDesc('is_primary')->orderBy('sort');
     }
 }

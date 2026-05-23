@@ -8,7 +8,9 @@ use Illuminate\Support\Facades\Storage;
 
 class HostImage extends Model
 {
-    protected $fillable = ['host_id', 'host_facility_id', 'path', 'sort'];
+    protected $fillable = ['host_id', 'host_facility_id', 'path', 'sort', 'is_primary'];
+
+    protected $casts = ['is_primary' => 'boolean'];
 
     protected $appends = ['url'];
 

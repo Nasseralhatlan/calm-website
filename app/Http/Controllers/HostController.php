@@ -96,25 +96,39 @@ class HostController extends Controller
         }
 
         $sort = 0;
+        $primaryKey = (string) $request->input('primary_image', '');
+        $primaryAssigned = false;
 
         foreach ($data['facility_images'] ?? [] as $facilityKey => $files) {
             $facility = $facilityModels[$facilityKey] ?? null;
-            foreach ($files as $file) {
-                $upload = $this->storage->upload($file, "hosts/{$host->slug}");
+            foreach ($files as $i => $file) {
+                $upload    = $this->storage->upload($file, "hosts/{$host->slug}");
+                $thisKey   = "facility_images.{$facilityKey}.{$i}";
+                $isPrimary = ! $primaryAssigned && $thisKey === $primaryKey;
+                if ($isPrimary) {
+                    $primaryAssigned = true;
+                }
                 $host->images()->create([
                     'host_facility_id' => $facility?->id,
                     'path'             => $upload['data']['path'],
                     'sort'             => $sort++,
+                    'is_primary'       => $isPrimary,
                 ]);
             }
         }
 
-        foreach ($data['extra_images'] ?? [] as $file) {
-            $upload = $this->storage->upload($file, "hosts/{$host->slug}");
+        foreach ($data['extra_images'] ?? [] as $i => $file) {
+            $upload    = $this->storage->upload($file, "hosts/{$host->slug}");
+            $thisKey   = "extra_images.{$i}";
+            $isPrimary = ! $primaryAssigned && $thisKey === $primaryKey;
+            if ($isPrimary) {
+                $primaryAssigned = true;
+            }
             $host->images()->create([
                 'host_facility_id' => null,
                 'path'             => $upload['data']['path'],
                 'sort'             => $sort++,
+                'is_primary'       => $isPrimary,
             ]);
         }
 
