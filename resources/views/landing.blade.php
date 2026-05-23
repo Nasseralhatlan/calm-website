@@ -1,0 +1,171 @@
+@extends('layouts.app')
+
+@section('title', 'Calm')
+
+@section('body')
+@php
+    $locale = app()->getLocale();
+    $isRtl = $locale === 'ar';
+    $arabicClass = $isRtl ? 'font-arabic' : '';
+@endphp
+
+<div class="min-h-screen flex flex-col bg-white">
+    {{-- header --}}
+    <header class="w-full border-b border-[#ebebeb]">
+        <div class="px-6 sm:px-10 lg:px-20 h-20 flex items-center justify-between">
+            <a href="/" class="flex items-center gap-2">
+                <img src="/assets/logo/logo.png" alt="Calm" class="h-9 sm:h-10 w-auto select-none" draggable="false">
+            </a>
+
+            <form method="POST" action="{{ url('/locale/' . ($locale === 'ar' ? 'en' : 'ar')) }}" class="m-0">
+                @csrf
+                <button type="submit"
+                    style="border-radius: 14px;"
+                    class="text-sm font-semibold text-[#222] hover:bg-[#f7f7f7] px-4 py-3 transition-colors">
+                    {{ $locale === 'ar' ? 'English' : 'العربية' }}
+                </button>
+            </form>
+        </div>
+    </header>
+
+    {{-- HERO --}}
+    <section class="px-6 sm:px-10 lg:px-20 py-6 sm:py-8">
+        <div
+            class="relative w-full overflow-hidden shadow-card min-h-[calc(100vh-12rem)] bg-[#0e3a44]"
+            style="border-radius: 100px;"
+        >
+            @if($heroImage)
+                <img
+                    src="{{ $heroImage }}"
+                    alt=""
+                    class="absolute inset-0 w-full h-full object-cover"
+                    draggable="false"
+                >
+            @endif
+
+            {{-- text directly on the photo, with shadow for legibility --}}
+            <div class="absolute inset-0 flex flex-col items-center justify-center text-center px-6" style="corner-shape: squircle">
+                <h1 class="text-white font-black tracking-tight leading-[0.9]
+                    text-[clamp(72px,16vw,220px)] {{ $arabicClass }}">
+                    {{ __('coming_soon') }}
+                </h1>
+                <p class="mt-10 sm:mt-14 text-white text-xl sm:text-3xl max-w-2xl font-medium {{ $arabicClass }}"
+                   style="text-shadow: 0 2px 16px rgba(0,0,0,0.55);">
+                    {{ __('tagline') }}
+                </p>
+            </div>
+        </div>
+    </section>
+
+    {{-- SHOWCASE: one image + three features --}}
+    <section class="px-6 sm:px-10 lg:px-20 py-20 sm:py-28">
+        <div class="max-w-6xl mx-auto">
+            <div class="text-center mb-14">
+                <h2 class="text-3xl sm:text-5xl font-bold tracking-tight text-[#222] {{ $arabicClass }}">
+                    {{ __('showcase_title') }}
+                </h2>
+                <p class="mt-5 text-base sm:text-xl text-[#717171] max-w-2xl mx-auto {{ $arabicClass }}">
+                    {{ __('showcase_sub') }}
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-center">
+                {{-- image --}}
+                <div
+                    class="relative overflow-hidden shadow-card bg-[#0e3a44] aspect-[4/5] sm:aspect-[5/6] lg:aspect-[4/5] w-full"
+                    style="border-radius: 60px;"
+                >
+                    @if($showcaseImage)
+                        <img src="{{ $showcaseImage }}" alt="" class="absolute inset-0 w-full h-full object-cover" draggable="false">
+                    @elseif($heroImage)
+                        <img src="{{ $heroImage }}" alt="" class="absolute inset-0 w-full h-full object-cover" draggable="false">
+                    @endif
+                </div>
+
+                {{-- three features --}}
+                <div class="space-y-8">
+                    @php
+                        $features = [
+                            ['emoji' => '🤍', 'title' => 'feature_1_title', 'desc' => 'feature_1_desc'],
+                            ['emoji' => '👀', 'title' => 'feature_2_title', 'desc' => 'feature_2_desc'],
+                            ['emoji' => '💬', 'title' => 'feature_3_title', 'desc' => 'feature_3_desc'],
+                        ];
+                    @endphp
+                    @foreach($features as $i => $f)
+                        <div class="flex items-start gap-5">
+                            <div class="shrink-0 w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-[#fff5f4] flex items-center justify-center text-2xl"
+                                 style="box-shadow: 0px 10px 30px 0px rgba(0,0,0,0.05);">
+                                {{ $f['emoji'] }}
+                            </div>
+                            <div>
+                                <h3 class="text-xl sm:text-2xl font-bold text-[#222] {{ $arabicClass }}">
+                                    {{ __($f['title']) }}
+                                </h3>
+                                <p class="mt-2 text-base text-[#717171] leading-relaxed {{ $arabicClass }}">
+                                    {{ __($f['desc']) }}
+                                </p>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+        </div>
+    </section>
+
+    {{-- FOOTER --}}
+    <footer class="border-t border-[#ebebeb] px-6 sm:px-10 lg:px-20 py-14 bg-[#fafafa]">
+        <div class="max-w-6xl mx-auto">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-10">
+                {{-- brand --}}
+                <div>
+                    <img src="/assets/logo/logo.png" alt="Calm" class="h-9 w-auto" draggable="false">
+                    <p class="mt-4 text-sm text-[#717171] leading-relaxed max-w-xs {{ $arabicClass }}">
+                        {{ __('footer_about') }}
+                    </p>
+                </div>
+
+                {{-- contact --}}
+                <div>
+                    <h4 class="text-sm font-bold text-[#222] uppercase tracking-wider {{ $arabicClass }}">
+                        {{ __('footer_contact') }}
+                    </h4>
+                    <ul class="mt-4 space-y-2 text-sm text-[#717171]">
+                        <li><a href="mailto:hello@calm.sa" class="hover:text-[#222]" dir="ltr">hello@calm.sa</a></li>
+                        <li><a href="https://wa.me/966500000000" target="_blank" rel="noopener" class="hover:text-[#222]" dir="ltr">+966 50 000 0000</a></li>
+                    </ul>
+                </div>
+
+                {{-- social --}}
+                <div>
+                    <h4 class="text-sm font-bold text-[#222] uppercase tracking-wider {{ $arabicClass }}">
+                        {{ __('footer_follow') }}
+                    </h4>
+                    <div class="mt-4 flex items-center gap-3">
+                        {{-- X / Twitter --}}
+                        <a href="#" aria-label="X" class="w-10 h-10 rounded-full bg-white shadow-card flex items-center justify-center text-[#222] hover:bg-[#222] hover:text-white transition-colors">
+                            <svg viewBox="0 0 24 24" class="w-4 h-4" fill="currentColor"><path d="M18.244 2H21l-6.52 7.452L22 22h-6.79l-5.32-6.946L3.78 22H1l7.005-8.006L1.78 2H8.69l4.79 6.34L18.244 2zm-1.19 18h1.86L7.06 4H5.11l11.944 16z"/></svg>
+                        </a>
+                        {{-- Instagram --}}
+                        <a href="#" aria-label="Instagram" class="w-10 h-10 rounded-full bg-white shadow-card flex items-center justify-center text-[#222] hover:bg-[#222] hover:text-white transition-colors">
+                            <svg viewBox="0 0 24 24" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"/></svg>
+                        </a>
+                        {{-- TikTok --}}
+                        <a href="#" aria-label="TikTok" class="w-10 h-10 rounded-full bg-white shadow-card flex items-center justify-center text-[#222] hover:bg-[#222] hover:text-white transition-colors">
+                            <svg viewBox="0 0 24 24" class="w-4 h-4" fill="currentColor"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5.8 20.1a6.34 6.34 0 0 0 10.86-4.43V9.42a8.16 8.16 0 0 0 4.77 1.52V7.49a4.85 4.85 0 0 1-1.84-.8z"/></svg>
+                        </a>
+                        {{-- Snapchat --}}
+                        <a href="#" aria-label="Snapchat" class="w-10 h-10 rounded-full bg-white shadow-card flex items-center justify-center text-[#222] hover:bg-[#222] hover:text-white transition-colors">
+                            <svg viewBox="0 0 24 24" class="w-5 h-5" fill="currentColor"><path d="M12.001 2c3.219 0 5.829 2.464 5.829 5.498 0 1.41-.078 2.51-.214 3.358.246.131.514.222.793.292.444.111.835.18 1.144.18.243 0 .51-.041.738-.183a.5.5 0 0 1 .69.196.5.5 0 0 1-.07.66c-.32.27-.74.434-1.15.524-.49.108-.99.176-1.49.21-.06.16-.13.32-.21.48.59.81 1.39 1.32 2.41 1.58.51.13.83.32.83.62 0 .53-1.04.92-2.62 1.07-.04.06-.09.26-.13.42-.07.27-.14.55-.31.7-.18.16-.42.18-.69.18-.34 0-.74-.05-1.21-.05-.74 0-1.05.11-1.41.36-.91.61-1.84 1.2-3.26 1.2-1.43 0-2.36-.59-3.27-1.2-.36-.25-.67-.36-1.41-.36-.47 0-.87.05-1.21.05-.27 0-.51-.02-.69-.18-.17-.15-.24-.43-.31-.7-.04-.16-.09-.36-.13-.42-1.58-.15-2.62-.54-2.62-1.07 0-.3.32-.49.83-.62 1.02-.26 1.82-.77 2.41-1.58-.08-.16-.15-.32-.21-.48-.5-.034-1-.102-1.49-.21-.41-.09-.83-.254-1.15-.524a.5.5 0 0 1-.07-.66.5.5 0 0 1 .69-.196c.228.142.495.183.738.183.309 0 .7-.069 1.144-.18.279-.07.547-.161.793-.292-.136-.848-.214-1.948-.214-3.358C6.172 4.464 8.782 2 12.001 2z"/></svg>
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-12 pt-6 border-t border-[#ebebeb] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[#717171]">
+                <span class="{{ $arabicClass }}">© {{ date('Y') }} Calm. {{ __('footer_rights') }}</span>
+                <span dir="ltr">hello@calm.sa</span>
+            </div>
+        </div>
+    </footer>
+</div>
+@endsection

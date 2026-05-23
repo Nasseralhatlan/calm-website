@@ -1,0 +1,165 @@
+@import 'tailwindcss';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+@source '../**/*.blade.php';
+@source '../**/*.js';
+
+@font-face {
+    font-family: 'Satoshi';
+    src: url('/assets/fonts/Satoshi-Light.ttf') format('truetype');
+    font-weight: 300;
+    font-style: normal;
+    font-display: swap;
+}
+@font-face {
+    font-family: 'Satoshi';
+    src: url('/assets/fonts/Satoshi-Regular.ttf') format('truetype');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+@font-face {
+    font-family: 'Satoshi';
+    src: url('/assets/fonts/Satoshi-Medium.ttf') format('truetype');
+    font-weight: 500;
+    font-style: normal;
+    font-display: swap;
+}
+@font-face {
+    font-family: 'Satoshi';
+    src: url('/assets/fonts/Satoshi-Bold.ttf') format('truetype');
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+}
+@font-face {
+    font-family: 'Satoshi';
+    src: url('/assets/fonts/Satoshi-Black.ttf') format('truetype');
+    font-weight: 900;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Thmanyah';
+    src: url('/assets/fonts/thmanyahsans-Light.otf') format('opentype');
+    font-weight: 300;
+    font-style: normal;
+    font-display: swap;
+}
+@font-face {
+    font-family: 'Thmanyah';
+    src: url('/assets/fonts/thmanyahsans-Regular.otf') format('opentype');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+@font-face {
+    font-family: 'Thmanyah';
+    src: url('/assets/fonts/thmanyahsans-Medium.otf') format('opentype');
+    font-weight: 500;
+    font-style: normal;
+    font-display: swap;
+}
+@font-face {
+    font-family: 'Thmanyah';
+    src: url('/assets/fonts/thmanyahsans-Bold.otf') format('opentype');
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+}
+@font-face {
+    font-family: 'Thmanyah';
+    src: url('/assets/fonts/thmanyahsans-Black.otf') format('opentype');
+    font-weight: 900;
+    font-style: normal;
+    font-display: swap;
+}
+
+@theme {
+    --font-sans: 'Satoshi', ui-sans-serif, system-ui, sans-serif;
+    --font-arabic: 'Thmanyah', ui-sans-serif, system-ui, sans-serif;
+    --color-calm-bg: #ffffff;
+    --color-calm-ink: #222222;
+    --color-calm-muted: #717171;
+    --color-calm-border: #dddddd;
+    --color-calm-soft: #f7f7f7;
+    --color-calm-accent: #F88379;
+    --color-calm-accent-hover: #f56b60;
+}
+
+html[dir="rtl"],
+html[lang="ar"] {
+    font-family: var(--font-arabic);
+}
+
+html, body {
+    background-color: var(--color-calm-bg);
+    color: var(--color-calm-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+}
+
+/* iOS-flavoured continuous-feel corners — applied to anything rounded,
+   so any future class with "rounded" or "r-ios" in its name picks it up too. */
+[class*="rounded"],
+[class*="r-ios"] {
+    corner-shape: squircle;
+    -webkit-corner-shape: squircle;
+}
+
+.r-ios   { border-radius: 14px; corner-shape: squircle; -webkit-corner-shape: squircle; }
+.r-ios-lg{ border-radius: 20px; corner-shape: squircle; -webkit-corner-shape: squircle; }
+.r-ios-xl{ border-radius: 28px; corner-shape: squircle; -webkit-corner-shape: squircle; }
+.r-ios-2xl{ border-radius: 36px; corner-shape: squircle; -webkit-corner-shape: squircle; }
+
+/* Figma card shadow: x=0 y=10 blur=30 black @ 5% */
+.shadow-card {
+    box-shadow: 0px 10px 30px 0px rgba(0, 0, 0, 0.05);
+}
+.shadow-card-hover:hover {
+    box-shadow: 0px 14px 36px 0px rgba(0, 0, 0, 0.08);
+}
+
+/* every button is clickable; disabled stays default */
+button:not(:disabled), [role="button"]:not(:disabled) { cursor: pointer; }
+label[for], label:has(input) { cursor: pointer; }
+
+.btn-primary {
+    background-color: #F88379;
+    color: #fff;
+    font-weight: 600;
+    padding: 0.95rem 1.75rem;
+    border-radius: 14px;
+    transition: background-color 0.15s ease, transform 0.05s ease;
+    -webkit-tap-highlight-color: transparent;
+    cursor: pointer;
+}
+.btn-primary:hover { background-color: #f56b60; }
+.btn-primary:active { transform: translateY(1px); }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btn-dark {
+    background-color: #222;
+    color: #fff;
+    font-weight: 600;
+    padding: 0.95rem 1.75rem;
+    border-radius: 14px;
+    transition: background-color 0.15s ease, transform 0.05s ease;
+    -webkit-tap-highlight-color: transparent;
+    cursor: pointer;
+}
+.btn-dark:hover { background-color: #000; }
+.btn-dark:active { transform: translateY(1px); }
+.btn-dark:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.btn-ghost {
+    color: #222;
+    font-weight: 600;
+    padding: 0.75rem 1rem;
+    border-radius: 14px;
+    transition: background-color 0.15s ease;
+    cursor: pointer;
+}
+.btn-ghost:hover { background-color: #f7f7f7; }
