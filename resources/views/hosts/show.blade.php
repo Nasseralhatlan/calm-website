@@ -370,7 +370,7 @@
                 @if($allImages->count() > 1)
                     {{-- dot indicators (carousel position) --}}
                     @if($allImages->count() <= 12)
-                        <div class="flex justify-center items-center" style="gap: 6px; margin-top: 14px;" dir="ltr">
+                        <div class="flex justify-center items-center" style="gap: 6px; margin-top: 14px;">
                             @foreach($allImages as $i => $img)
                                 <span class="block transition-all"
                                       :style="idx === {{ $i }}
@@ -460,46 +460,56 @@
                     </section>
                 @endif
 
-                {{-- FACILITIES IMAGES (carousel — always LTR regardless of page direction) --}}
+                {{-- FACILITIES IMAGES (carousel — transform-based, always LTR regardless of page direction) --}}
                 @if($host->facilities->count() > 0)
                     <section class="border-b border-[#ebebeb]"
                              dir="ltr"
-                             style="padding-top: 56px; padding-bottom: 56px;"
+                             style="padding-top: 56px; padding-bottom: 56px; direction: ltr; unicode-bidi: isolate;"
                              x-data="{
                                 idx: 0,
                                 total: {{ $host->facilities->count() }},
+                                slideWidth: 200,
+                                startX: 0,
+                                deltaX: 0,
+                                dragging: false,
+                                dragged: false,
                                 init() {
-                                    this.$nextTick(() => {
-                                        if (this.$refs.track) this.$refs.track.scrollLeft = 0;
-                                        this.idx = 0;
-                                    });
+                                    this.measure();
+                                    window.addEventListener('resize', () => this.measure());
                                 },
-                                slides()    { const t = this.$refs.track; if (!t || !t.firstElementChild) return []; return Array.from(t.firstElementChild.children); },
-                                slideLeft(el) { const t = this.$refs.track; return el.getBoundingClientRect().left - t.getBoundingClientRect().left + t.scrollLeft; },
-                                onScroll()  {
-                                    const t = this.$refs.track; if (!t) return;
-                                    const slides = this.slides();
-                                    if (!slides.length) return;
-                                    let best = 0, bestDist = Infinity;
-                                    const x = t.scrollLeft;
-                                    slides.forEach((s, i) => {
-                                        const d = Math.abs(this.slideLeft(s) - x);
-                                        if (d < bestDist) { bestDist = d; best = i; }
-                                    });
-                                    this.idx = best;
+                                measure() {
+                                    const t = this.$refs.track;
+                                    const first = t && t.firstElementChild;
+                                    if (first) this.slideWidth = first.offsetWidth + 20;
                                 },
-                                go(i) {
-                                    const t = this.$refs.track; if (!t) return;
-                                    const slides = this.slides();
-                                    if (!slides[i]) return;
-                                    this.idx = i;
-                                    t.scrollTo({ left: this.slideLeft(slides[i]), behavior: 'smooth' });
+                                onStart(e) {
+                                    this.dragging = true;
+                                    this.startX = (e.touches ? e.touches[0].clientX : e.clientX);
+                                    this.deltaX = 0;
                                 },
-                                next()      { this.go((this.idx + 1) % this.total); },
-                                prev()      { this.go((this.idx - 1 + this.total) % this.total); },
+                                onMove(e) {
+                                    if (!this.dragging) return;
+                                    const x = (e.touches ? e.touches[0].clientX : e.clientX);
+                                    this.deltaX = x - this.startX;
+                                },
+                                onEnd() {
+                                    if (!this.dragging) return;
+                                    this.dragging = false;
+                                    if (Math.abs(this.deltaX) > 5) {
+                                        this.dragged = true;
+                                        setTimeout(() => this.dragged = false, 80);
+                                    }
+                                    if (this.deltaX < -50) this.next();
+                                    else if (this.deltaX > 50) this.prev();
+                                    this.deltaX = 0;
+                                },
+                                offset() { return -this.idx * this.slideWidth + this.deltaX; },
+                                go(i) { this.idx = ((i % this.total) + this.total) % this.total; },
+                                next() { this.go(this.idx + 1); },
+                                prev() { this.go(this.idx - 1); },
                              }">
                         <div class="flex items-end justify-between gap-4">
-                            <div class="{{ $start }} {{ $fa }}">
+                            <div style="text-align: start;" class="{{ $fa }}">
                                 <h2 class="text-[22px] sm:text-2xl font-semibold text-[#222]">
                                     {{ $isRtl ? 'صور المرافق' : 'Facilities images' }}
                                 </h2>
@@ -507,7 +517,7 @@
                                     {{ $isRtl ? 'استكشف كل مساحات المكان' : 'Browse every space of the place' }}
                                 </p>
                             </div>
-                            <div class="flex items-center shrink-0" style="gap: 10px;" dir="ltr">
+                            <div class="flex items-center shrink-0" style="gap: 10px;">
                                 {{-- LEFT chevron = previous --}}
                                 <button type="button"
                                         @click="prev()"
@@ -531,16 +541,20 @@
                             </div>
                         </div>
 
-                        <div class="overflow-x-auto no-scrollbar"
-                             x-ref="track"
+                        <div class="overflow-hidden"
                              dir="ltr"
-                             @scroll.passive="onScroll"
-                             style="margin-top: 28px; scroll-behavior: smooth; scroll-snap-type: x mandatory;">
-                            <div class="flex" style="width: max-content; gap: 20px;">
+                             style="margin-top: 28px; touch-action: pan-y; direction: ltr;"
+                             @touchstart.passive="onStart"
+                             @touchmove.passive="onMove"
+                             @touchend.passive="onEnd">
+                            <div x-ref="track"
+                                 dir="ltr"
+                                 class="flex flex-row"
+                                 :style="'direction: ltr; width: max-content; gap: 20px; transform: translateX(' + offset() + 'px); transition: transform ' + (dragging ? '0ms' : '300ms') + ' ease; will-change: transform;'">
                                 @foreach($host->facilities as $f)
                                     @php $firstImg = $f->images->first(); @endphp
-                                    <div class="shrink-0 {{ $start }}"
-                                         style="width: 180px; scroll-snap-align: start;"
+                                    <div class="shrink-0"
+                                         style="width: 180px; text-align: start;"
                                          x-data="{ expanded: false }">
                                         <button type="button"
                                                 @click="{{ $firstImg ? "openGallery('{$f->key}')" : '' }}"
@@ -593,7 +607,7 @@
 
                         {{-- Dot indicators --}}
                         @if($host->facilities->count() > 1 && $host->facilities->count() <= 20)
-                            <div class="flex justify-center items-center" style="gap: 6px; margin-top: 20px;" dir="ltr">
+                            <div class="flex flex-row justify-center items-center" style="gap: 6px; margin-top: 20px; direction: ltr;" dir="ltr">
                                 @foreach($host->facilities as $i => $f)
                                     <button type="button"
                                             @click="go({{ $i }})"
