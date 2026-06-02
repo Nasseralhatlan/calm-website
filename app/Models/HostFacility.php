@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class HostFacility extends Model
 {
-    protected $fillable = ['host_id', 'key', 'count'];
+    protected $fillable = ['host_id', 'key', 'count', 'description'];
 
     public function host(): BelongsTo
     {

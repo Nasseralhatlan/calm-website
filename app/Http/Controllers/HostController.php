@@ -27,6 +27,11 @@ class HostController extends Controller
 
     public function store(Request $request)
     {
+        // Lift execution + memory limits — many remote MySQL round-trips can add up.
+        @set_time_limit(0);
+        @ini_set('max_execution_time', '0');
+        @ini_set('memory_limit', '512M');
+
         // Accept either a plain URL or the full iframe HTML that Google's
         // "Embed a map" tab gives. If it's an iframe, pull out the src.
         $rawMaps = (string) $request->input('maps_url', '');
@@ -35,7 +40,7 @@ class HostController extends Controller
         }
 
         $data = $request->validate([
-            'phone'                => ['required', 'string', 'min:6', 'max:30'],
+            'phone'                => ['required', 'string', 'regex:/^5\d{8}$/'],
             'place_type'           => ['required', 'in:chalet,resthouse,camp'],
             'title'                => ['required', 'string', 'min:2', 'max:120'],
             'description'          => ['nullable', 'string', 'max:5000'],
@@ -43,24 +48,25 @@ class HostController extends Controller
             'maps_url'             => ['required', 'url', 'max:500'],
             'address'              => ['nullable', 'string', 'max:255'],
             'facilities'           => ['required', 'array', 'min:1'],
-            'facilities.*.key'     => ['required', 'string'],
-            'facilities.*.count'   => ['required', 'integer', 'min:1', 'max:99'],
-            'amenities'            => ['array'],
-            'amenities.*'          => ['string'],
-            'facility_images'      => ['array'],
-            'facility_images.*'    => ['array'],
-            'facility_images.*.*'  => ['file', 'mimes:jpg,jpeg,png,webp,heic,heif,avif', 'max:16384'],
-            'extra_images'         => ['array'],
-            'extra_images.*'       => ['file', 'mimes:jpg,jpeg,png,webp,heic,heif,avif', 'max:16384'],
+            'facilities.*.key'         => ['required', 'string'],
+            'facilities.*.count'       => ['required', 'integer', 'min:1', 'max:99'],
+            'facilities.*.description' => ['nullable', 'string', 'max:500'],
+            'amenities'                => ['array'],
+            'amenities.*'              => ['string'],
+            'facility_image_paths'     => ['array'],
+            'facility_image_paths.*'   => ['array'],
+            'facility_image_paths.*.*' => ['string', 'max:500'],
+            'extra_image_paths'        => ['array'],
+            'extra_image_paths.*'      => ['string', 'max:500'],
         ]);
 
         // every selected facility must have at least one image
-        $uploadedByKey = $request->file('facility_images', []);
-        $errors = [];
+        $pathsByKey = $data['facility_image_paths'] ?? [];
+        $errors     = [];
         foreach ($data['facilities'] as $f) {
-            $files = (array) ($uploadedByKey[$f['key']] ?? []);
-            if (\count($files) === 0) {
-                $errors["facility_images.{$f['key']}"] = __('photos_required_per_facility');
+            $paths = (array) ($pathsByKey[$f['key']] ?? []);
+            if (\count($paths) === 0) {
+                $errors["facility_image_paths.{$f['key']}"] = __('photos_required_per_facility');
             }
         }
         if (! empty($errors)) {
@@ -86,50 +92,69 @@ class HostController extends Controller
         $facilityModels = [];
         foreach ($data['facilities'] ?? [] as $f) {
             $facilityModels[$f['key']] = $host->facilities()->create([
-                'key'   => $f['key'],
-                'count' => (int) $f['count'],
+                'key'         => $f['key'],
+                'count'       => (int) $f['count'],
+                'description' => $f['description'] ?? null,
             ]);
         }
 
-        foreach ($data['amenities'] ?? [] as $key) {
-            $host->amenities()->create(['key' => $key]);
+        // Bulk-insert amenities — one round-trip instead of N.
+        $now = now();
+        if (! empty($data['amenities'])) {
+            \App\Models\HostAmenity::insert(array_map(fn ($key) => [
+                'host_id'    => $host->id,
+                'key'        => $key,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ], $data['amenities']));
         }
 
-        $sort = 0;
-        $primaryKey = (string) $request->input('primary_image', '');
+        // Files were already uploaded to S3; we only persist their paths here.
+        $sort            = 0;
+        $primaryKey      = (string) $request->input('primary_image', '');
         $primaryAssigned = false;
+        $imageRows       = [];
 
-        foreach ($data['facility_images'] ?? [] as $facilityKey => $files) {
+        foreach ($data['facility_image_paths'] ?? [] as $facilityKey => $paths) {
             $facility = $facilityModels[$facilityKey] ?? null;
-            foreach ($files as $i => $file) {
-                $upload    = $this->storage->upload($file, "hosts/{$host->slug}");
+            foreach ($paths as $i => $path) {
                 $thisKey   = "facility_images.{$facilityKey}.{$i}";
                 $isPrimary = ! $primaryAssigned && $thisKey === $primaryKey;
                 if ($isPrimary) {
                     $primaryAssigned = true;
                 }
-                $host->images()->create([
+                $imageRows[] = [
+                    'host_id'          => $host->id,
                     'host_facility_id' => $facility?->id,
-                    'path'             => $upload['data']['path'],
+                    'path'             => $path,
                     'sort'             => $sort++,
                     'is_primary'       => $isPrimary,
-                ]);
+                    'created_at'       => $now,
+                    'updated_at'       => $now,
+                ];
             }
         }
 
-        foreach ($data['extra_images'] ?? [] as $i => $file) {
-            $upload    = $this->storage->upload($file, "hosts/{$host->slug}");
+        foreach ($data['extra_image_paths'] ?? [] as $i => $path) {
             $thisKey   = "extra_images.{$i}";
             $isPrimary = ! $primaryAssigned && $thisKey === $primaryKey;
             if ($isPrimary) {
                 $primaryAssigned = true;
             }
-            $host->images()->create([
+            $imageRows[] = [
+                'host_id'          => $host->id,
                 'host_facility_id' => null,
-                'path'             => $upload['data']['path'],
+                'path'             => $path,
                 'sort'             => $sort++,
                 'is_primary'       => $isPrimary,
-            ]);
+                'created_at'       => $now,
+                'updated_at'       => $now,
+            ];
+        }
+
+        // Bulk-insert all images in a single round-trip.
+        if (! empty($imageRows)) {
+            \App\Models\HostImage::insert($imageRows);
         }
 
         return redirect()->route('property.show', ['slug' => $host->slug]);
@@ -143,6 +168,67 @@ class HostController extends Controller
 
         return view('hosts.show', [
             'host' => $host,
+        ]);
+    }
+
+    /**
+     * Mints a short-lived presigned PUT URL so the browser can upload the file
+     * straight to DO Spaces — the PHP container never sees the bytes.
+     */
+    public function presignUpload(Request $request)
+    {
+        $request->validate([
+            'filename' => ['required', 'string', 'max:255'],
+            'mime'     => ['required', 'string', 'max:120'],
+        ]);
+
+        $ext  = pathinfo((string) $request->input('filename'), PATHINFO_EXTENSION) ?: 'jpg';
+        $key  = 'hosts/uploads/' . Str::lower(Str::random(24)) . '.' . Str::lower($ext);
+        $mime = (string) $request->input('mime');
+
+        /** @var \Illuminate\Filesystem\FilesystemAdapter $disk */
+        $disk    = \Illuminate\Support\Facades\Storage::disk('s3');
+        /** @var \Aws\S3\S3Client $client */
+        $client  = $disk->getClient();
+        $bucket  = config('filesystems.disks.s3.bucket');
+
+        $command = $client->getCommand('PutObject', [
+            'Bucket'      => $bucket,
+            'Key'         => $key,
+            'ContentType' => $mime,
+            'ACL'         => 'public-read',
+        ]);
+
+        $presigned = $client->createPresignedRequest($command, '+15 minutes');
+
+        return response()->json([
+            'put_url'    => (string) $presigned->getUri(),
+            'path'       => $key,
+            'public_url' => $disk->url($key),
+            'mime'       => $mime,
+        ]);
+    }
+
+    /**
+     * Legacy server-proxied upload (kept as a fallback).
+     */
+    public function uploadImage(Request $request)
+    {
+        // Lift the per-request limits so large files + slow S3 round-trips don't 504.
+        @set_time_limit(0);
+        @ini_set('max_execution_time', '0');
+        @ini_set('memory_limit', '1024M');
+
+        $request->validate([
+            // no size cap — image previews must stay full-quality
+            'image' => ['required', 'file', 'mimes:jpg,jpeg,png,webp,heic,heif,avif'],
+        ]);
+
+        $result = $this->storage->upload($request->file('image'), 'hosts/uploads');
+
+        return response()->json([
+            'path' => $result['data']['path'],
+            'url'  => \Illuminate\Support\Facades\Storage::disk('s3')->url($result['data']['path']),
         ]);
     }
 

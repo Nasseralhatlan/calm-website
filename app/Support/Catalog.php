@@ -35,6 +35,20 @@ class Catalog
             ['key' => 'kids_playground',  'en' => 'Kids playgrounds',   'ar' => 'ملاعب أطفال'],
             ['key' => 'lawn',             'en' => 'Green areas',        'ar' => 'مسطحات خضراء'],
             ['key' => 'parking',          'en' => 'Parking spots',      'ar' => 'مواقف'],
+            ['key' => 'storage_room',     'en' => 'Storage rooms',      'ar' => 'غرف تخزين'],
+            ['key' => 'maid_room',        'en' => "Maid's rooms",       'ar' => 'غرف خادمة'],
+            ['key' => 'driver_annex',     'en' => "Driver's annex",     'ar' => 'ملحق سائق'],
+            ['key' => 'outdoor_bathroom', 'en' => 'Outdoor bathrooms',  'ar' => 'دورات مياه خارجية'],
+            ['key' => 'laundry_room',     'en' => 'Laundry rooms',      'ar' => 'مغاسل'],
+            ['key' => 'terrace',          'en' => 'Terraces',           'ar' => 'دكك'],
+            ['key' => 'panorama_majlis',  'en' => 'Panoramic majlis',   'ar' => 'مجلس بانورامي'],
+            ['key' => 'glass_house',      'en' => 'Glass house',        'ar' => 'بيت زجاجي'],
+            ['key' => 'horse_stable',     'en' => 'Horse stables',      'ar' => 'إسطبلات خيل'],
+            ['key' => 'animal_pen',       'en' => 'Animal pens',        'ar' => 'حظائر حيوانات'],
+            ['key' => 'bird_house',       'en' => 'Bird coops',         'ar' => 'أكواخ طيور'],
+            ['key' => 'play_area',        'en' => 'Play area',          'ar' => 'منطقة ألعاب'],
+            ['key' => 'karting',          'en' => 'Karting cars',       'ar' => 'سيارات كارتينغ'],
+            ['key' => 'fireplace_sitting','en' => 'Fireplace sitting',  'ar' => 'جلسة مع مشب'],
         ];
     }
 

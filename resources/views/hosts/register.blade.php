@@ -85,7 +85,7 @@
                 dir="{{ $dirAttr }}"
             >
                 @csrf
-                <input type="hidden" name="primary_image" :value="primaryImage">
+                <input type="hidden" name="primary_image" :value="primaryImageMarker()">
 
                 {{-- step 1: phone --}}
                 <section x-show="step === 1" x-transition.opacity>
@@ -99,8 +99,12 @@
                             <input
                                 name="phone"
                                 x-model="phone"
+                                @input="phone = phone.replace(/\D/g, '').slice(0, 9)"
                                 inputmode="numeric"
-                                pattern="[0-9]*"
+                                pattern="5[0-9]{8}"
+                                maxlength="9"
+                                minlength="9"
+                                title="Saudi mobile, starts with 5, 9 digits total"
                                 placeholder="{{ __('phone_placeholder') }}"
                                 class="flex-1 px-4 py-4 outline-none bg-transparent text-base"
                                 required
@@ -270,22 +274,37 @@
                         </template>
                     </div>
 
-                    {{-- counts --}}
-                    <div x-show="selectedFacilities.length > 0" class="mt-10 space-y-3">
+                    {{-- counts + per-facility description --}}
+                    <div x-show="selectedFacilities.length > 0" class="mt-10 space-y-4">
                         <p class="text-sm font-semibold text-[#222] mb-3 {{ $arabicClass }}">{{ __('how_many') }}</p>
                         <template x-for="(f, idx) in selectedFacilities" :key="f.key">
-                            <div class="flex items-center justify-between bg-white shadow-card r-ios-lg px-5 py-4">
-                                <div class="font-medium text-[#222] {{ $arabicClass }}" x-text="f.label"></div>
-                                <div class="flex items-center gap-4">
-                                    <button type="button" @click="f.count = Math.max(1, f.count - 1)"
-                                        class="cursor-pointer w-9 h-9 rounded-full border border-[#b0b0b0] text-[#222] hover:border-[#222] flex items-center justify-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-lg leading-none"
-                                        :disabled="f.count <= 1">−</button>
-                                    <span class="w-6 text-center font-medium text-[#222]" x-text="f.count"></span>
-                                    <button type="button" @click="f.count = Math.min(99, f.count + 1)"
-                                        class="cursor-pointer w-9 h-9 rounded-full border border-[#b0b0b0] text-[#222] hover:border-[#222] flex items-center justify-center transition-colors text-lg leading-none">+</button>
+                            <div class="bg-white shadow-card r-ios-lg p-5">
+                                <div class="flex items-center justify-between">
+                                    <div class="font-medium text-[#222] {{ $arabicClass }}" x-text="f.label"></div>
+                                    <div class="flex items-center gap-4">
+                                        <button type="button" @click="f.count = Math.max(1, f.count - 1)"
+                                            class="cursor-pointer w-9 h-9 rounded-full border border-[#b0b0b0] text-[#222] hover:border-[#222] flex items-center justify-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-lg leading-none"
+                                            :disabled="f.count <= 1">−</button>
+                                        <span class="w-6 text-center font-medium text-[#222]" x-text="f.count"></span>
+                                        <button type="button" @click="f.count = Math.min(99, f.count + 1)"
+                                            class="cursor-pointer w-9 h-9 rounded-full border border-[#b0b0b0] text-[#222] hover:border-[#222] flex items-center justify-center transition-colors text-lg leading-none">+</button>
+                                    </div>
                                 </div>
-                                <input type="hidden" :name="`facilities[${idx}][key]`" :value="f.key">
-                                <input type="hidden" :name="`facilities[${idx}][count]`" :value="f.count">
+
+                                {{-- optional description --}}
+                                <div class="mt-3 border border-[#ebebeb] focus-within:border-[#222] transition-all r-ios-lg overflow-hidden bg-[#fafafa]">
+                                    <textarea
+                                        x-model="f.description"
+                                        rows="2"
+                                        maxlength="500"
+                                        placeholder="{{ __('facility_description_placeholder') }}"
+                                        class="w-full bg-transparent outline-none resize-none text-[14px] text-[#222] py-3 px-4 leading-relaxed {{ $arabicClass }}"
+                                    ></textarea>
+                                </div>
+
+                                <input type="hidden" :name="`facilities[${idx}][key]`"         :value="f.key">
+                                <input type="hidden" :name="`facilities[${idx}][count]`"       :value="f.count">
+                                <input type="hidden" :name="`facilities[${idx}][description]`" :value="f.description">
                             </div>
                         </template>
                     </div>
@@ -354,33 +373,59 @@
                                         <span x-show="(facilityFileCounts[f.key] || 0) > 0">✓ <span x-text="facilityFileCounts[f.key]"></span></span>
                                     </div>
                                 </div>
-                                <label class="block">
-                                    <span class="sr-only">{{ __('add_photos') }}</span>
+                                <label class="block relative cursor-pointer hover:bg-[#f7f7f7] transition-colors {{ $arabicClass }}"
+                                       style="border: 2px dashed #cbd5e1; border-radius: 20px; corner-shape: squircle; padding: 28px 16px; text-align: center;">
+                                    <div class="text-3xl" style="line-height: 1;">📷</div>
+                                    <div class="mt-2 text-sm font-semibold text-[#222]">{{ __('add_photos') }}</div>
+                                    <div class="mt-1 text-xs text-[#717171]">{{ __('add_more_photos') }}</div>
                                     <input
                                         type="file"
-                                        :name="`facility_images[${f.key}][]`"
                                         accept="image/*"
                                         multiple
                                         @change="onFacilityFiles($event, f.key)"
-                                        class="block w-full text-sm text-[#222]
-                                            file:me-4 file:py-2.5 file:px-5 file:rounded-full
-                                            file:border-0 file:text-sm file:font-semibold file:cursor-pointer
-                                            file:bg-[#222] file:text-white hover:file:bg-[#000] cursor-pointer"
+                                        class="absolute inset-0 opacity-0 cursor-pointer"
                                     >
                                 </label>
-                                <div class="mt-4 grid grid-cols-3 sm:grid-cols-4 gap-2" x-show="(facilityPreviews[f.key] || []).length > 0">
-                                    <template x-for="(src, i) in facilityPreviews[f.key] || []" :key="src">
+                                {{-- hidden inputs that carry the already-uploaded S3 paths --}}
+                                <template x-for="(u, i) in (facilityUploads[f.key] || []).filter(u => u.status === 'done')" :key="u.id">
+                                    <input type="hidden" :name="`facility_image_paths[${f.key}][${i}]`" :value="u.path">
+                                </template>
+                                <div class="mt-4 grid grid-cols-3 sm:grid-cols-4 gap-2" x-show="(facilityUploads[f.key] || []).length > 0">
+                                    <template x-for="u in facilityUploads[f.key] || []" :key="u.id">
                                         <div class="relative">
-                                            <img :src="src"
+                                            <img :src="u.preview"
                                                  class="block w-full aspect-square object-cover r-ios"
-                                                 :class="primaryImage === `facility_images.${f.key}.${i}` ? 'ring-2 ring-[#F88379]' : ''">
+                                                 :class="primaryImage === u.id ? 'ring-2 ring-[#F88379]' : ''">
+                                            {{-- upload progress overlay --}}
+                                            <div x-show="u.status === 'uploading'"
+                                                 class="absolute inset-0 flex items-center justify-center r-ios"
+                                                 style="background: rgba(255,255,255,0.6); backdrop-filter: blur(4px);">
+                                                <div class="w-6 h-6 border-2 border-[#F88379] border-t-transparent rounded-full animate-spin"></div>
+                                            </div>
+                                            <div x-show="u.status === 'failed'"
+                                                 :title="u.error || 'Upload failed'"
+                                                 class="absolute inset-0 flex items-center justify-center r-ios text-white font-bold text-xs cursor-help"
+                                                 style="background: rgba(180,35,24,0.85);">!</div>
+                                            {{-- remove button (top-{{ $isRtl ? 'right' : 'left' }}) --}}
                                             <button type="button"
-                                                    @click="primaryImage = primaryImage === `facility_images.${f.key}.${i}` ? '' : `facility_images.${f.key}.${i}`"
-                                                    :title="primaryImage === `facility_images.${f.key}.${i}` ? '{{ __('cover_photo') }}' : '{{ __('set_as_cover') }}'"
-                                                    class="absolute top-1.5 {{ $isRtl ? 'left-1.5' : 'right-1.5' }} w-7 h-7 flex items-center justify-center transition-all"
-                                                    :class="primaryImage === `facility_images.${f.key}.${i}` ? 'bg-[#F88379] text-white' : 'bg-white/90 text-[#222] hover:bg-white'"
-                                                    style="border-radius: 999px; corner-shape: squircle; box-shadow: 0 2px 6px rgba(0,0,0,0.18);">
-                                                <svg width="14" height="14" viewBox="0 0 24 24" :fill="primaryImage === `facility_images.${f.key}.${i}` ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                    @click="removeFacilityUpload(f.key, u.id)"
+                                                    title="Remove"
+                                                    class="flex items-center justify-center hover:bg-white text-[#222] transition-all"
+                                                    style="position: absolute; top: 6px; {{ $isRtl ? 'right' : 'left' }}: 6px; width: 28px; height: 28px; background: rgba(255,255,255,0.95); border-radius: 999px; corner-shape: squircle; box-shadow: 0 2px 6px rgba(0,0,0,0.18); z-index: 5;">
+                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                                                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                                                </svg>
+                                            </button>
+                                            {{-- cover star (top-{{ $isRtl ? 'left' : 'right' }}) --}}
+                                            <button type="button"
+                                                    x-show="u.status === 'done'"
+                                                    @click="primaryImage = primaryImage === u.id ? null : u.id"
+                                                    :title="primaryImage === u.id ? '{{ __('cover_photo') }}' : '{{ __('set_as_cover') }}'"
+                                                    class="flex items-center justify-center transition-all"
+                                                    :class="primaryImage === u.id ? 'text-white' : 'text-[#222] hover:opacity-100'"
+                                                    :style="`position: absolute; top: 6px; {{ $isRtl ? 'left' : 'right' }}: 6px; width: 28px; height: 28px; background: ${primaryImage === u.id ? '#F88379' : 'rgba(255,255,255,0.95)'}; border-radius: 999px; corner-shape: squircle; box-shadow: 0 2px 6px rgba(0,0,0,0.18); z-index: 5;`">
+                                                <svg width="14" height="14" viewBox="0 0 24 24" :fill="primaryImage === u.id ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                                     <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
                                                 </svg>
                                             </button>
@@ -394,32 +439,55 @@
                         <div class="r-ios-lg bg-white border-2 border-dashed border-[#dddddd] p-5 shadow-card">
                             <div class="font-semibold text-[#222] {{ $arabicClass }}">{{ __('extra_photos') }}</div>
                             <p class="text-sm text-[#717171] mt-1 {{ $arabicClass }}">{{ __('extra_photos_sub') }}</p>
-                            <label class="block mt-4">
+                            <label class="block mt-4 relative cursor-pointer hover:bg-[#f7f7f7] transition-colors {{ $arabicClass }}"
+                                   style="border: 2px dashed #cbd5e1; border-radius: 20px; corner-shape: squircle; padding: 28px 16px; text-align: center;">
+                                <div class="text-3xl" style="line-height: 1;">🖼️</div>
+                                <div class="mt-2 text-sm font-semibold text-[#222]">{{ __('add_photos') }}</div>
+                                <div class="mt-1 text-xs text-[#717171]">{{ __('add_more_photos') }}</div>
                                 <input
                                     type="file"
-                                    name="extra_images[]"
                                     accept="image/*"
                                     multiple
                                     @change="onExtraFiles($event)"
-                                    class="block w-full text-sm text-[#222]
-                                        file:me-4 file:py-2.5 file:px-5 file:rounded-full
-                                        file:border-0 file:text-sm file:font-semibold file:cursor-pointer
-                                        file:bg-[#222] file:text-white hover:file:bg-[#000] cursor-pointer"
+                                    class="absolute inset-0 opacity-0 cursor-pointer"
                                 >
                             </label>
-                            <div class="mt-4 grid grid-cols-3 sm:grid-cols-4 gap-2" x-show="extraPreviews.length > 0">
-                                <template x-for="(src, i) in extraPreviews" :key="src">
+                            {{-- hidden inputs that carry the already-uploaded S3 paths --}}
+                            <template x-for="(u, i) in extraUploads.filter(u => u.status === 'done')" :key="u.id">
+                                <input type="hidden" :name="`extra_image_paths[${i}]`" :value="u.path">
+                            </template>
+                            <div class="mt-4 grid grid-cols-3 sm:grid-cols-4 gap-2" x-show="extraUploads.length > 0">
+                                <template x-for="u in extraUploads" :key="u.id">
                                     <div class="relative">
-                                        <img :src="src"
+                                        <img :src="u.preview"
                                              class="block w-full aspect-square object-cover r-ios"
-                                             :class="primaryImage === `extra_images.${i}` ? 'ring-2 ring-[#F88379]' : ''">
+                                             :class="primaryImage === u.id ? 'ring-2 ring-[#F88379]' : ''">
+                                        <div x-show="u.status === 'uploading'"
+                                             class="absolute inset-0 flex items-center justify-center r-ios"
+                                             style="background: rgba(255,255,255,0.6); backdrop-filter: blur(4px);">
+                                            <div class="w-6 h-6 border-2 border-[#F88379] border-t-transparent rounded-full animate-spin"></div>
+                                        </div>
+                                        <div x-show="u.status === 'failed'"
+                                             class="absolute inset-0 flex items-center justify-center r-ios text-white font-bold text-xs"
+                                             style="background: rgba(180,35,24,0.85);">!</div>
                                         <button type="button"
-                                                @click="primaryImage = primaryImage === `extra_images.${i}` ? '' : `extra_images.${i}`"
-                                                :title="primaryImage === `extra_images.${i}` ? '{{ __('cover_photo') }}' : '{{ __('set_as_cover') }}'"
-                                                class="absolute top-1.5 {{ $isRtl ? 'left-1.5' : 'right-1.5' }} w-7 h-7 flex items-center justify-center transition-all"
-                                                :class="primaryImage === `extra_images.${i}` ? 'bg-[#F88379] text-white' : 'bg-white/90 text-[#222] hover:bg-white'"
+                                                @click="removeExtraUpload(u.id)"
+                                                title="Remove"
+                                                class="absolute top-1.5 {{ $isRtl ? 'right-1.5' : 'left-1.5' }} w-7 h-7 flex items-center justify-center bg-white/90 hover:bg-white text-[#222] transition-all"
                                                 style="border-radius: 999px; corner-shape: squircle; box-shadow: 0 2px 6px rgba(0,0,0,0.18);">
-                                            <svg width="14" height="14" viewBox="0 0 24 24" :fill="primaryImage === `extra_images.${i}` ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                                            </svg>
+                                        </button>
+                                        <button type="button"
+                                                x-show="u.status === 'done'"
+                                                @click="primaryImage = primaryImage === u.id ? null : u.id"
+                                                :title="primaryImage === u.id ? '{{ __('cover_photo') }}' : '{{ __('set_as_cover') }}'"
+                                                class="absolute top-1.5 {{ $isRtl ? 'left-1.5' : 'right-1.5' }} w-7 h-7 flex items-center justify-center transition-all"
+                                                :class="primaryImage === u.id ? 'bg-[#F88379] text-white' : 'bg-white/90 text-[#222] hover:bg-white'"
+                                                style="border-radius: 999px; corner-shape: squircle; box-shadow: 0 2px 6px rgba(0,0,0,0.18);">
+                                            <svg width="14" height="14" viewBox="0 0 24 24" :fill="primaryImage === u.id ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                                 <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
                                             </svg>
                                         </button>
@@ -455,7 +523,7 @@
                     <button
                         type="submit"
                         x-show="step === totalSteps"
-                        :disabled="submitting || !allFacilitiesHavePhotos()"
+                        :disabled="submitting || !allFacilitiesHavePhotos() || !allUploadsFinished()"
                         class="btn-primary {{ $arabicClass }}"
                     >
                         <span x-show="!submitting">{{ __('submit') }}</span>
@@ -501,10 +569,33 @@
             selectedFacilities: [],
             selectedAmenities: [],
 
-            facilityPreviews: {},
-            facilityFileCounts: {},
-            extraPreviews: [],
-            primaryImage: '',
+            facilityUploads: {},   // key -> [{ id, name, status, path, url, preview }]
+            extraUploads: [],
+            uploadCounter: 0,
+            primaryImage: null,    // upload id of the chosen cover (number) or null
+
+            // turn primaryImage (an id) into the position-based marker the controller expects.
+            primaryImageMarker() {
+                if (!this.primaryImage) return '';
+                const keys = Object.keys(this.facilityUploads);
+                for (const key of keys) {
+                    const done = (this.facilityUploads[key] || []).filter(u => u.status === 'done');
+                    const i = done.findIndex(u => u.id === this.primaryImage);
+                    if (i >= 0) return 'facility_images.' + key + '.' + i;
+                }
+                const doneExtras = this.extraUploads.filter(u => u.status === 'done');
+                const j = doneExtras.findIndex(u => u.id === this.primaryImage);
+                if (j >= 0) return 'extra_images.' + j;
+                return '';
+            },
+            removeFacilityUpload(key, id) {
+                this.facilityUploads[key] = (this.facilityUploads[key] || []).filter(u => u.id !== id);
+                if (this.primaryImage === id) this.primaryImage = null;
+            },
+            removeExtraUpload(id) {
+                this.extraUploads = this.extraUploads.filter(u => u.id !== id);
+                if (this.primaryImage === id) this.primaryImage = null;
+            },
 
             hasFacility(key) {
                 return this.selectedFacilities.some(f => f.key === key);
@@ -515,44 +606,127 @@
                     this.selectedFacilities.splice(idx, 1);
                 } else {
                     const meta = this.facilities.find(f => f.key === key);
-                    this.selectedFacilities.push({ key, label: meta.label, count: 1 });
+                    this.selectedFacilities.push({ key, label: meta.label, count: 1, description: '' });
                 }
             },
-            onFacilityFiles(e, key) {
-                const files = Array.from(e.target.files || []);
-                this.facilityFileCounts[key] = files.length;
-                this.facilityPreviews[key] = [];
-                if (this.primaryImage.startsWith(`facility_images.${key}.`)) {
-                    this.primaryImage = '';
+            async _uploadOne(file) {
+                const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+                // Step 1: ask Laravel for a presigned PUT URL (no file bytes — tiny JSON only).
+                const presignRes = await fetch('{{ route('hosts.presign-upload') }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRF-TOKEN': csrf,
+                    },
+                    body: JSON.stringify({
+                        filename: file.name,
+                        mime: file.type || 'application/octet-stream',
+                    }),
+                });
+                if (!presignRes.ok) {
+                    let msg = `Could not get upload URL (${presignRes.status})`;
+                    try {
+                        const err = await presignRes.json();
+                        if (err.message) msg = err.message;
+                    } catch (_) {}
+                    throw new Error(msg);
                 }
-                files.forEach(file => {
-                    const reader = new FileReader();
-                    reader.onload = ev => {
-                        this.facilityPreviews[key] = [...(this.facilityPreviews[key] || []), ev.target.result];
-                    };
-                    reader.readAsDataURL(file);
+                const ticket = await presignRes.json(); // { put_url, path, public_url, mime }
+
+                // Step 2: stream the file straight to DO Spaces — PHP container is bypassed.
+                const putRes = await fetch(ticket.put_url, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': ticket.mime,
+                        'x-amz-acl': 'public-read',
+                    },
+                    body: file,
+                });
+                if (!putRes.ok) {
+                    throw new Error(`Upload to storage failed (${putRes.status})`);
+                }
+
+                return { path: ticket.path, url: ticket.public_url };
+            },
+            _readPreview(file) {
+                return new Promise(resolve => {
+                    const r = new FileReader();
+                    r.onload = ev => resolve(ev.target.result);
+                    r.readAsDataURL(file);
                 });
             },
-            onExtraFiles(e) {
-                const files = Array.from(e.target.files || []);
-                this.extraPreviews = [];
-                if (this.primaryImage.startsWith('extra_images.')) {
-                    this.primaryImage = '';
+            async onFacilityFiles(e, key) {
+                const newFiles = Array.from(e.target.files || []);
+                e.target.value = ''; // allow re-picking the same file later
+                if (newFiles.length === 0) return;
+                if (!this.facilityUploads[key]) this.facilityUploads[key] = [];
+
+                for (const file of newFiles) {
+                    const preview = await this._readPreview(file);
+                    const id = ++this.uploadCounter;
+                    this.facilityUploads[key].push({
+                        id,
+                        name: file.name,
+                        status: 'uploading',
+                        preview,
+                        path: null,
+                        url: null,
+                    });
+                    // mutate via the reactive proxy by finding the row by id
+                    this._uploadOne(file)
+                        .then(r => {
+                            const row = (this.facilityUploads[key] || []).find(u => u.id === id);
+                            if (row) { row.path = r.path; row.url = r.url; row.status = 'done'; }
+                        })
+                        .catch((err) => {
+                            const row = (this.facilityUploads[key] || []).find(u => u.id === id);
+                            if (row) { row.status = 'failed'; row.error = err.message || 'Upload failed'; }
+                        });
                 }
-                files.forEach(file => {
-                    const reader = new FileReader();
-                    reader.onload = ev => {
-                        this.extraPreviews = [...this.extraPreviews, ev.target.result];
-                    };
-                    reader.readAsDataURL(file);
-                });
+            },
+            async onExtraFiles(e) {
+                const newFiles = Array.from(e.target.files || []);
+                e.target.value = '';
+                if (newFiles.length === 0) return;
+
+                for (const file of newFiles) {
+                    const preview = await this._readPreview(file);
+                    const id = ++this.uploadCounter;
+                    this.extraUploads.push({
+                        id,
+                        name: file.name,
+                        status: 'uploading',
+                        preview,
+                        path: null,
+                        url: null,
+                    });
+                    this._uploadOne(file)
+                        .then(r => {
+                            const row = this.extraUploads.find(u => u.id === id);
+                            if (row) { row.path = r.path; row.url = r.url; row.status = 'done'; }
+                        })
+                        .catch((err) => {
+                            const row = this.extraUploads.find(u => u.id === id);
+                            if (row) { row.status = 'failed'; row.error = err.message || 'Upload failed'; }
+                        });
+                }
             },
             allFacilitiesHavePhotos() {
                 if (this.selectedFacilities.length === 0) return false;
-                return this.selectedFacilities.every(f => (this.facilityFileCounts[f.key] || 0) > 0);
+                return this.selectedFacilities.every(f =>
+                    (this.facilityUploads[f.key] || []).some(u => u.status === 'done')
+                );
+            },
+            allUploadsFinished() {
+                const inProgress = (uploads) => uploads.some(u => u.status === 'uploading');
+                if (inProgress(this.extraUploads)) return false;
+                return Object.values(this.facilityUploads).every(arr => !inProgress(arr));
             },
             canAdvance() {
-                if (this.step === 1) return this.phone.trim().length >= 6;
+                if (this.step === 1) return /^5\d{8}$/.test(this.phone.trim());
                 if (this.step === 2) return !!this.placeType;
                 if (this.step === 3) return this.title.trim().length >= 2 && parseInt(this.maxGuests) >= 1;
                 if (this.step === 4) return /^https?:\/\/.+/i.test(this.mapsUrl.trim());

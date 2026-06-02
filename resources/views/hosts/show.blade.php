@@ -476,6 +476,72 @@
                     </section>
                 @endif
 
+                {{-- FACILITIES LIST (each facility expanded: name, images, description) --}}
+                @if($host->facilities->where('images', '!=', null)->count() > 0)
+                    <section class="border-b border-[#ebebeb]" style="padding-top: 56px; padding-bottom: 56px;">
+                        <h2 class="text-[22px] sm:text-2xl font-semibold text-[#222] {{ $start }} {{ $fa }}" style="margin-bottom: 8px;">
+                            {{ $isRtl ? 'قائمة المرافق' : 'Facilities list' }}
+                        </h2>
+                        <p class="text-[15px] text-[#717171] {{ $start }} {{ $fa }}" style="margin-bottom: 28px;">
+                            {{ $host->facilities->count() }} {{ $isRtl ? 'مرفق' : 'spaces' }}
+                        </p>
+
+                        {{-- Quick list with counts (anchor links to jump within the section) --}}
+                        <div class="flex flex-wrap" style="gap: 8px; margin-bottom: 40px;">
+                            @foreach($host->facilities as $f)
+                                <a href="#facility-{{ $f->key }}"
+                                   class="inline-flex items-center bg-[#fafafa] hover:bg-[#f4f4f4] transition-colors {{ $fa }}"
+                                   style="gap: 8px; padding: 8px 14px; border-radius: 999px; corner-shape: squircle;">
+                                    <span class="text-[14px] font-semibold text-[#222]">{{ Catalog::facilityLabel($f->key, $locale) }}</span>
+                                    <span class="text-[12px] font-bold text-white bg-[#222] tabular-nums"
+                                          style="padding: 2px 8px; border-radius: 999px; corner-shape: squircle;">{{ $f->count }}</span>
+                                </a>
+                            @endforeach
+                        </div>
+
+                        {{-- Per-facility blocks: title + images grid + description --}}
+                        <div class="flex flex-col" style="gap: 56px;">
+                            @foreach($host->facilities as $f)
+                                <div id="facility-{{ $f->key }}" style="scroll-margin-top: 100px;">
+                                    <div class="flex items-center {{ $start }} {{ $fa }}" style="gap: 12px;">
+                                        <h3 class="text-[20px] sm:text-[22px] font-bold text-[#222]">
+                                            {{ Catalog::facilityLabel($f->key, $locale) }}
+                                        </h3>
+                                        <span class="text-xs font-bold text-[#222] bg-[#f7f7f7] tabular-nums"
+                                              style="padding: 4px 12px; border-radius: 999px; corner-shape: squircle;">
+                                            {{ $f->count }}
+                                        </span>
+                                    </div>
+
+                                    @if($f->images->count() > 0)
+                                        @php $globalIdx = $allImages->search(fn($i) => $i->id === $f->images->first()->id); @endphp
+                                        <div class="grid grid-cols-2 sm:grid-cols-3" style="gap: 10px; margin-top: 20px;">
+                                            @foreach($f->images as $img)
+                                                <button type="button"
+                                                        @click="openGallery('{{ $f->key }}')"
+                                                        class="block overflow-hidden group cursor-zoom-in"
+                                                        style="border-radius: 20px; corner-shape: squircle;">
+                                                    <img src="{{ $img->url }}"
+                                                         class="w-full aspect-square object-cover group-hover:scale-105 transition-transform duration-500"
+                                                         alt=""
+                                                         loading="lazy">
+                                                </button>
+                                            @endforeach
+                                        </div>
+                                    @endif
+
+                                    @if($f->description)
+                                        <p class="text-[15px] text-[#222] {{ $fa }} {{ $start }}"
+                                           style="margin-top: 20px; line-height: 1.7; white-space: pre-line;">
+                                            {{ $f->description }}
+                                        </p>
+                                    @endif
+                                </div>
+                            @endforeach
+                        </div>
+                    </section>
+                @endif
+
                 {{-- AMENITIES --}}
                 @if($host->amenities->count() > 0)
                     <section class="border-b border-[#ebebeb]" style="padding-top: 56px; padding-bottom: 56px;">
@@ -729,6 +795,11 @@
                         <p class="mt-2 text-[14px] text-[#6B7280] {{ $fa }}">
                             {{ $f->count }} · {{ $f->images->count() }} {{ $isRtl ? 'صورة' : ($f->images->count() === 1 ? 'photo' : 'photos') }}
                         </p>
+                        @if($f->description)
+                            <p class="mt-4 text-[15px] text-[#222] {{ $fa }}" style="line-height: 1.7; white-space: pre-line;">
+                                {{ $f->description }}
+                            </p>
+                        @endif
                         <div class="mt-6 space-y-5">
                             @foreach($f->images as $img)
                                 <img src="{{ $img->url }}"

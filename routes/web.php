@@ -11,6 +11,8 @@ Route::post('/locale/{locale}', [LandingController::class, 'switchLocale'])->nam
 // hidden host registration (no auth, no link from anywhere)
 Route::get('/host-register', [HostController::class, 'create'])->name('hosts.create');
 Route::post('/host-register', [HostController::class, 'store'])->name('hosts.store');
+Route::post('/host-register/upload-image', [HostController::class, 'uploadImage'])->name('hosts.upload-image');
+Route::post('/host-register/presign-upload', [HostController::class, 'presignUpload'])->name('hosts.presign-upload');
 
 // public, shareable property page
 Route::get('/p/{slug}', [HostController::class, 'show'])->name('property.show');

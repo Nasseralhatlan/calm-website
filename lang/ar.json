@@ -54,6 +54,8 @@
     "step_facilities_title": "ما المرافق المتوفرة لديك؟",
     "step_facilities_sub": "اختر ما هو متوفر في المكان.",
     "how_many": "كم العدد؟",
+    "facility_description_placeholder": "وصف هذا المرفق (اختياري)",
+    "add_more_photos": "إضافة المزيد من الصور",
     "step_amenities_title": "ما المميزات التي يحصل عليها الضيف؟",
     "step_amenities_sub": "اختر كل ما ينطبق.",
     "step_images_title": "أضف الصور",

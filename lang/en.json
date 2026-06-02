@@ -54,6 +54,8 @@
     "step_facilities_title": "What facilities do you have?",
     "step_facilities_sub": "Choose what's on the property. Tap a chip to add it.",
     "how_many": "How many?",
+    "facility_description_placeholder": "Describe this space (optional)",
+    "add_more_photos": "Add more photos",
     "step_amenities_title": "What amenities do guests get?",
     "step_amenities_sub": "Pick everything that applies.",
     "step_images_title": "Add photos",
