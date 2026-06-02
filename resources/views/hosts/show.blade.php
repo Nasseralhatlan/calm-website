@@ -122,6 +122,7 @@
     x-data="{
         gallery: false,
         sheet: null,
+        description: false,
         openGallery(sectionKey) {
             this.gallery = true;
             document.body.style.overflow = 'hidden';
@@ -135,11 +136,20 @@
             const el = document.getElementById('gallery-section-' + sectionKey);
             if (el && scroller) scroller.scrollTo({ top: el.offsetTop - 180, behavior: 'smooth' });
         },
-        closeGallery() { this.gallery = false; if (!this.sheet) document.body.style.overflow = ''; },
+        closeGallery() { this.gallery = false; if (!this.sheet && !this.description) document.body.style.overflow = ''; },
         openSheet(name) { this.sheet = name; document.body.style.overflow = 'hidden'; },
-        closeSheet() { this.sheet = null; if (!this.gallery) document.body.style.overflow = ''; },
+        closeSheet() { this.sheet = null; if (!this.gallery && !this.description) document.body.style.overflow = ''; },
+        openDescription() {
+            this.description = true;
+            document.body.style.overflow = 'hidden';
+            this.$nextTick(() => {
+                const scroller = document.getElementById('description-scroll');
+                if (scroller) scroller.scrollTo({ top: 0, behavior: 'instant' });
+            });
+        },
+        closeDescription() { this.description = false; if (!this.gallery && !this.sheet) document.body.style.overflow = ''; },
     }"
-    @keydown.escape.window="closeGallery(); closeSheet();"
+    @keydown.escape.window="closeGallery(); closeSheet(); closeDescription();"
 >
 
     {{-- HEADER --}}
@@ -161,21 +171,29 @@
 
     <main class="max-w-7xl mx-auto w-full px-6 sm:px-10 lg:px-20 py-8 sm:py-10">
 
-        {{-- TITLE BLOCK --}}
-        <div class="{{ $start }} mb-6">
+        {{-- TITLE BLOCK — centered --}}
+        <div class="text-center mb-6">
             <h1 class="text-[26px] sm:text-[32px] font-bold tracking-tight text-[#222] {{ $fa }}" style="line-height: 1.2;">
                 {{ $host->title ?? $placeLabel }}
             </h1>
-            <div class="mt-2 text-[15px] text-[#717171] {{ $fa }}">
-                <span>{{ $placeLabel }}</span>
+            <div class="flex flex-wrap items-center justify-center {{ $fa }}"
+                 style="gap: 8px; margin-top: 12px;">
+                <span class="text-[13px] text-[#717171] bg-[#fafafa]"
+                      style="padding: 4px 12px; border-radius: 999px; corner-shape: squircle;">
+                    {{ $placeLabel }}
+                </span>
                 @if($host->max_guests)
-                    <span class="mx-2 text-[#cecece]">·</span>
-                    <span>{{ $host->max_guests }} {{ $isRtl ? 'ضيف' : 'guests' }}</span>
+                    <span class="text-[13px] text-[#717171] bg-[#fafafa]"
+                          style="padding: 4px 12px; border-radius: 999px; corner-shape: squircle;">
+                        {{ $host->max_guests }} {{ $isRtl ? 'ضيف' : 'guests' }}
+                    </span>
                 @endif
-                @foreach($host->facilities->take(4) as $f)
-                    <span class="mx-2 text-[#cecece]">·</span>
-                    <span>{{ $f->count }} {{ Catalog::facilityLabel($f->key, $locale) }}</span>
-                @endforeach
+                @if($host->facilities->count() > 0)
+                    <span class="text-[13px] text-[#717171] bg-[#fafafa]"
+                          style="padding: 4px 12px; border-radius: 999px; corner-shape: squircle;">
+                        {{ $host->facilities->count() }} {{ $isRtl ? 'مرافق' : 'facilities' }}
+                    </span>
+                @endif
             </div>
         </div>
 
@@ -363,12 +381,12 @@
                     @endif
 
                     {{-- "View all images" CTA --}}
-                    <div class="flex justify-center" style="margin-top: 16px;">
+                    <div class="flex justify-center" style="margin-top: 12px;">
                         <button type="button"
                                 @click="openGallery('')"
                                 class="inline-flex items-center font-semibold text-[#222] bg-white hover:bg-[#f7f7f7] active:scale-[0.98] transition-all {{ $fa }}"
-                                style="gap: 8px; padding: 11px 22px; border: 1px solid #222; border-radius: 12px; corner-shape: squircle;">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                style="gap: 6px; padding: 7px 14px; font-size: 13px; border: 1px solid #222; border-radius: 999px; corner-shape: squircle;">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                                 <rect x="3" y="3" width="7" height="7"></rect>
                                 <rect x="14" y="3" width="7" height="7"></rect>
                                 <rect x="14" y="14" width="7" height="7"></rect>
@@ -384,49 +402,128 @@
         {{-- FULL-WIDTH BODY --}}
         <div style="margin-top: 48px;">
 
-                {{-- DESCRIPTION --}}
+                {{-- DESCRIPTION (collapsed by default; full text in modal) --}}
                 @if($description)
-                    <section class="{{ $start }} border-b border-[#ebebeb]" style="padding-bottom: 56px;">
+                    <section class="{{ $start }} border-b border-[#ebebeb]"
+                             style="padding-bottom: 56px;">
                         <h2 class="text-[22px] sm:text-2xl font-semibold text-[#222] {{ $fa }}" style="margin-bottom: 20px;">
                             {{ $isRtl ? 'الوصف' : 'About this place' }}
                         </h2>
                         <p class="text-[16px] text-[#222] {{ $fa }}"
-                           style="line-height: 1.7; white-space: pre-line;">{{ $description }}</p>
+                           style="line-height: 1.7; white-space: pre-line; display: -webkit-box; -webkit-line-clamp: 4; line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis;">{{ $description }}</p>
+                        @if(mb_strlen($description) > 200)
+                            <button type="button"
+                                    @click="openDescription()"
+                                    class="w-full flex items-center justify-center font-semibold text-[#222] hover:bg-[#ebebeb] transition-colors {{ $fa }}"
+                                    style="margin-top: 20px; padding: 14px 20px; background-color: #f7f7f7; border-radius: 14px; corner-shape: squircle;">
+                                <span>{{ $isRtl ? 'عرض المزيد' : 'Show more' }}</span>
+                            </button>
+                        @endif
                     </section>
                 @endif
 
-                {{-- THE SPACES --}}
+                {{-- قائمة المرافق — list with × count + expandable description per row --}}
+                @if($host->facilities->count() > 0)
+                    <section class="border-b border-[#ebebeb]" style="padding-top: 56px; padding-bottom: 56px;">
+                        <h2 class="text-[22px] sm:text-2xl font-semibold text-[#222] {{ $start }} {{ $fa }}" style="margin-bottom: 24px;">
+                            {{ $isRtl ? 'قائمة المرافق' : 'Facilities list' }}
+                        </h2>
+                        <ul class="{{ $start }} {{ $fa }}" style="list-style: none; padding: 0; margin: 0;">
+                            @foreach($host->facilities as $f)
+                                <li style="padding: 14px 0; border-bottom: 1px solid #ebebeb;"
+                                    x-data="{ expanded: false }">
+                                    <div class="flex items-center" style="gap: 12px;">
+                                        <span style="width: 6px; height: 6px; background: #F88379; border-radius: 999px; flex-shrink: 0; display: inline-block;"></span>
+                                        <span class="text-[15px] sm:text-[16px] text-[#222] flex-1 font-medium">{{ Catalog::facilityLabel($f->key, $locale) }}</span>
+                                        <span class="text-[14px] font-bold text-[#222] tabular-nums" dir="ltr">×{{ $f->count }}</span>
+                                    </div>
+                                    @if($f->description)
+                                        <div style="padding-{{ $isRtl ? 'right' : 'left' }}: 18px; margin-top: 8px;">
+                                            <p class="text-[14px] text-[#717171]"
+                                               :style="expanded
+                                                   ? 'line-height: 1.65;'
+                                                   : 'line-height: 1.65; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;'">{{ $f->description }}</p>
+                                            @if(mb_strlen($f->description) > 100)
+                                                <button type="button"
+                                                        @click="expanded = !expanded"
+                                                        class="text-[13px] font-semibold text-[#222] underline underline-offset-2 hover:text-black"
+                                                        style="margin-top: 6px;">
+                                                    <span x-show="!expanded">{{ $isRtl ? 'عرض المزيد' : 'Show more' }}</span>
+                                                    <span x-show="expanded" x-cloak>{{ $isRtl ? 'عرض أقل' : 'Show less' }}</span>
+                                                </button>
+                                            @endif
+                                        </div>
+                                    @endif
+                                </li>
+                            @endforeach
+                        </ul>
+                    </section>
+                @endif
+
+                {{-- FACILITIES IMAGES (carousel — always LTR regardless of page direction) --}}
                 @if($host->facilities->count() > 0)
                     <section class="border-b border-[#ebebeb]"
+                             dir="ltr"
                              style="padding-top: 56px; padding-bottom: 56px;"
                              x-data="{
-                                scrollPrev() { this.$refs.spacesTrack?.scrollBy({ left: -260, behavior: 'smooth' }); },
-                                scrollNext() { this.$refs.spacesTrack?.scrollBy({ left: 260, behavior: 'smooth' }); },
+                                idx: 0,
+                                total: {{ $host->facilities->count() }},
+                                init() {
+                                    this.$nextTick(() => {
+                                        if (this.$refs.track) this.$refs.track.scrollLeft = 0;
+                                        this.idx = 0;
+                                    });
+                                },
+                                slides()    { const t = this.$refs.track; if (!t || !t.firstElementChild) return []; return Array.from(t.firstElementChild.children); },
+                                slideLeft(el) { const t = this.$refs.track; return el.getBoundingClientRect().left - t.getBoundingClientRect().left + t.scrollLeft; },
+                                onScroll()  {
+                                    const t = this.$refs.track; if (!t) return;
+                                    const slides = this.slides();
+                                    if (!slides.length) return;
+                                    let best = 0, bestDist = Infinity;
+                                    const x = t.scrollLeft;
+                                    slides.forEach((s, i) => {
+                                        const d = Math.abs(this.slideLeft(s) - x);
+                                        if (d < bestDist) { bestDist = d; best = i; }
+                                    });
+                                    this.idx = best;
+                                },
+                                go(i) {
+                                    const t = this.$refs.track; if (!t) return;
+                                    const slides = this.slides();
+                                    if (!slides[i]) return;
+                                    this.idx = i;
+                                    t.scrollTo({ left: this.slideLeft(slides[i]), behavior: 'smooth' });
+                                },
+                                next()      { this.go((this.idx + 1) % this.total); },
+                                prev()      { this.go((this.idx - 1 + this.total) % this.total); },
                              }">
                         <div class="flex items-end justify-between gap-4">
                             <div class="{{ $start }} {{ $fa }}">
                                 <h2 class="text-[22px] sm:text-2xl font-semibold text-[#222]">
-                                    {{ $isRtl ? 'المرافق' : 'The spaces' }}
+                                    {{ $isRtl ? 'صور المرافق' : 'Facilities images' }}
                                 </h2>
                                 <p class="text-[15px] text-[#717171]" style="margin-top: 4px;">
                                     {{ $isRtl ? 'استكشف كل مساحات المكان' : 'Browse every space of the place' }}
                                 </p>
                             </div>
                             <div class="flex items-center shrink-0" style="gap: 10px;" dir="ltr">
+                                {{-- LEFT chevron = previous --}}
                                 <button type="button"
-                                        @click="scrollPrev()"
+                                        @click="prev()"
                                         aria-label="previous"
-                                        class="flex items-center justify-center text-[#222] bg-white border border-[#dddddd] hover:bg-[#f7f7f7] active:scale-95 transition-all"
-                                        style="width: 40px; height: 40px; border-radius: 999px; corner-shape: squircle;">
+                                        class="flex items-center justify-center text-[#222] hover:text-black active:scale-95 transition-all"
+                                        style="width: 40px; height: 40px; border-radius: 999px; corner-shape: squircle; background-color: rgba(255,255,255,0.7); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(0,0,0,0.08); box-shadow: 0 2px 8px rgba(0,0,0,0.06);">
                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                                         <polyline points="15 18 9 12 15 6"></polyline>
                                     </svg>
                                 </button>
+                                {{-- RIGHT chevron = next --}}
                                 <button type="button"
-                                        @click="scrollNext()"
+                                        @click="next()"
                                         aria-label="next"
-                                        class="flex items-center justify-center text-[#222] bg-white border border-[#dddddd] hover:bg-[#f7f7f7] active:scale-95 transition-all"
-                                        style="width: 40px; height: 40px; border-radius: 999px; corner-shape: squircle;">
+                                        class="flex items-center justify-center text-[#222] hover:text-black active:scale-95 transition-all"
+                                        style="width: 40px; height: 40px; border-radius: 999px; corner-shape: squircle; background-color: rgba(255,255,255,0.7); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(0,0,0,0.08); box-shadow: 0 2px 8px rgba(0,0,0,0.06);">
                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                                         <polyline points="9 18 15 12 9 6"></polyline>
                                     </svg>
@@ -434,111 +531,80 @@
                             </div>
                         </div>
 
-                        <div class="overflow-x-auto no-scrollbar" x-ref="spacesTrack" style="margin-top: 28px; scroll-behavior: smooth;">
+                        <div class="overflow-x-auto no-scrollbar"
+                             x-ref="track"
+                             dir="ltr"
+                             @scroll.passive="onScroll"
+                             style="margin-top: 28px; scroll-behavior: smooth; scroll-snap-type: x mandatory;">
                             <div class="flex" style="width: max-content; gap: 20px;">
                                 @foreach($host->facilities as $f)
                                     @php $firstImg = $f->images->first(); @endphp
-                                    <button type="button"
-                                            @click="{{ $firstImg ? "openGallery('{$f->key}')" : '' }}"
-                                            class="shrink-0 block {{ $start }} group {{ $firstImg ? 'cursor-zoom-in' : 'cursor-default' }}"
-                                            style="width: 220px;"
-                                            @if(!$firstImg) disabled @endif>
-                                        @if($firstImg)
-                                            <div class="overflow-hidden bg-[#f7f7f7]"
-                                                 style="width: 220px; height: 220px; border-radius: 24px; corner-shape: squircle;">
-                                                <img src="{{ $firstImg->url }}"
-                                                     class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                                                     alt=""
-                                                     loading="lazy">
+                                    <div class="shrink-0 {{ $start }}"
+                                         style="width: 180px; scroll-snap-align: start;"
+                                         x-data="{ expanded: false }">
+                                        <button type="button"
+                                                @click="{{ $firstImg ? "openGallery('{$f->key}')" : '' }}"
+                                                class="block group {{ $firstImg ? 'cursor-zoom-in' : 'cursor-default' }}"
+                                                style="width: 180px;"
+                                                @if(!$firstImg) disabled @endif>
+                                            @if($firstImg)
+                                                <div class="overflow-hidden bg-[#f7f7f7]"
+                                                     style="width: 180px; height: 180px; border-radius: 20px; corner-shape: squircle;">
+                                                    <img src="{{ $firstImg->url }}"
+                                                         class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                                         alt=""
+                                                         loading="lazy">
+                                                </div>
+                                            @else
+                                                <div class="flex items-center justify-center text-4xl text-[#cecece] bg-[#f7f7f7]"
+                                                     style="width: 180px; height: 180px; border-radius: 20px; corner-shape: squircle;">🏠</div>
+                                            @endif
+                                            <div class="flex items-center gap-2 {{ $fa }}" style="margin-top: 12px;">
+                                                <h3 class="text-[15px] font-bold text-[#222]">
+                                                    {{ Catalog::facilityLabel($f->key, $locale) }}
+                                                </h3>
+                                                <span class="text-xs font-bold text-[#222] bg-[#f7f7f7] tabular-nums"
+                                                      style="padding: 3px 9px; border-radius: 999px; corner-shape: squircle;">
+                                                    {{ $f->count }}
+                                                </span>
                                             </div>
-                                        @else
-                                            <div class="flex items-center justify-center text-4xl text-[#cecece] bg-[#f7f7f7]"
-                                                 style="width: 220px; height: 220px; border-radius: 24px; corner-shape: squircle;">🏠</div>
-                                        @endif
-                                        <div class="flex items-center gap-2 {{ $fa }}" style="margin-top: 14px;">
-                                            <h3 class="text-[16px] font-bold text-[#222]">
-                                                {{ Catalog::facilityLabel($f->key, $locale) }}
-                                            </h3>
-                                            <span class="text-xs font-bold text-[#222] bg-[#f7f7f7] tabular-nums"
-                                                  style="padding: 3px 10px; border-radius: 999px; corner-shape: squircle;">
-                                                {{ $f->count }}
-                                            </span>
-                                        </div>
-                                        @if($f->images->count() > 0)
-                                            <div class="text-[13px] text-[#717171] {{ $fa }}" style="margin-top: 2px;">
-                                                {{ $f->images->count() }} {{ $isRtl ? 'صور' : 'photos' }}
+                                        </button>
+                                        @if($f->description)
+                                            <div class="{{ $fa }}" style="margin-top: 4px;">
+                                                <p class="text-[13px] text-[#717171]"
+                                                   :style="expanded
+                                                       ? 'line-height: 1.55;'
+                                                       : 'line-height: 1.55; display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;'">{{ $f->description }}</p>
+                                                @if(mb_strlen($f->description) > 90)
+                                                    <button type="button"
+                                                            @click.stop="expanded = !expanded"
+                                                            class="text-[12px] font-semibold text-[#222] underline underline-offset-2"
+                                                            style="margin-top: 4px;">
+                                                        <span x-show="!expanded">{{ $isRtl ? 'عرض المزيد' : 'Show more' }}</span>
+                                                        <span x-show="expanded" x-cloak>{{ $isRtl ? 'عرض أقل' : 'Show less' }}</span>
+                                                    </button>
+                                                @endif
                                             </div>
                                         @endif
-                                    </button>
+                                    </div>
                                 @endforeach
                             </div>
                         </div>
-                    </section>
-                @endif
 
-                {{-- FACILITIES LIST (each facility expanded: name, images, description) --}}
-                @if($host->facilities->where('images', '!=', null)->count() > 0)
-                    <section class="border-b border-[#ebebeb]" style="padding-top: 56px; padding-bottom: 56px;">
-                        <h2 class="text-[22px] sm:text-2xl font-semibold text-[#222] {{ $start }} {{ $fa }}" style="margin-bottom: 8px;">
-                            {{ $isRtl ? 'قائمة المرافق' : 'Facilities list' }}
-                        </h2>
-                        <p class="text-[15px] text-[#717171] {{ $start }} {{ $fa }}" style="margin-bottom: 28px;">
-                            {{ $host->facilities->count() }} {{ $isRtl ? 'مرفق' : 'spaces' }}
-                        </p>
-
-                        {{-- Quick list with counts (anchor links to jump within the section) --}}
-                        <div class="flex flex-wrap" style="gap: 8px; margin-bottom: 40px;">
-                            @foreach($host->facilities as $f)
-                                <a href="#facility-{{ $f->key }}"
-                                   class="inline-flex items-center bg-[#fafafa] hover:bg-[#f4f4f4] transition-colors {{ $fa }}"
-                                   style="gap: 8px; padding: 8px 14px; border-radius: 999px; corner-shape: squircle;">
-                                    <span class="text-[14px] font-semibold text-[#222]">{{ Catalog::facilityLabel($f->key, $locale) }}</span>
-                                    <span class="text-[12px] font-bold text-white bg-[#222] tabular-nums"
-                                          style="padding: 2px 8px; border-radius: 999px; corner-shape: squircle;">{{ $f->count }}</span>
-                                </a>
-                            @endforeach
-                        </div>
-
-                        {{-- Per-facility blocks: title + images grid + description --}}
-                        <div class="flex flex-col" style="gap: 56px;">
-                            @foreach($host->facilities as $f)
-                                <div id="facility-{{ $f->key }}" style="scroll-margin-top: 100px;">
-                                    <div class="flex items-center {{ $start }} {{ $fa }}" style="gap: 12px;">
-                                        <h3 class="text-[20px] sm:text-[22px] font-bold text-[#222]">
-                                            {{ Catalog::facilityLabel($f->key, $locale) }}
-                                        </h3>
-                                        <span class="text-xs font-bold text-[#222] bg-[#f7f7f7] tabular-nums"
-                                              style="padding: 4px 12px; border-radius: 999px; corner-shape: squircle;">
-                                            {{ $f->count }}
-                                        </span>
-                                    </div>
-
-                                    @if($f->images->count() > 0)
-                                        @php $globalIdx = $allImages->search(fn($i) => $i->id === $f->images->first()->id); @endphp
-                                        <div class="grid grid-cols-2 sm:grid-cols-3" style="gap: 10px; margin-top: 20px;">
-                                            @foreach($f->images as $img)
-                                                <button type="button"
-                                                        @click="openGallery('{{ $f->key }}')"
-                                                        class="block overflow-hidden group cursor-zoom-in"
-                                                        style="border-radius: 20px; corner-shape: squircle;">
-                                                    <img src="{{ $img->url }}"
-                                                         class="w-full aspect-square object-cover group-hover:scale-105 transition-transform duration-500"
-                                                         alt=""
-                                                         loading="lazy">
-                                                </button>
-                                            @endforeach
-                                        </div>
-                                    @endif
-
-                                    @if($f->description)
-                                        <p class="text-[15px] text-[#222] {{ $fa }} {{ $start }}"
-                                           style="margin-top: 20px; line-height: 1.7; white-space: pre-line;">
-                                            {{ $f->description }}
-                                        </p>
-                                    @endif
-                                </div>
-                            @endforeach
-                        </div>
+                        {{-- Dot indicators --}}
+                        @if($host->facilities->count() > 1 && $host->facilities->count() <= 20)
+                            <div class="flex justify-center items-center" style="gap: 6px; margin-top: 20px;" dir="ltr">
+                                @foreach($host->facilities as $i => $f)
+                                    <button type="button"
+                                            @click="go({{ $i }})"
+                                            aria-label="go to slide {{ $i + 1 }}"
+                                            class="block transition-all"
+                                            :style="idx === {{ $i }}
+                                                ? 'width: 24px; height: 6px; background: #222; border-radius: 999px;'
+                                                : 'width: 6px; height: 6px; background: #cbd5e1; border-radius: 999px;'"></button>
+                                @endforeach
+                            </div>
+                        @endif
                     </section>
                 @endif
 
@@ -646,31 +712,40 @@
         </div>
     </main>
 
-    {{-- ─────────── DESCRIPTION SHEET ─────────── --}}
-    <div x-show="sheet === 'description'" x-cloak class="fixed inset-0 z-50">
-        <div class="absolute inset-0" style="background-color: rgba(0,0,0,0.5);" @click="closeSheet()" x-transition.opacity></div>
-        <div class="absolute inset-x-0 bottom-0 sm:inset-0 sm:m-auto sm:max-w-2xl sm:max-h-[85vh] sm:h-fit bg-white flex flex-col"
-             style="border-radius: 28px 28px 0 0; corner-shape: squircle;"
-             x-show="sheet === 'description'"
-             x-transition:enter="transition ease-out duration-300"
-             x-transition:enter-start="translate-y-full sm:translate-y-0 sm:opacity-0 sm:scale-95"
-             x-transition:enter-end="translate-y-0 sm:opacity-100 sm:scale-100"
-             x-transition:leave="transition ease-in duration-200"
-             x-transition:leave-start="translate-y-0 sm:opacity-100 sm:scale-100"
-             x-transition:leave-end="translate-y-full sm:translate-y-0 sm:opacity-0 sm:scale-95"
-             dir="{{ $isRtl ? 'rtl' : 'ltr' }}">
+    {{-- ─────────── DESCRIPTION MODAL (full white, like gallery) ─────────── --}}
+    <div x-show="description" x-cloak
+         x-transition.opacity
+         id="description-scroll"
+         style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 60; background-color: #ffffff; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch;"
+         dir="{{ $isRtl ? 'rtl' : 'ltr' }}">
 
-            <div class="relative px-6 pt-6 pb-4 border-b border-[#ebebeb]">
+        {{-- Sticky top header — close + title, blurry like the page header --}}
+        <div class="sticky top-0 border-b border-[#ebebeb]"
+             style="z-index: 2; background-color: rgba(255,255,255,0.7); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);">
+            <div class="max-w-3xl mx-auto flex items-center justify-between px-6 sm:px-10 h-20">
                 <button type="button"
-                        @click="closeSheet()"
-                        class="absolute top-5 {{ $isRtl ? 'right-5' : 'left-5' }} w-9 h-9 flex items-center justify-center hover:bg-[#f7f7f7] rounded-full transition-colors">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                        @click="closeDescription()"
+                        class="w-10 h-10 flex items-center justify-center text-[#222] hover:bg-[#f7f7f7] transition-colors"
+                        style="border-radius: 999px; corner-shape: squircle;"
+                        aria-label="close">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
                 </button>
-                <div class="text-center font-semibold text-[#222] {{ $fa }}">{{ $isRtl ? 'الوصف' : 'About this place' }}</div>
+
+                <h2 class="text-[16px] sm:text-[18px] font-bold text-[#222] {{ $fa }}">
+                    {{ $isRtl ? 'الوصف' : 'About this place' }}
+                </h2>
+
+                {{-- spacer to balance the layout --}}
+                <div class="w-10 h-10"></div>
             </div>
-            <div class="overflow-y-auto p-6 sm:p-8 {{ $start }}">
-                <p class="text-[16px] text-[#222] {{ $fa }}" style="line-height: 1.8; white-space: pre-line;">{{ $description }}</p>
-            </div>
+        </div>
+
+        {{-- Content --}}
+        <div class="max-w-3xl mx-auto px-6 sm:px-10 {{ $start }}" style="padding-top: 32px; padding-bottom: 160px;">
+            <p class="text-[16px] sm:text-[17px] text-[#222] {{ $fa }}" style="line-height: 1.8; white-space: pre-line;">{{ $description }}</p>
         </div>
     </div>
 
@@ -788,15 +863,12 @@
             @foreach($host->facilities as $f)
                 @if($f->images->count() > 0)
                     <section id="gallery-section-{{ $f->key }}"
-                             style="padding-top: 96px; scroll-margin-top: 100px;">
+                             style="padding-top: 32px; scroll-margin-top: 100px;">
                         <h3 class="text-[22px] sm:text-[26px] font-bold text-[#222] {{ $fa }}" style="line-height: 1.2;">
                             {{ Catalog::facilityLabel($f->key, $locale) }}
                         </h3>
-                        <p class="mt-2 text-[14px] text-[#6B7280] {{ $fa }}">
-                            {{ $f->count }} · {{ $f->images->count() }} {{ $isRtl ? 'صورة' : ($f->images->count() === 1 ? 'photo' : 'photos') }}
-                        </p>
                         @if($f->description)
-                            <p class="mt-4 text-[15px] text-[#222] {{ $fa }}" style="line-height: 1.7; white-space: pre-line;">
+                            <p class="mt-2 text-[14px] sm:text-[15px] text-[#6B7280] {{ $fa }}" style="line-height: 1.6;">
                                 {{ $f->description }}
                             </p>
                         @endif
@@ -815,7 +887,7 @@
 
             @if($extraImages->count() > 0)
                 <section id="gallery-section-extras"
-                         style="padding-top: 96px; scroll-margin-top: 100px;">
+                         style="padding-top: 32px; scroll-margin-top: 100px;">
                     <h3 class="text-[22px] sm:text-[26px] font-bold text-[#222] {{ $fa }}" style="line-height: 1.2;">
                         {{ $isRtl ? 'صور أخرى' : 'More photos' }}
                     </h3>

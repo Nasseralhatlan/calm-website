@@ -12,8 +12,9 @@ class SetLocale
     {
         $locale = $request->cookie('locale');
 
+        // Default to Arabic; only switch to English if the user explicitly set the cookie to 'en'.
         if (! in_array($locale, ['en', 'ar'], true)) {
-            $locale = str_starts_with($request->getPreferredLanguage(['en', 'ar']) ?? 'en', 'ar') ? 'ar' : 'en';
+            $locale = 'ar';
         }
 
         app()->setLocale($locale);
