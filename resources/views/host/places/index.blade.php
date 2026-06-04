@@ -7,15 +7,28 @@
     $isRtl = $locale === 'ar';
     $fa = $isRtl ? 'font-arabic' : '';
 
-    $reviewColor = fn (PlaceReviewStatus $s) => match ($s) {
-        PlaceReviewStatus::Draft => 'background-color: #f3f4f6; color: #6b7280;',
-        PlaceReviewStatus::PendingReview => 'background-color: #fef3c7; color: #92400e;',
-        PlaceReviewStatus::Approved => 'background-color: #d1fae5; color: #15803d;',
-        PlaceReviewStatus::Rejected => 'background-color: #fee2e2; color: #b91c1c;',
+    // Saturated pill palette — solid colored background, lighter "live" dot,
+    // white text. Catches the eye at a glance instead of melting into the row.
+    $reviewPill = fn (PlaceReviewStatus $s): array => match ($s) {
+        PlaceReviewStatus::Draft         => ['bg' => '#9ca3af', 'dot' => '#e5e7eb'],
+        PlaceReviewStatus::PendingReview => ['bg' => '#f59e0b', 'dot' => '#fde68a'],
+        PlaceReviewStatus::Approved      => ['bg' => '#10b981', 'dot' => '#a7f3d0'],
+        PlaceReviewStatus::Rejected      => ['bg' => '#ef4444', 'dot' => '#fecaca'],
     };
-    $statusColor = fn (PlaceStatus $s) => $s === PlaceStatus::Active
-        ? 'background-color: #d1fae5; color: #15803d;'
-        : 'background-color: #f3f4f6; color: #6b7280;';
+    $statusPill = fn (PlaceStatus $s): array => $s === PlaceStatus::Active
+        ? ['bg' => '#10b981', 'dot' => '#a7f3d0']
+        : ['bg' => '#9ca3af', 'dot' => '#e5e7eb'];
+
+    $reviewLabel = fn (PlaceReviewStatus $s): string => $isRtl ? match ($s) {
+        PlaceReviewStatus::Draft         => 'مسودة',
+        PlaceReviewStatus::PendingReview => 'قيد المراجعة',
+        PlaceReviewStatus::Approved      => 'موافق عليه',
+        PlaceReviewStatus::Rejected      => 'مرفوض',
+    } : str_replace('_', ' ', $s->value);
+
+    $statusLabel = fn (PlaceStatus $s): string => $isRtl
+        ? ($s === PlaceStatus::Active ? 'مفعّل' : 'موقوف')
+        : $s->value;
 @endphp
 
 @section('title', $isRtl ? 'أماكني' : 'My places')
@@ -52,20 +65,44 @@
                         <th class="text-start" style="padding: 14px 20px;">{{ $isRtl ? 'السعر' : 'Price' }}</th>
                         <th class="text-start" style="padding: 14px 20px;">{{ $isRtl ? 'الحالة' : 'Status' }}</th>
                         <th class="text-start" style="padding: 14px 20px;">{{ $isRtl ? 'المراجعة' : 'Review' }}</th>
+                        <th class="text-end" style="padding: 14px 20px;">{{ $isRtl ? 'إجراء' : 'Action' }}</th>
                     </tr>
                 </thead>
                 <tbody class="text-[14px]">
                     @foreach($places as $place)
-                        <tr class="border-t border-[#ebebeb]">
+                        @php
+                            $rp = $reviewPill($place->review_status);
+                            $sp = $statusPill($place->status);
+                            $isDraft = $place->review_status === PlaceReviewStatus::Draft;
+                        @endphp
+                        <tr class="border-t border-[#ebebeb] {{ $isDraft ? 'bg-[#fffbeb]/40 hover:bg-[#fffbeb]' : 'hover:bg-[#fafafa]' }} transition-colors">
                             <td class="text-center" style="padding: 14px 12px; font-size: 22px; line-height: 1;">{{ $place->type?->icon ?: '🏠' }}</td>
-                            <td style="padding: 14px 20px;" class="font-medium">{{ $place->title }}</td>
+                            <td style="padding: 14px 20px;" class="font-medium">{{ $place->title ?: ($isRtl ? '— بدون عنوان —' : '— Untitled —') }}</td>
                             <td style="padding: 14px 20px;" class="text-[#717171]">{{ $isRtl ? $place->cityArea?->city?->name_ar : $place->cityArea?->city?->name_en }}</td>
                             <td style="padding: 14px 20px;" class="font-semibold tabular-nums" dir="ltr">{{ number_format($place->price) }} SAR</td>
                             <td style="padding: 14px 20px;">
-                                <span class="text-[11px] font-bold uppercase tracking-wider" style="padding: 4px 10px; border-radius: 999px; {{ $statusColor($place->status) }}">{{ $place->status->value }}</span>
+                                <span class="inline-flex items-center text-[11px] font-bold uppercase tracking-wider text-white {{ $fa }}"
+                                      style="padding: 4px 12px 4px 9px; border-radius: 999px; gap: 6px; background-color: {{ $sp['bg'] }};">
+                                    <span style="width: 6px; height: 6px; border-radius: 999px; background-color: {{ $sp['dot'] }};"></span>
+                                    {{ $statusLabel($place->status) }}
+                                </span>
                             </td>
                             <td style="padding: 14px 20px;">
-                                <span class="text-[11px] font-bold uppercase tracking-wider" style="padding: 4px 10px; border-radius: 999px; {{ $reviewColor($place->review_status) }}">{{ $place->review_status->value }}</span>
+                                <span class="inline-flex items-center text-[11px] font-bold uppercase tracking-wider text-white {{ $fa }}"
+                                      style="padding: 4px 12px 4px 9px; border-radius: 999px; gap: 6px; background-color: {{ $rp['bg'] }};">
+                                    <span style="width: 6px; height: 6px; border-radius: 999px; background-color: {{ $rp['dot'] }};"></span>
+                                    {{ $reviewLabel($place->review_status) }}
+                                </span>
+                            </td>
+                            <td class="text-end" style="padding: 14px 20px;">
+                                @if($isDraft)
+                                    <a href="{{ route('host.places.create', ['draft' => $place->id]) }}"
+                                       class="inline-flex items-center gap-1 text-[13px] font-bold text-[#F88379] hover:text-[#f56b60] {{ $fa }}">
+                                        {{ $isRtl ? '↩ متابعة الإكمال' : 'Continue ↪' }}
+                                    </a>
+                                @else
+                                    <span class="text-[12px] text-[#cccccc]">—</span>
+                                @endif
                             </td>
                         </tr>
                     @endforeach

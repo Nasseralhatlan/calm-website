@@ -37,20 +37,78 @@ final class PlaceService
     }
 
     /**
-     * Create a new place owned by the given host. New places start as
-     * inactive drafts pending review — exactly the same default the admin
-     * would land on if creating via the admin panel.
+     * Confirm a host's place — the final submit at the end of the wizard.
+     * If a $draftId is provided and matches one of this host's Draft places,
+     * we promote that record to PendingReview. Otherwise we create fresh.
+     *
+     * This pairs with {@see saveDraftForHost()}: the wizard auto-saves each
+     * step as a Draft, then this method flips that Draft to PendingReview
+     * once the host clicks "Create place" so we never end up with duplicate
+     * rows for one wizard session.
      *
      * @param  array<string, mixed>  $data
      */
-    public function createForHost(User $host, array $data): Place
+    public function createForHost(User $host, array $data, ?int $draftId = null): Place
     {
-        return Place::query()->create([
+        $existing = null;
+        if ($draftId !== null) {
+            $existing = Place::query()
+                ->where('id', $draftId)
+                ->where('host_user_id', $host->id)
+                ->where('review_status', PlaceReviewStatus::Draft->value)
+                ->first();
+        }
+
+        $payload = [
+            ...$data,
+            'host_user_id' => $host->id,
+            'status' => PlaceStatus::Inactive->value,
+            'review_status' => PlaceReviewStatus::PendingReview->value,
+        ];
+
+        if ($existing) {
+            $existing->update($payload);
+
+            return $existing->refresh();
+        }
+
+        return Place::query()->create($payload);
+    }
+
+    /**
+     * Upsert the host's in-progress draft. The wizard calls this every time
+     * the host advances a step, so the server-side record exists from step 1
+     * onward and survives a tab close. Status stays Inactive + review_status
+     * stays Draft until the host hits the final "Create place" submit, which
+     * uses {@see createForHost()} (well, the same Draft, just confirmed).
+     *
+     * @param  array<string, mixed>  $data  Any subset of place columns; nulls and missing keys are tolerated.
+     */
+    public function saveDraftForHost(User $host, array $data, ?int $draftId = null): Place
+    {
+        $draft = null;
+        if ($draftId !== null) {
+            $draft = Place::query()
+                ->where('id', $draftId)
+                ->where('host_user_id', $host->id)
+                ->where('review_status', PlaceReviewStatus::Draft->value)
+                ->first();
+        }
+
+        $payload = [
             ...$data,
             'host_user_id' => $host->id,
             'status' => PlaceStatus::Inactive->value,
             'review_status' => PlaceReviewStatus::Draft->value,
-        ]);
+        ];
+
+        if ($draft) {
+            $draft->update($payload);
+
+            return $draft->refresh();
+        }
+
+        return Place::query()->create($payload);
     }
 
     /**

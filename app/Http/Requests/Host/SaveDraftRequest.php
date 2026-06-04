@@ -7,7 +7,7 @@ namespace App\Http\Requests\Host;
 use App\Models\Place;
 use Illuminate\Foundation\Http\FormRequest;
 
-class StorePlaceRequest extends FormRequest
+class SaveDraftRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -15,19 +15,22 @@ class StorePlaceRequest extends FormRequest
     }
 
     /**
+     * Drafts only require a place_type_id — everything else is nullable
+     * because the host is mid-wizard.
+     *
      * @return array<string, mixed>
      */
     public function rules(): array
     {
         $rules = [
             'draft_id' => ['nullable', 'integer'],
-            'title' => ['required', 'string', 'max:255'],
-            'description' => ['nullable', 'string', 'max:10000'],
             'place_type_id' => ['required', 'integer', 'exists:place_types,id'],
-            'city_area_id' => ['required', 'integer', 'exists:city_areas,id'],
-            'price' => ['required', 'integer', 'min:0'],
-            'check_in_time' => ['required', 'string', 'max:8'],
-            'check_out_time' => ['required', 'string', 'max:8'],
+            'title' => ['nullable', 'string', 'max:255'],
+            'description' => ['nullable', 'string', 'max:10000'],
+            'city_area_id' => ['nullable', 'integer', 'exists:city_areas,id'],
+            'price' => ['nullable', 'integer', 'min:0'],
+            'check_in_time' => ['nullable', 'string', 'max:8'],
+            'check_out_time' => ['nullable', 'string', 'max:8'],
             'rules' => ['nullable', 'string', 'max:10000'],
         ];
 
@@ -39,12 +42,15 @@ class StorePlaceRequest extends FormRequest
     }
 
     /**
-     * Validated place columns only — `draft_id` is a control field, not a column.
+     * Only the place-column subset for the service — keep `draft_id` out so
+     * it doesn't end up as a stray column.
      *
      * @return array<string, mixed>
      */
     public function placeData(): array
     {
-        return collect($this->validated())->except('draft_id')->toArray();
+        return collect($this->validated())
+            ->except('draft_id')
+            ->toArray();
     }
 }

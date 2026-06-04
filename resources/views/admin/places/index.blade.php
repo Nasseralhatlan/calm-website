@@ -6,16 +6,16 @@
     $locale = app()->getLocale();
     $isRtl = $locale === 'ar';
 
-    $reviewColor = fn (PlaceReviewStatus $s) => match ($s) {
-        PlaceReviewStatus::Draft => 'background-color: #f3f4f6; color: #6b7280;',
-        PlaceReviewStatus::PendingReview => 'background-color: #fef3c7; color: #92400e;',
-        PlaceReviewStatus::Approved => 'background-color: #d1fae5; color: #15803d;',
-        PlaceReviewStatus::Rejected => 'background-color: #fee2e2; color: #b91c1c;',
+    // Same vivid pill palette as host/places/index — saturated bg, lighter dot, white text.
+    $reviewPill = fn (PlaceReviewStatus $s): array => match ($s) {
+        PlaceReviewStatus::Draft         => ['bg' => '#9ca3af', 'dot' => '#e5e7eb'],
+        PlaceReviewStatus::PendingReview => ['bg' => '#f59e0b', 'dot' => '#fde68a'],
+        PlaceReviewStatus::Approved      => ['bg' => '#10b981', 'dot' => '#a7f3d0'],
+        PlaceReviewStatus::Rejected      => ['bg' => '#ef4444', 'dot' => '#fecaca'],
     };
-
-    $statusColor = fn (PlaceStatus $s) => $s === PlaceStatus::Active
-        ? 'background-color: #d1fae5; color: #15803d;'
-        : 'background-color: #f3f4f6; color: #6b7280;';
+    $statusPill = fn (PlaceStatus $s): array => $s === PlaceStatus::Active
+        ? ['bg' => '#10b981', 'dot' => '#a7f3d0']
+        : ['bg' => '#9ca3af', 'dot' => '#e5e7eb'];
 @endphp
 
 @section('title', $isRtl ? 'الأماكن' : 'Places')
@@ -40,16 +40,25 @@
             </thead>
             <tbody class="text-[14px]">
                 @forelse($places as $place)
+                    @php $sp = $statusPill($place->status); $rp = $reviewPill($place->review_status); @endphp
                     <tr class="border-t border-[#ebebeb]">
-                        <td style="padding: 14px 20px;" class="font-medium">{{ $place->title }}</td>
+                        <td style="padding: 14px 20px;" class="font-medium">{{ $place->title ?: ($isRtl ? '— بدون عنوان —' : '— Untitled —') }}</td>
                         <td style="padding: 14px 20px;" class="text-[#717171]" dir="ltr">{{ $place->host?->phone ? '+966 '.$place->host->phone : ($place->host?->email ?? '—') }}</td>
                         <td style="padding: 14px 20px;" class="text-[#717171]">{{ $isRtl ? $place->type?->name_ar : $place->type?->name_en }}</td>
                         <td style="padding: 14px 20px;" class="text-[#717171]">{{ $isRtl ? $place->cityArea?->city?->name_ar : $place->cityArea?->city?->name_en }}</td>
                         <td style="padding: 14px 20px;">
-                            <span class="text-[11px] font-bold uppercase tracking-wider" style="padding: 4px 10px; border-radius: 999px; {{ $statusColor($place->status) }}">{{ $place->status->value }}</span>
+                            <span class="inline-flex items-center text-[11px] font-bold uppercase tracking-wider text-white"
+                                  style="padding: 4px 12px 4px 9px; border-radius: 999px; gap: 6px; background-color: {{ $sp['bg'] }};">
+                                <span style="width: 6px; height: 6px; border-radius: 999px; background-color: {{ $sp['dot'] }};"></span>
+                                {{ $place->status->value }}
+                            </span>
                         </td>
                         <td style="padding: 14px 20px;">
-                            <span class="text-[11px] font-bold uppercase tracking-wider" style="padding: 4px 10px; border-radius: 999px; {{ $reviewColor($place->review_status) }}">{{ $place->review_status->value }}</span>
+                            <span class="inline-flex items-center text-[11px] font-bold uppercase tracking-wider text-white"
+                                  style="padding: 4px 12px 4px 9px; border-radius: 999px; gap: 6px; background-color: {{ $rp['bg'] }};">
+                                <span style="width: 6px; height: 6px; border-radius: 999px; background-color: {{ $rp['dot'] }};"></span>
+                                {{ str_replace('_', ' ', $place->review_status->value) }}
+                            </span>
                         </td>
                         <td style="padding: 14px 20px;" class="text-end whitespace-nowrap">
                             <a href="{{ route('admin.places.edit', $place) }}" class="text-[#222] font-semibold hover:underline">{{ $isRtl ? 'تعديل' : 'Edit' }}</a>
