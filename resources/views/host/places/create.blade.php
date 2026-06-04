@@ -4,6 +4,7 @@
 
 @section('body')
 @php
+    use Illuminate\Support\Facades\Storage;
     $locale = app()->getLocale();
     $isRtl = $locale === 'ar';
     $fa = $isRtl ? 'font-arabic' : '';
@@ -63,6 +64,20 @@
         'check_in_time' => $draft->check_in_time,
         'check_out_time' => $draft->check_out_time,
         'rules' => $draft->rules,
+        // Restore the host's facility picks.
+        'attributes' => $draft->attributeValues->map(fn ($pa) => [
+            'attribute_id' => $pa->attribute_id,
+            'value' => $pa->value,
+            'description' => $pa->description,
+        ])->values(),
+        // Restore uploaded photos as { attribute_id|null, path, url, is_cover }.
+        // The wizard reconstructs its in-memory upload state from these.
+        'photos' => $draft->photos->map(fn ($p) => [
+            'place_attribute_id' => $p->place_attribute_id,
+            'path' => $p->path,
+            'url' => Storage::disk('s3')->url($p->path),
+            'is_cover' => (bool) $p->is_cover,
+        ])->values(),
     ] : null;
 @endphp
 
@@ -336,15 +351,16 @@
                     </template>
                 </section>
 
-                {{-- ── Step 8: images per chosen attribute that needs / allows photos ── --}}
+                {{-- ── Step 8: photos (per-attribute + extras + cover) ── --}}
                 <section x-show="step === 8" x-transition.opacity>
                     <h2 class="text-3xl sm:text-[34px] font-bold tracking-tight text-[#222] {{ $fa }}">{{ $isRtl ? 'صور المكان' : 'Photos of your place' }}</h2>
-                    <p class="mt-2 text-[#717171] text-base {{ $fa }}">{{ $isRtl ? 'أضف صوراً للعناصر المهمة — الصور الواضحة تزيد الحجوزات.' : 'Add photos for the key spaces — clear photos book faster.' }}</p>
+                    <p class="mt-2 text-[#717171] text-base {{ $fa }}">{{ $isRtl ? 'أضف صوراً للعناصر، صوراً عامة، وحدّد صورة الغلاف.' : 'Add per-attribute photos, general photos, then pick a cover.' }}</p>
 
+                    {{-- A. Per-attribute uploads — only for attributes whose photo_rule is required/optional --}}
                     <div class="mt-10 space-y-4">
-                        <template x-for="entry in photoNeedingAttributes()" :key="`img-${entry.id}`">
+                        <template x-for="entry in photoNeedingAttributes()" :key="`up-${entry.id}`">
                             <div class="r-ios-lg bg-white shadow-card p-5 border-2"
-                                 :class="entry.attribute.photoRule === 'required' && !entry.photosCount
+                                 :class="entry.attribute.photoRule === 'required' && uploadCountFor(entry.id, false) === 0
                                      ? 'border-[#F88379]/40'
                                      : 'border-transparent'">
                                 <div class="flex items-center justify-between mb-3">
@@ -361,20 +377,46 @@
                                 </div>
 
                                 <label class="block relative cursor-pointer hover:bg-[#f7f7f7] transition-colors {{ $fa }}"
-                                       style="border: 2px dashed #cbd5e1; border-radius: 20px; padding: 28px 16px; text-align: center;">
+                                       style="border: 2px dashed #cbd5e1; border-radius: 20px; padding: 24px 16px; text-align: center;">
                                     <div class="text-3xl" style="line-height: 1;">📷</div>
                                     <div class="mt-2 text-sm font-semibold text-[#222]">{{ $isRtl ? 'أضف صوراً' : 'Add photos' }}</div>
                                     <div class="mt-1 text-xs text-[#717171]">{{ $isRtl ? 'يمكنك اختيار أكثر من صورة' : 'You can pick more than one' }}</div>
                                     <input type="file" accept="image/*" multiple
-                                           @change="onPhotosPicked($event, entry.id)"
+                                           @change="onAttributeFiles($event, entry.id)"
                                            class="absolute inset-0 opacity-0 cursor-pointer">
                                 </label>
 
-                                {{-- Preview grid --}}
-                                <div class="mt-4 grid grid-cols-3 sm:grid-cols-4 gap-2" x-show="(photoPreviews[entry.id] || []).length > 0">
-                                    <template x-for="(p, pIdx) in photoPreviews[entry.id] || []" :key="`p-${entry.id}-${pIdx}`">
-                                        <div class="relative">
-                                            <img :src="p" class="block w-full aspect-square object-cover r-ios">
+                                {{-- Upload tiles --}}
+                                <div class="mt-4 grid grid-cols-3 sm:grid-cols-4 gap-2" x-show="(attributeUploads[entry.id] || []).length > 0">
+                                    <template x-for="(u, uIdx) in attributeUploads[entry.id] || []" :key="`au-${entry.id}-${u.id}`">
+                                        <div class="relative group">
+                                            <img :src="u.preview || u.url" class="block w-full aspect-square object-cover r-ios"
+                                                 :class="u.status === 'uploading' ? 'opacity-40' : ''">
+                                            {{-- Cover badge --}}
+                                            <span x-show="u.id === coverUploadId"
+                                                  class="absolute top-1 left-1 inline-flex items-center gap-1 text-[10px] font-bold bg-[#F88379] text-white px-2 py-0.5 {{ $fa }}"
+                                                  style="border-radius: 999px;">
+                                                <span>★</span><span>{{ $isRtl ? 'غلاف' : 'COVER' }}</span>
+                                            </span>
+                                            {{-- Status overlay --}}
+                                            <div x-show="u.status === 'uploading'" class="absolute inset-0 flex items-center justify-center text-[11px] font-bold text-[#222] {{ $fa }}">
+                                                {{ $isRtl ? '...جارٍ الرفع' : 'Uploading...' }}
+                                            </div>
+                                            <div x-show="u.status === 'failed'"
+                                                 class="absolute inset-0 flex items-center justify-center text-[11px] font-bold bg-[#fef3f2]/90 text-[#b91c1c] {{ $fa }}">
+                                                {{ $isRtl ? 'فشل الرفع' : 'Upload failed' }}
+                                            </div>
+                                            {{-- Hover toolbar --}}
+                                            <div class="absolute inset-x-1 bottom-1 flex items-center justify-between opacity-0 group-hover:opacity-100 transition-opacity"
+                                                 x-show="u.status === 'done'">
+                                                <button type="button" @click="coverUploadId = u.id"
+                                                        class="text-[10px] font-bold bg-white/90 text-[#222] px-2 py-0.5"
+                                                        style="border-radius: 999px;"
+                                                        x-show="u.id !== coverUploadId">★ {{ $isRtl ? 'غلاف' : 'Cover' }}</button>
+                                                <button type="button" @click="removeAttributeUpload(entry.id, u.id)"
+                                                        class="text-[10px] font-bold bg-white/90 text-[#b91c1c] px-2 py-0.5 ml-auto"
+                                                        style="border-radius: 999px;">✕</button>
+                                            </div>
                                         </div>
                                     </template>
                                 </div>
@@ -382,14 +424,77 @@
                         </template>
 
                         <div x-show="photoNeedingAttributes().length === 0"
-                             class="r-ios-lg bg-[#fafafa] p-8 text-center text-[#717171] text-sm {{ $fa }}">
-                            {{ $isRtl ? 'لا يوجد عنصر مختار يتطلب صوراً — يمكنك المتابعة.' : "Nothing you picked needs photos — you can continue." }}
+                             class="r-ios-lg bg-[#fafafa] p-6 text-center text-[#717171] text-sm {{ $fa }}">
+                            {{ $isRtl ? 'لا يوجد عنصر مختار يتطلب صوراً — يمكنك المتابعة عبر إضافة صور عامة.' : "None of your picks need attribute-specific photos — use the general photos below if you'd like." }}
                         </div>
-
-                        <p class="text-[12px] text-[#717171] text-center {{ $fa }}" x-show="photoNeedingAttributes().length > 0">
-                            {{ $isRtl ? '💡 رفع الصور إلى الخادم سيُفعّل في خطوة لاحقة.' : '💡 Server upload wiring lands in a follow-up step.' }}
-                        </p>
                     </div>
+
+                    {{-- B. Extra (general) photos — not tied to any attribute --}}
+                    <div class="mt-10">
+                        <h3 class="text-lg font-bold text-[#222] mb-3 {{ $fa }}">{{ $isRtl ? 'صور إضافية' : 'More photos' }}</h3>
+                        <p class="text-[13px] text-[#717171] mb-4 {{ $fa }}">{{ $isRtl ? 'صور للمكان غير مرتبطة بعنصر محدد.' : "Place photos that aren't tied to any specific attribute." }}</p>
+
+                        <label class="block relative cursor-pointer hover:bg-[#f7f7f7] transition-colors {{ $fa }}"
+                               style="border: 2px dashed #cbd5e1; border-radius: 20px; padding: 24px 16px; text-align: center;">
+                            <div class="text-3xl" style="line-height: 1;">🖼️</div>
+                            <div class="mt-2 text-sm font-semibold text-[#222]">{{ $isRtl ? 'أضف صوراً عامة' : 'Add general photos' }}</div>
+                            <div class="mt-1 text-xs text-[#717171]">{{ $isRtl ? 'يمكنك اختيار أكثر من صورة' : 'You can pick more than one' }}</div>
+                            <input type="file" accept="image/*" multiple
+                                   @change="onExtraFiles($event)"
+                                   class="absolute inset-0 opacity-0 cursor-pointer">
+                        </label>
+
+                        <div class="mt-4 grid grid-cols-3 sm:grid-cols-4 gap-2" x-show="extraUploads.length > 0">
+                            <template x-for="(u, uIdx) in extraUploads" :key="`ex-${u.id}`">
+                                <div class="relative group">
+                                    <img :src="u.preview || u.url" class="block w-full aspect-square object-cover r-ios"
+                                         :class="u.status === 'uploading' ? 'opacity-40' : ''">
+                                    <span x-show="u.id === coverUploadId"
+                                          class="absolute top-1 left-1 inline-flex items-center gap-1 text-[10px] font-bold bg-[#F88379] text-white px-2 py-0.5 {{ $fa }}"
+                                          style="border-radius: 999px;">
+                                        <span>★</span><span>{{ $isRtl ? 'غلاف' : 'COVER' }}</span>
+                                    </span>
+                                    <div x-show="u.status === 'uploading'" class="absolute inset-0 flex items-center justify-center text-[11px] font-bold text-[#222] {{ $fa }}">
+                                        {{ $isRtl ? '...جارٍ الرفع' : 'Uploading...' }}
+                                    </div>
+                                    <div x-show="u.status === 'failed'"
+                                         class="absolute inset-0 flex items-center justify-center text-[11px] font-bold bg-[#fef3f2]/90 text-[#b91c1c] {{ $fa }}">
+                                        {{ $isRtl ? 'فشل الرفع' : 'Upload failed' }}
+                                    </div>
+                                    <div class="absolute inset-x-1 bottom-1 flex items-center justify-between opacity-0 group-hover:opacity-100 transition-opacity"
+                                         x-show="u.status === 'done'">
+                                        <button type="button" @click="coverUploadId = u.id"
+                                                class="text-[10px] font-bold bg-white/90 text-[#222] px-2 py-0.5"
+                                                style="border-radius: 999px;"
+                                                x-show="u.id !== coverUploadId">★ {{ $isRtl ? 'غلاف' : 'Cover' }}</button>
+                                        <button type="button" @click="removeExtraUpload(u.id)"
+                                                class="text-[10px] font-bold bg-white/90 text-[#b91c1c] px-2 py-0.5 ml-auto"
+                                                style="border-radius: 999px;">✕</button>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+
+                    {{-- C. Cover image hint --}}
+                    <div class="mt-8 r-ios-lg bg-[#fafafa] p-4 text-[13px] text-[#717171] {{ $fa }}"
+                         x-show="totalDoneUploads() > 0 && coverUploadId === null">
+                        {{ $isRtl ? '⭐ مرّر فوق أي صورة وانقر "غلاف" لاختيار صورة الواجهة.' : '⭐ Hover any photo and tap "Cover" to mark it as the listing cover.' }}
+                    </div>
+
+                    {{-- Hidden inputs — form-submit payload --}}
+                    <template x-for="entry in selectedAttributesList()" :key="`aphid-${entry.id}`">
+                        <div>
+                            <template x-for="(u, uIdx) in (attributeUploads[entry.id] || []).filter(x => x.status === 'done')"
+                                      :key="`aphidv-${entry.id}-${u.id}`">
+                                <input type="hidden" :name="`attribute_image_paths[${entry.id}][${uIdx}]`" :value="u.path">
+                            </template>
+                        </div>
+                    </template>
+                    <template x-for="(u, uIdx) in extraUploads.filter(x => x.status === 'done')" :key="`exhid-${u.id}`">
+                        <input type="hidden" :name="`extra_image_paths[${uIdx}]`" :value="u.path">
+                    </template>
+                    <input type="hidden" name="cover_image" :value="coverImageMarker()">
                 </section>
 
                 {{-- ── Step 9: check-in/out + rules + submit ── --}}
@@ -484,8 +589,13 @@ function registerWizard() {
         rules: '',
         // attribute_id → { count, description }
         selectedAttributes: {},
-        // attribute_id → array of preview dataURLs (UI only — server upload wiring lands later)
-        photoPreviews: {},
+
+        // Upload pipeline state (master's pattern). Each entry is
+        // { id, status: 'uploading'|'done'|'failed', preview, path, url, name, error? }
+        attributeUploads: {},   // attribute_id → list
+        extraUploads: [],       // general photos, no attribute
+        coverUploadId: null,    // upload id currently flagged as the cover
+        uploadCounter: 0,       // monotonic id source for upload rows
 
         init() {
             // Base price → mirror into all 7 day prices.
@@ -509,6 +619,30 @@ function registerWizard() {
                 this.checkOutTime = init.draft.check_out_time || '12:00';
                 this.rules        = init.draft.rules || '';
                 this.draftId      = init.draft.id;
+
+                // Restore selected attributes — keyed by attribute_id, value = count, plus description.
+                (init.draft.attributes || []).forEach((a) => {
+                    this.selectedAttributes[a.attribute_id] = {
+                        count: Number(a.value) || 1,
+                        description: a.description || '',
+                    };
+                });
+
+                // Restore uploaded photos into the same in-memory shape the upload
+                // pipeline builds. `status: 'done'` so they render as fully-uploaded
+                // and persist back through the next saveDraft() round-trip.
+                (init.draft.photos || []).forEach((p) => {
+                    const id = ++this.uploadCounter;
+                    const key = (p.place_attribute_id != null) ? `attribute_images.${p.place_attribute_id}` : 'extra_images';
+                    const entry = { id, status: 'done', preview: p.url, path: p.path, url: p.url, name: '' };
+                    if (p.place_attribute_id != null) {
+                        if (!this.attributeUploads[p.place_attribute_id]) this.attributeUploads[p.place_attribute_id] = [];
+                        this.attributeUploads[p.place_attribute_id].push(entry);
+                    } else {
+                        this.extraUploads.push(entry);
+                    }
+                    if (p.is_cover) this.coverUploadId = id;
+                });
             }
         },
 
@@ -537,7 +671,7 @@ function registerWizard() {
                 case 7: return this.selectedAttributesList().every((e) => e.count >= 1); // configure
                 case 8: return this.photoNeedingAttributes()
                     .filter((e) => e.attribute.photoRule === 'required')
-                    .every((e) => (this.photoPreviews[e.id] || []).length > 0);        // photos
+                    .every((e) => this.uploadCountFor(e.id, true) > 0);                // photos
                 case 9: return this.checkInTime.trim().length > 0 && this.checkOutTime.trim().length > 0;
                 default: return true;
             }
@@ -557,7 +691,10 @@ function registerWizard() {
 
         // ── Attributes (selection — step 6)
         hasAttribute(id) {
-            return Object.prototype.hasOwnProperty.call(this.selectedAttributes, id);
+            // Direct key access goes through Alpine's reactive proxy `get` trap,
+            // so the UI updates on toggleAttribute(). `hasOwnProperty.call` did
+            // NOT trigger reactivity → the chip's selected style stuck stale.
+            return this.selectedAttributes[id] !== undefined;
         },
         toggleAttribute(id) {
             if (this.hasAttribute(id)) {
@@ -585,7 +722,6 @@ function registerWizard() {
                     attribute: this.attributeById(id),
                     count: entry.count,
                     description: entry.description,
-                    photosCount: (this.photoPreviews[id] || []).length,
                 };
             }).filter((e) => e.attribute);
         },
@@ -600,27 +736,141 @@ function registerWizard() {
             }
         },
 
-        // ── Photos (step 8)
+        // ── Photos (step 8) — presign-then-PUT pipeline mirroring master/hosts.
         photoNeedingAttributes() {
             return this.selectedAttributesList().filter(
                 (e) => e.attribute.photoRule === 'required' || e.attribute.photoRule === 'optional'
             );
         },
-        onPhotosPicked(event, attributeId) {
-            const files = Array.from(event.target.files || []);
-            if (!files.length) return;
-            if (!this.photoPreviews[attributeId]) this.photoPreviews[attributeId] = [];
-            files.forEach((file) => {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    this.photoPreviews[attributeId] = [
-                        ...(this.photoPreviews[attributeId] || []),
-                        e.target.result,
-                    ];
-                };
-                reader.readAsDataURL(file);
+        uploadCountFor(attributeId, doneOnly = true) {
+            const list = this.attributeUploads[attributeId] || [];
+            return doneOnly ? list.filter((u) => u.status === 'done').length : list.length;
+        },
+        totalDoneUploads() {
+            let n = this.extraUploads.filter((u) => u.status === 'done').length;
+            Object.keys(this.attributeUploads).forEach((k) => {
+                n += (this.attributeUploads[k] || []).filter((u) => u.status === 'done').length;
             });
+            return n;
+        },
+        /**
+         * Build the composite key the server expects for the cover marker:
+         *   - `attribute_images.<attrId>.<i>` for an attribute upload
+         *   - `extra_images.<i>` for a general upload
+         * The index `i` is the position within the `.filter(u => u.status === 'done')`
+         * list — matching the same shape we use for hidden inputs.
+         */
+        coverImageMarker() {
+            if (this.coverUploadId === null) return '';
+            const attrIds = Object.keys(this.attributeUploads);
+            for (const aid of attrIds) {
+                const done = (this.attributeUploads[aid] || []).filter((u) => u.status === 'done');
+                const idx = done.findIndex((u) => u.id === this.coverUploadId);
+                if (idx >= 0) return `attribute_images.${aid}.${idx}`;
+            }
+            const extras = this.extraUploads.filter((u) => u.status === 'done');
+            const idx = extras.findIndex((u) => u.id === this.coverUploadId);
+            if (idx >= 0) return `extra_images.${idx}`;
+            return '';
+        },
+        removeAttributeUpload(attributeId, uploadId) {
+            this.attributeUploads[attributeId] = (this.attributeUploads[attributeId] || [])
+                .filter((u) => u.id !== uploadId);
+            if (this.coverUploadId === uploadId) this.coverUploadId = null;
+        },
+        removeExtraUpload(uploadId) {
+            this.extraUploads = this.extraUploads.filter((u) => u.id !== uploadId);
+            if (this.coverUploadId === uploadId) this.coverUploadId = null;
+        },
+        _readPreview(file) {
+            return new Promise((resolve) => {
+                const r = new FileReader();
+                r.onload = (e) => resolve(e.target.result);
+                r.readAsDataURL(file);
+            });
+        },
+        /**
+         * Step 1: POST {filename, mime} to /host-register/presign → ticket with put_url.
+         * Step 2: PUT the raw bytes straight to S3 (DO Spaces) — PHP doesn't see them.
+         * Returns { path, url } on success.
+         */
+        async _uploadOne(file) {
+            const presignRes = await fetch('{{ route('host.places.presign') }}', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': csrfToken,
+                },
+                body: JSON.stringify({
+                    filename: file.name,
+                    mime: file.type || 'application/octet-stream',
+                }),
+            });
+            if (!presignRes.ok) {
+                let msg = `Could not get upload URL (${presignRes.status})`;
+                try {
+                    const err = await presignRes.json();
+                    if (err.message) msg = err.message;
+                } catch (_) {}
+                throw new Error(msg);
+            }
+            const ticket = await presignRes.json();
+
+            const putRes = await fetch(ticket.put_url, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': ticket.mime,
+                    'x-amz-acl': 'public-read',
+                },
+                body: file,
+            });
+            if (!putRes.ok) throw new Error(`Upload to storage failed (${putRes.status})`);
+
+            return { path: ticket.path, url: ticket.public_url };
+        },
+        async onAttributeFiles(event, attributeId) {
+            const files = Array.from(event.target.files || []);
             event.target.value = '';
+            if (!files.length) return;
+            if (!this.attributeUploads[attributeId]) this.attributeUploads[attributeId] = [];
+
+            for (const file of files) {
+                const preview = await this._readPreview(file);
+                const id = ++this.uploadCounter;
+                this.attributeUploads[attributeId].push({
+                    id, name: file.name, status: 'uploading', preview, path: null, url: null,
+                });
+                this._uploadOne(file).then((r) => {
+                    const row = (this.attributeUploads[attributeId] || []).find((u) => u.id === id);
+                    if (row) { row.path = r.path; row.url = r.url; row.status = 'done'; }
+                }).catch((err) => {
+                    const row = (this.attributeUploads[attributeId] || []).find((u) => u.id === id);
+                    if (row) { row.status = 'failed'; row.error = err.message || 'Upload failed'; }
+                });
+            }
+        },
+        async onExtraFiles(event) {
+            const files = Array.from(event.target.files || []);
+            event.target.value = '';
+            if (!files.length) return;
+
+            for (const file of files) {
+                const preview = await this._readPreview(file);
+                const id = ++this.uploadCounter;
+                this.extraUploads.push({
+                    id, name: file.name, status: 'uploading', preview, path: null, url: null,
+                });
+                this._uploadOne(file).then((r) => {
+                    const row = this.extraUploads.find((u) => u.id === id);
+                    if (row) { row.path = r.path; row.url = r.url; row.status = 'done'; }
+                }).catch((err) => {
+                    const row = this.extraUploads.find((u) => u.id === id);
+                    if (row) { row.status = 'failed'; row.error = err.message || 'Upload failed'; }
+                });
+            }
         },
 
         // ── Draft auto-save
@@ -634,6 +884,7 @@ function registerWizard() {
             this.draftSaving = true;
             this.draftError = '';
 
+            // Place column subset.
             const payload = {
                 draft_id: this.draftId,
                 place_type_id: this.placeTypeId,
@@ -652,6 +903,33 @@ function registerWizard() {
                 price_friday:    this.dayPrices.friday    || 0,
                 price_saturday:  this.dayPrices.saturday  || 0,
             };
+
+            // Attribute picks — only sent once the host has chosen anything,
+            // so early-step drafts don't blow away a previous round's picks.
+            const attrIds = Object.keys(this.selectedAttributes);
+            if (attrIds.length > 0) {
+                payload.attributes = attrIds.map((id) => ({
+                    attribute_id: Number(id),
+                    value: String(this.selectedAttributes[id].count),
+                    description: this.selectedAttributes[id].description || null,
+                }));
+            }
+
+            // Photo paths — keyed by attribute_id, plus extras + cover marker.
+            // Same guard: only send the photo payload once any upload is done so
+            // pre-step-8 draft saves don't wipe what was already on the server.
+            if (this.totalDoneUploads() > 0) {
+                const attrPaths = {};
+                Object.keys(this.attributeUploads).forEach((aid) => {
+                    const done = (this.attributeUploads[aid] || []).filter((u) => u.status === 'done');
+                    if (done.length > 0) attrPaths[aid] = done.map((u) => u.path);
+                });
+                const extras = this.extraUploads.filter((u) => u.status === 'done').map((u) => u.path);
+
+                payload.attribute_image_paths = attrPaths;
+                payload.extra_image_paths = extras;
+                payload.cover_image = this.coverImageMarker();
+            }
 
             try {
                 const res = await fetch(this.draftEndpoint, {

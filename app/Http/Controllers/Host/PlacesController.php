@@ -16,6 +16,8 @@ use App\Services\Place\PlaceService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 class PlacesController extends Controller
@@ -40,7 +42,7 @@ class PlacesController extends Controller
         $draft = null;
         if ($draftId = $request->integer('draft')) {
             $draft = Place::query()
-                ->with('cityArea:id,city_id')
+                ->with(['cityArea:id,city_id', 'attributeValues', 'photos'])
                 ->where('id', $draftId)
                 ->where('host_user_id', $request->user()->id)
                 ->where('review_status', PlaceReviewStatus::Draft->value)
@@ -64,17 +66,56 @@ class PlacesController extends Controller
      */
     public function saveDraft(SaveDraftRequest $request): JsonResponse
     {
-        $draftId = $request->integer('draft_id') ?: null;
-
         $draft = $this->service->saveDraftForHost(
             $request->user(),
             $request->placeData(),
-            $draftId,
+            $request->integer('draft_id') ?: null,
+            $request->attributesData(),
+            $request->photosData(),
         );
 
         return response()->json([
             'id' => $draft->id,
             'review_status' => $draft->review_status->value,
+        ]);
+    }
+
+    /**
+     * Mint a short-lived presigned PUT URL so the browser uploads the file
+     * straight to DO Spaces / S3 — the PHP container never sees the bytes.
+     * Mirrors master's `hosts.presign-upload` route.
+     */
+    public function presignUpload(Request $request): JsonResponse
+    {
+        $request->validate([
+            'filename' => ['required', 'string', 'max:255'],
+            'mime' => ['required', 'string', 'max:120'],
+        ]);
+
+        $ext = pathinfo((string) $request->input('filename'), PATHINFO_EXTENSION) ?: 'jpg';
+        $key = 'places/uploads/'.Str::lower(Str::random(24)).'.'.Str::lower($ext);
+        $mime = (string) $request->input('mime');
+
+        /** @var \Illuminate\Filesystem\FilesystemAdapter $disk */
+        $disk = Storage::disk('s3');
+        /** @var \Aws\S3\S3Client $client */
+        $client = $disk->getClient();
+        $bucket = config('filesystems.disks.s3.bucket');
+
+        $command = $client->getCommand('PutObject', [
+            'Bucket' => $bucket,
+            'Key' => $key,
+            'ContentType' => $mime,
+            'ACL' => 'public-read',
+        ]);
+
+        $presigned = $client->createPresignedRequest($command, '+15 minutes');
+
+        return response()->json([
+            'put_url' => (string) $presigned->getUri(),
+            'path' => $key,
+            'public_url' => $disk->url($key),
+            'mime' => $mime,
         ]);
     }
 
@@ -84,6 +125,8 @@ class PlacesController extends Controller
             $request->user(),
             $request->placeData(),
             $request->integer('draft_id') ?: null,
+            $request->attributesData(),
+            $request->photosData(),
         );
 
         return redirect()

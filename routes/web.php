@@ -43,6 +43,7 @@ Route::middleware('auth:api')->group(function (): void {
     Route::get('/host-register', [HostPlacesController::class, 'create'])->name('host.places.create');
     Route::post('/host-register', [HostPlacesController::class, 'store'])->name('host.places.store');
     Route::post('/host-register/draft', [HostPlacesController::class, 'saveDraft'])->name('host.places.draft');
+    Route::post('/host-register/presign', [HostPlacesController::class, 'presignUpload'])->name('host.places.presign');
     Route::get('/my-places', [HostPlacesController::class, 'index'])->name('user.places');
 
     // Regular-user dashboard tabs (placeholders until each feature ships)
