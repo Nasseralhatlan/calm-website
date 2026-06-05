@@ -139,6 +139,43 @@ html, body {
     th { text-align: start; }
 }
 
+/*
+ * Spinner used by the global submit-loading handler in resources/js/app.js.
+ * The wrapper animates from 0-width → 16px with smooth opacity + margin
+ * transitions so the spinner glides in next to the existing button text
+ * instead of replacing it. SVG (not CSS-border) so the page-wide
+ * `corner-shape: squircle !important` rule can't flatten the circle.
+ */
+.calm-spinner-slot {
+    display: inline-flex;
+    align-items: center;
+    /* Align the slot with the text baseline. inline-flex defaults its
+     * baseline to the bottom of its block-level child (the SVG), so without
+     * this nudge the spinner floats slightly above the label. -3px brings
+     * the spinner's centre down onto the text's x-height. */
+    vertical-align: -3px;
+    width: 0;
+    margin-inline-end: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition: width 220ms ease, margin-inline-end 220ms ease, opacity 180ms ease;
+    pointer-events: none;
+}
+.calm-spinner-slot.is-active {
+    width: 16px;
+    margin-inline-end: 10px;
+    opacity: 1;
+}
+.calm-spinner {
+    display: block;
+    flex-shrink: 0;
+    animation: calm-spin 0.7s linear infinite;
+    color: currentColor;
+}
+@keyframes calm-spin {
+    to { transform: rotate(360deg); }
+}
+
 /* iOS-flavoured continuous-feel corners — applied to anything rounded,
    so any future class with "rounded" or "r-ios" in its name picks it up too. */
 [class*="rounded"],
