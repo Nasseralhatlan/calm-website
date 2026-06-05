@@ -107,7 +107,7 @@ final class OtpService
 
     private function dispatch(OtpType $type, string $identifier, string $code): void
     {
-        $message = "Your Calm verification code is: {$code}. Valid for ".self::TTL_MINUTES.' minutes.';
+        $message = "Your Calm verification code is: {$code}";
 
         match ($type) {
             OtpType::Phone => $this->sms->send($identifier, $message),
@@ -119,6 +119,15 @@ final class OtpService
 
     private function generateCode(): string
     {
+        // Dev convenience: the mock SMS driver doesn't deliver to a real phone,
+        // so a random code would just clutter the log and force the dev to
+        // open it on every login. Hard-code "111111" so anyone running the
+        // app locally (or in CI) can sign in without checking laravel.log.
+        // The real `sms_saudi` driver still gets a fresh random code.
+        if (config('sms.driver') === 'mock') {
+            return str_repeat('1', self::OTP_LENGTH);
+        }
+
         $code = '';
 
         for ($i = 0; $i < self::OTP_LENGTH; $i++) {

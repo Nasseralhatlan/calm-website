@@ -581,10 +581,18 @@
                     </button>
                     <div x-show="step === 1"></div>
 
-                    <button type="button" @click="next" x-show="step < totalSteps" :disabled="!canAdvance()"
-                            class="font-bold text-white bg-[#222] hover:bg-black disabled:bg-[#dddddd] disabled:cursor-not-allowed active:scale-[0.98] transition-all {{ $fa }}"
+                    <button type="button" @click="next" x-show="step < totalSteps" :disabled="!canAdvance() || draftSaving"
+                            class="inline-flex items-center justify-center font-bold text-white bg-[#222] hover:bg-black disabled:bg-[#dddddd] disabled:cursor-not-allowed active:scale-[0.98] transition-all {{ $fa }}"
                             style="padding: 14px 28px; border-radius: 16px;">
-                        {{ $isRtl ? 'التالي' : 'Continue' }}
+                        {{-- Slot opens (width + margin + opacity) when saveDraft is in flight,
+                             sliding the SVG spinner in next to the Continue label rather than replacing it. --}}
+                        <span class="calm-spinner-slot" :class="{ 'is-active': draftSaving }" aria-hidden="true">
+                            <svg class="calm-spinner" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round">
+                                <circle cx="12" cy="12" r="10" stroke-opacity="0.25"/>
+                                <path d="M22 12a10 10 0 0 1-10 10"/>
+                            </svg>
+                        </span>
+                        <span>{{ $isRtl ? 'التالي' : 'Continue' }}</span>
                     </button>
 
                     <button type="submit" x-show="step === totalSteps" :disabled="submitting || !canAdvance()"
