@@ -32,5 +32,14 @@
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
+        <!-- Force the in-memory SMS mock during tests so any code path going
+             through the DI container can NEVER reach the real SMS gateway,
+             even if a developer's local .env has SMS_DRIVER=sms_saudi. -->
+        <env name="SMS_DRIVER" value="mock"/>
+        <!-- Defang any accidental real outbound HTTP — also blocks the gateway
+             at the network layer. tests/Pest.php pairs this with
+             Http::preventStrayRequests() so unfaked requests throw loudly. -->
+        <env name="SMS_SAUDI_API_KEY" value="TEST_DO_NOT_USE"/>
+        <env name="SMS_SAUDI_SENDER" value="TestSender"/>
     </php>
 </phpunit>

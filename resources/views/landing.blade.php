@@ -37,20 +37,86 @@
 
 <div class="min-h-screen flex flex-col bg-white">
     {{-- header --}}
+    @php
+        // The whole app authenticates through the `api` (JWT) guard now — the JWT cookie
+        // is set on login and Laravel resolves the user from it for SSR Blade requests.
+        $signedIn = auth('api')->user();
+        $isHost = $signedIn?->isHost() ?? false;
+        $profileRoute = $signedIn?->isAdmin() ? route('admin.dashboard') : route('profile');
+        // Admins see "Dashboard"; regular users see "Profile" with a circular avatar.
+        $profileLabel = $isRtl
+            ? ($signedIn?->isAdmin() ? 'لوحة التحكم' : 'ملفي')
+            : ($signedIn?->isAdmin() ? 'Dashboard' : 'Profile');
+        $profileInitial = strtoupper(mb_substr($signedIn?->name ?: ($signedIn?->phone ?: '?'), 0, 1));
+    @endphp
     <header class="w-full border-b border-[#ebebeb]">
         <div class="px-6 sm:px-10 lg:px-20 h-20 flex items-center justify-between">
             <a href="/" class="flex items-center gap-2">
                 <img src="/assets/logo/logo.png" alt="Calm" class="h-9 sm:h-10 w-auto select-none" draggable="false">
             </a>
 
-            <form method="POST" action="{{ url('/locale/' . ($locale === 'ar' ? 'en' : 'ar')) }}" class="m-0">
-                @csrf
-                <button type="submit"
-                    style="border-radius: 14px;"
-                    class="text-sm font-semibold text-[#222] hover:bg-[#f7f7f7] px-4 py-3 transition-colors {{ $locale === 'en' ? 'font-arabic' : '' }}">
-                    {{ $locale === 'ar' ? 'English' : 'العربية' }}
-                </button>
-            </form>
+            <div class="flex items-center" style="gap: 6px;">
+                @if($signedIn)
+                    {{-- Profile-style button (avatar circle + label) --}}
+                    <a href="{{ $profileRoute }}"
+                       class="inline-flex items-center text-sm font-bold text-[#222] hover:bg-[#f7f7f7] transition-colors {{ $arabicClass }}"
+                       style="padding: 6px 14px 6px 6px; border-radius: 999px; gap: 10px;">
+                        <span class="flex items-center justify-center text-white font-bold"
+                              style="width: 32px; height: 32px; border-radius: 50%; background-color: #222; font-size: 13px;">{{ $profileInitial }}</span>
+                        <span>{{ $profileLabel }}</span>
+                    </a>
+
+                    {{-- Host CTA changes shape based on whether the user already hosts a place --}}
+                    @if($isHost)
+                        <a href="{{ route('user.places') }}"
+                           class="inline-flex items-center text-sm font-bold text-white bg-[#F88379] hover:bg-[#f56b60] active:scale-[0.98] transition-all {{ $arabicClass }}"
+                           style="padding: 10px 18px; border-radius: 14px; gap: 8px; box-shadow: 0 6px 14px rgba(248,131,121,0.3);">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M3 9.5L12 3l9 6.5V21a1 1 0 0 1-1 1h-5v-7h-6v7H4a1 1 0 0 1-1-1V9.5z"></path>
+                            </svg>
+                            <span>{{ $isRtl ? 'عرض أماكني' : 'View my places' }}</span>
+                        </a>
+                    @else
+                        <a href="{{ route('host.places.create') }}"
+                           class="inline-flex items-center text-sm font-bold text-white bg-[#F88379] hover:bg-[#f56b60] active:scale-[0.98] transition-all {{ $arabicClass }}"
+                           style="padding: 10px 18px; border-radius: 14px; gap: 8px; box-shadow: 0 6px 14px rgba(248,131,121,0.3);">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 5v14M5 12h14"></path>
+                            </svg>
+                            <span>{{ $isRtl ? 'كن مضيفاً' : 'Become a host' }}</span>
+                        </a>
+                    @endif
+                @else
+                    <a href="{{ route('login') }}"
+                       class="inline-flex items-center text-sm font-bold text-[#222] hover:bg-[#f7f7f7] transition-colors {{ $arabicClass }}"
+                       style="padding: 10px 16px; border-radius: 14px; gap: 8px;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path>
+                            <polyline points="10 17 15 12 10 7"></polyline>
+                            <line x1="15" y1="12" x2="3" y2="12"></line>
+                        </svg>
+                        <span>{{ $isRtl ? 'تسجيل الدخول' : 'Sign in' }}</span>
+                    </a>
+
+                    <a href="{{ route('login', ['next' => '/host-register']) }}"
+                       class="inline-flex items-center text-sm font-bold text-white bg-[#F88379] hover:bg-[#f56b60] active:scale-[0.98] transition-all {{ $arabicClass }}"
+                       style="padding: 10px 18px; border-radius: 14px; gap: 8px; box-shadow: 0 6px 14px rgba(248,131,121,0.3);">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 5v14M5 12h14"></path>
+                        </svg>
+                        <span>{{ $isRtl ? 'كن مضيفاً' : 'Become a host' }}</span>
+                    </a>
+                @endif
+
+                <form method="POST" action="{{ url('/locale/' . ($locale === 'ar' ? 'en' : 'ar')) }}" class="m-0">
+                    @csrf
+                    <button type="submit"
+                        style="border-radius: 14px;"
+                        class="text-sm font-semibold text-[#222] hover:bg-[#f7f7f7] px-4 py-3 transition-colors {{ $locale === 'en' ? 'font-arabic' : '' }}">
+                        {{ $locale === 'ar' ? 'English' : 'العربية' }}
+                    </button>
+                </form>
+            </div>
         </div>
     </header>
 
@@ -151,11 +217,11 @@
                 </div>
 
                 {{-- CTA --}}
-                <a href="{{ route('hosts.create') }}"
+                <a href="{{ route('login') }}"
                    class="inline-flex items-center font-bold text-white bg-[#F88379] hover:bg-[#f56b60] active:scale-[0.98] transition-all"
                    style="margin-top: 48px; padding: 16px 32px; gap: 10px; border-radius: 28px; corner-shape: squircle; box-shadow: 0 6px 14px rgba(248,131,121,0.3); font-size: 16px;">
                     <span>{{ __('host_cta') }}</span>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transform: {{ $isRtl ? 'scaleX(-1)' : 'none' }};">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" @if($isRtl) style="transform: scaleX(-1);" @endif>
                         <polyline points="9 18 15 12 9 6"></polyline>
                     </svg>
                 </a>
@@ -234,8 +300,19 @@
                         {{ __('footer_contact') }}
                     </h4>
                     <ul class="mt-4 space-y-2 text-sm text-[#717171]">
-                        <li><a href="mailto:khaled@calmapp.co" class="hover:text-[#222]" dir="ltr">khaled@calmapp.co</a></li>
-                        <li><a href="https://wa.me/966582727970" target="_blank" rel="noopener" class="hover:text-[#222]" dir="ltr">+966 58 272 7970</a></li>
+                        {{-- Pulled from the admin-editable Settings (support_email / support_phone)
+                             so the footer reflects whatever the admin has set without code changes. --}}
+                        @if(! empty($supportEmail))
+                            <li><a href="mailto:{{ $supportEmail }}" class="hover:text-[#222]" dir="ltr">{{ $supportEmail }}</a></li>
+                        @endif
+                        @if(! empty($supportPhone))
+                            @php
+                                // Build a tel: URL by stripping spaces; keep the display form readable.
+                                $telHref = preg_replace('/\s+/', '', $supportPhone);
+                                $waHref  = 'https://wa.me/'.ltrim(preg_replace('/\D+/', '', $supportPhone), '0');
+                            @endphp
+                            <li><a href="{{ $waHref }}" target="_blank" rel="noopener" class="hover:text-[#222]" dir="ltr">{{ $supportPhone }}</a></li>
+                        @endif
                     </ul>
                 </div>
 
