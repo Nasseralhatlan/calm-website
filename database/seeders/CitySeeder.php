@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Database\Seeders;
 
+use App\Enums\GeoStatus;
 use App\Models\City;
 use App\Models\Country;
 use Illuminate\Database\Seeder;
@@ -37,7 +38,11 @@ class CitySeeder extends Seeder
         foreach (self::CITIES as $city) {
             City::updateOrCreate(
                 ['country_id' => $saudi->id, 'name_en' => $city['name_en']],
-                ['name_ar' => $city['name_ar'], 'avatar' => $city['avatar']],
+                [
+                    'name_ar' => $city['name_ar'],
+                    'avatar' => $city['avatar'],
+                    'status' => GeoStatus::Active->value,
+                ],
             );
         }
     }

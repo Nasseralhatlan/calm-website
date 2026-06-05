@@ -28,14 +28,27 @@
 </head>
 <body class="min-h-screen antialiased text-[#222] {{ $fa }}" style="background-color: #F8F8F8;">
 
-    {{-- Header — same shape as landing / admin --}}
-    <header class="w-full bg-white border-b border-[#ebebeb]">
+    {{-- Header — sticky so it stays visible as the host scrolls long tables /
+         forms. Uses bg-white/90 + backdrop-blur to soften content scrolling
+         underneath. Matches the existing landing + wizard headers. --}}
+    <header class="w-full bg-white border-b border-[#ebebeb] sticky top-0 z-30 backdrop-blur"
+            style="background-color: rgba(255,255,255,0.92);">
         <div class="px-6 sm:px-10 lg:px-20 h-20 flex items-center justify-between">
             <a href="{{ route('landing') }}" class="flex items-center" style="gap: 10px;">
                 <img src="/assets/logo/logo.png" alt="Calm" class="h-9 sm:h-10 w-auto select-none" draggable="false">
             </a>
 
             <div class="flex items-center" style="gap: 4px;">
+                {{-- "Become a host" CTA for guests with no places — same coral pill
+                     as the landing page so the call-to-action is consistent. --}}
+                @if($user && ! $isHost)
+                    <a href="{{ route('host.places.create') }}"
+                       style="border-radius: 14px; box-shadow: 0 6px 14px rgba(248,131,121,0.3); margin-inline-end: 8px;"
+                       class="inline-flex items-center font-bold text-white bg-[#F88379] hover:bg-[#f56b60] px-4 py-2.5 transition-colors {{ $fa }}">
+                        <span style="margin-inline-end: 6px;">+</span>{{ $isRtl ? 'كن مضيفاً' : 'Become a host' }}
+                    </a>
+                @endif
+
                 <a href="{{ route('landing') }}"
                    style="border-radius: 14px;"
                    class="text-sm font-semibold text-[#222] hover:bg-[#f7f7f7] px-4 py-3 transition-colors {{ $fa }}">

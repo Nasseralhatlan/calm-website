@@ -1,8 +1,13 @@
 @extends('layouts.admin')
 
 @php
+    use App\Enums\GeoStatus;
     $locale = app()->getLocale();
     $isRtl = $locale === 'ar';
+
+    $statusPill = fn (?GeoStatus $s): array => $s === GeoStatus::Active
+        ? ['bg' => '#10b981', 'dot' => '#a7f3d0']
+        : ['bg' => '#9ca3af', 'dot' => '#e5e7eb'];
 @endphp
 
 @section('title', $isRtl ? 'المدن' : 'Cities')
@@ -26,21 +31,38 @@
         <table class="w-full">
             <thead class="bg-[#fafafa] text-[12px] uppercase text-[#717171] tracking-wider">
                 <tr>
+                    <th class="text-start" style="padding: 14px 20px;">{{ $isRtl ? 'المدينة' : 'City' }}</th>
                     <th class="text-start" style="padding: 14px 20px;">{{ $isRtl ? 'الدولة' : 'Country' }}</th>
-                    <th class="text-start" style="padding: 14px 20px;">{{ $isRtl ? 'الاسم (عربي)' : 'Name (AR)' }}</th>
-                    <th class="text-start" style="padding: 14px 20px;">{{ $isRtl ? 'الاسم (إنجليزي)' : 'Name (EN)' }}</th>
                     <th class="text-start" style="padding: 14px 20px;">{{ $isRtl ? 'الأحياء' : 'Areas' }}</th>
+                    <th class="text-start" style="padding: 14px 20px;">{{ $isRtl ? 'الحالة' : 'Status' }}</th>
                     <th class="text-end" style="padding: 14px 20px;">{{ $isRtl ? 'إجراءات' : 'Actions' }}</th>
                 </tr>
             </thead>
             <tbody class="text-[14px]">
                 @forelse($cities as $city)
+                    @php $sp = $statusPill($city->status); @endphp
                     <tr class="border-t border-[#ebebeb]">
-                        <td style="padding: 14px 20px;" class="text-[#717171]">{{ $isRtl ? $city->country?->name_ar : $city->country?->name_en }}</td>
-                        <td style="padding: 14px 20px;">{{ $city->name_ar }}</td>
-                        <td style="padding: 14px 20px;">{{ $city->name_en }}</td>
-                        <td style="padding: 14px 20px;" class="tabular-nums text-[#717171]">{{ $city->areas_count }}</td>
-                        <td style="padding: 14px 20px;" class="text-end whitespace-nowrap">
+                        <td class="text-start" style="padding: 14px 20px;">
+                            <span class="inline-flex items-center" style="gap: 10px;">
+                                <span style="font-size: 22px; line-height: 1;">{{ $city->avatar ?: '🏙️' }}</span>
+                                <span class="font-medium text-[#222]">{{ $isRtl ? $city->name_ar : $city->name_en }}</span>
+                            </span>
+                        </td>
+                        <td class="text-start text-[#717171]" style="padding: 14px 20px;">
+                            <span class="inline-flex items-center" style="gap: 8px;">
+                                <span>{{ $city->country?->avatar ?: '🌐' }}</span>
+                                <span>{{ $isRtl ? $city->country?->name_ar : $city->country?->name_en }}</span>
+                            </span>
+                        </td>
+                        <td class="text-start tabular-nums text-[#717171]" style="padding: 14px 20px;">{{ $city->areas_count }}</td>
+                        <td class="text-start" style="padding: 14px 20px;">
+                            <span class="inline-flex items-center text-[11px] font-bold uppercase tracking-wider text-white"
+                                  style="padding: 4px 12px 4px 9px; border-radius: 999px; gap: 6px; background-color: {{ $sp['bg'] }};">
+                                <span style="width: 6px; height: 6px; border-radius: 999px; background-color: {{ $sp['dot'] }};"></span>
+                                {{ $city->status?->value ?? 'inactive' }}
+                            </span>
+                        </td>
+                        <td class="text-end whitespace-nowrap" style="padding: 14px 20px;">
                             <a href="{{ route('admin.cities.edit', $city) }}" class="text-[#222] font-semibold hover:underline">{{ $isRtl ? 'تعديل' : 'Edit' }}</a>
                             <form method="POST" action="{{ route('admin.cities.destroy', $city) }}"
                                   class="inline" style="margin-inline-start: 14px;"
@@ -52,7 +74,7 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="5" style="padding: 32px 20px;" class="text-center text-[#717171]">{{ $isRtl ? 'لا توجد مدن بعد.' : 'No cities yet.' }}</td></tr>
+                    <tr><td colspan="5" class="text-center text-[#717171]" style="padding: 32px 20px;">{{ $isRtl ? 'لا توجد مدن بعد.' : 'No cities yet.' }}</td></tr>
                 @endforelse
             </tbody>
         </table>

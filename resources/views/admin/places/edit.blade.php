@@ -3,14 +3,83 @@
 @php
     use App\Enums\PlaceReviewStatus;
     use App\Enums\PlaceStatus;
+    use Illuminate\Support\Facades\Storage;
     $locale = app()->getLocale();
     $isRtl = $locale === 'ar';
+    $fa = $isRtl ? 'font-arabic' : '';
 @endphp
 
 @section('title', $isRtl ? 'تعديل المكان' : 'Edit place')
-@section('heading', $place->title)
+@section('heading', $place->title ?: ($isRtl ? '— بدون عنوان —' : '— Untitled —'))
 
 @section('main')
+    {{-- Header: links + host context --}}
+    <div class="flex items-center justify-between flex-wrap" style="margin-bottom: 18px; gap: 10px;">
+        <div class="text-[12px] text-[#717171] {{ $fa }}">
+            {{ $isRtl ? 'المعرّف:' : 'ID:' }}
+            <code class="text-[11px] text-[#bababa]" dir="ltr">{{ $place->id }}</code>
+            ·
+            {{ $isRtl ? 'المضيف:' : 'Host:' }}
+            <code class="text-[12px] text-[#222]" dir="ltr">
+                {{ $place->host?->phone ? '+966 '.$place->host->phone : ($place->host?->email ?? '—') }}
+            </code>
+        </div>
+        <div class="flex items-center" style="gap: 10px;">
+            <a href="{{ route('places.show', $place) }}" target="_blank" rel="noopener"
+               class="text-[13px] font-semibold text-[#222] hover:underline {{ $fa }}">
+                {{ $isRtl ? 'معاينة كزائر ↗' : 'Preview as guest ↗' }}
+            </a>
+            @if($place->review_status === PlaceReviewStatus::PendingReview)
+                <a href="{{ route('admin.places.review', $place) }}"
+                   class="inline-flex items-center font-bold text-white bg-[#F88379] hover:bg-[#f56b60] {{ $fa }}"
+                   style="padding: 8px 14px; gap: 6px; border-radius: 12px; font-size: 13px;">
+                    {{ $isRtl ? 'مراجعة' : 'Review' }} →
+                </a>
+            @endif
+        </div>
+    </div>
+
+    {{-- Read-only context: photos + attributes the host configured --}}
+    @if($place->photos->count() > 0 || $place->attributeValues->count() > 0)
+        <div class="bg-white max-w-3xl" style="padding: 20px; margin-bottom: 16px; border-radius: 24px; box-shadow: 0px 6px 18px 0px rgba(0,0,0,0.04);">
+            <h3 class="text-[14px] font-bold text-[#222] {{ $fa }}" style="margin-bottom: 12px;">
+                {{ $isRtl ? 'تفاصيل المكان (للعرض فقط)' : 'Place details (read-only)' }}
+            </h3>
+
+            @if($place->photos->count() > 0)
+                <div class="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-2" style="margin-bottom: 14px;">
+                    @foreach($place->photos as $p)
+                        @php $url = str_starts_with($p->path, 'http') ? $p->path : Storage::disk('s3')->url($p->path); @endphp
+                        <div class="relative">
+                            <img src="{{ $url }}" alt="" class="block w-full aspect-square object-cover" style="border-radius: 10px;">
+                            @if($p->is_cover)
+                                <span class="absolute top-1 inline-flex items-center text-[9px] font-bold bg-[#F88379] text-white"
+                                      style="padding: 1px 5px; border-radius: 999px; {{ $isRtl ? 'right: 3px;' : 'left: 3px;' }}">★</span>
+                            @endif
+                        </div>
+                    @endforeach
+                </div>
+            @endif
+
+            @if($place->attributeValues->count() > 0)
+                <div class="flex flex-wrap" style="gap: 6px;">
+                    @foreach($place->attributeValues as $pa)
+                        @php $a = $pa->attribute; @endphp
+                        @continue(! $a)
+                        <span class="inline-flex items-center bg-[#f7f7f7] text-[#222] text-[12px] {{ $fa }}"
+                              style="padding: 4px 10px; border-radius: 999px; gap: 5px;">
+                            <span>{{ $a->icon }}</span>
+                            <span>{{ $isRtl ? $a->name_ar : $a->name_en }}</span>
+                            @if($pa->value && is_numeric($pa->value) && (int) $pa->value > 1)
+                                <span class="text-[#717171]" dir="ltr">× {{ $pa->value }}</span>
+                            @endif
+                        </span>
+                    @endforeach
+                </div>
+            @endif
+        </div>
+    @endif
+
     <div class="bg-white max-w-3xl" style="padding: 24px; border-radius: 28px; box-shadow: 0px 10px 30px 0px rgba(0,0,0,0.05);">
         <form method="POST" action="{{ route('admin.places.update', $place) }}">
             @csrf @method('PUT')
@@ -83,18 +152,37 @@
                 </div>
             </div>
 
+            @php
+                $hours = [];
+                for ($h = 0; $h < 24; $h++) {
+                    $value = sprintf('%02d:00', $h);
+                    $period = $h < 12 ? 'AM' : 'PM';
+                    $hour12 = $h === 0 ? 12 : ($h > 12 ? $h - 12 : $h);
+                    $hours[$value] = sprintf('%d:00 %s', $hour12, $period);
+                }
+                $currentCheckIn  = old('check_in_time',  $place->check_in_time);
+                $currentCheckOut = old('check_out_time', $place->check_out_time);
+            @endphp
             <div class="grid grid-cols-1 sm:grid-cols-2" style="gap: 16px; margin-top: 16px;">
                 <div>
                     <label class="block text-[13px] font-semibold text-[#222]" style="margin-bottom: 6px;">{{ $isRtl ? 'وقت الوصول' : 'Check-in time' }}</label>
-                    <input type="text" name="check_in_time" value="{{ old('check_in_time', $place->check_in_time) }}" required dir="ltr" placeholder="15:00"
-                           class="w-full bg-[#fafafa] border border-[#ebebeb] focus:border-[#222] text-[15px] tabular-nums focus:outline-none"
-                           style="padding: 11px 14px; border-radius: 12px;">
+                    <select name="check_in_time" required dir="ltr"
+                            class="w-full bg-[#fafafa] border border-[#ebebeb] focus:border-[#222] text-[15px] tabular-nums focus:outline-none cursor-pointer"
+                            style="padding: 11px 14px; border-radius: 12px;">
+                        @foreach($hours as $val => $label)
+                            <option value="{{ $val }}" @selected($currentCheckIn === $val)>{{ $label }}</option>
+                        @endforeach
+                    </select>
                 </div>
                 <div>
                     <label class="block text-[13px] font-semibold text-[#222]" style="margin-bottom: 6px;">{{ $isRtl ? 'وقت المغادرة' : 'Check-out time' }}</label>
-                    <input type="text" name="check_out_time" value="{{ old('check_out_time', $place->check_out_time) }}" required dir="ltr" placeholder="12:00"
-                           class="w-full bg-[#fafafa] border border-[#ebebeb] focus:border-[#222] text-[15px] tabular-nums focus:outline-none"
-                           style="padding: 11px 14px; border-radius: 12px;">
+                    <select name="check_out_time" required dir="ltr"
+                            class="w-full bg-[#fafafa] border border-[#ebebeb] focus:border-[#222] text-[15px] tabular-nums focus:outline-none cursor-pointer"
+                            style="padding: 11px 14px; border-radius: 12px;">
+                        @foreach($hours as $val => $label)
+                            <option value="{{ $val }}" @selected($currentCheckOut === $val)>{{ $label }}</option>
+                        @endforeach
+                    </select>
                 </div>
             </div>
 
@@ -126,6 +214,16 @@
                         @endforeach
                     </select>
                 </div>
+            </div>
+
+            <div style="margin-top: 16px;">
+                <label class="block text-[13px] font-semibold text-[#222]" style="margin-bottom: 6px;">
+                    {{ $isRtl ? 'سبب الرفض (يظهر للمضيف)' : 'Rejection reason (visible to host)' }}
+                </label>
+                <textarea name="rejection_reason" rows="3" maxlength="2000"
+                          placeholder="{{ $isRtl ? 'اتركه فارغاً إذا لم يكن المكان مرفوضاً.' : 'Leave empty if the place is not rejected.' }}"
+                          class="w-full bg-[#fafafa] border border-[#ebebeb] focus:border-[#222] text-[15px] focus:outline-none"
+                          style="padding: 11px 14px; border-radius: 12px;">{{ old('rejection_reason', $place->rejection_reason) }}</textarea>
             </div>
 
             <div class="flex items-center" style="gap: 12px; margin-top: 24px;">

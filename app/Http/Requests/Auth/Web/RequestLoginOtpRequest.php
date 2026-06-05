@@ -23,6 +23,11 @@ class RequestLoginOtpRequest extends FormRequest
     {
         return [
             'phone' => $this->saudiPhoneRule(),
+            // Country picked from the dropdown. Optional today — we only
+            // support Saudi phones — but accepting it keeps the form payload
+            // valid and lets the SMS layer expand to dial codes other than
+            // +966 without another schema/validation change.
+            'country_id' => ['nullable', 'uuid', 'exists:countries,id'],
             'next' => ['nullable', 'string', 'starts_with:/'],
         ];
     }

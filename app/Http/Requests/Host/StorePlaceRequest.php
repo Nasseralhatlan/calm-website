@@ -20,18 +20,18 @@ class StorePlaceRequest extends FormRequest
     public function rules(): array
     {
         $rules = [
-            'draft_id' => ['nullable', 'integer'],
+            'draft_id' => ['nullable', 'uuid'],
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:10000'],
-            'place_type_id' => ['required', 'integer', 'exists:place_types,id'],
-            'city_area_id' => ['required', 'integer', 'exists:city_areas,id'],
+            'place_type_id' => ['required', 'uuid', 'exists:place_types,id'],
+            'city_area_id' => ['required', 'uuid', 'exists:city_areas,id'],
             'price' => ['required', 'integer', 'min:0'],
             'check_in_time' => ['required', 'string', 'max:8'],
             'check_out_time' => ['required', 'string', 'max:8'],
             'rules' => ['nullable', 'string', 'max:10000'],
 
             'attributes' => ['nullable', 'array'],
-            'attributes.*.attribute_id' => ['required', 'integer', 'exists:attributes,id'],
+            'attributes.*.attribute_id' => ['required', 'uuid', 'exists:attributes,id'],
             'attributes.*.value' => ['nullable', 'string', 'max:255'],
             'attributes.*.description' => ['nullable', 'string', 'max:1000'],
 
@@ -71,7 +71,7 @@ class StorePlaceRequest extends FormRequest
         $raw = $this->validated()['attributes'] ?? [];
 
         return array_values(array_map(fn (array $a): array => [
-            'attribute_id' => (int) $a['attribute_id'],
+            'attribute_id' => (string) $a['attribute_id'],
             'value' => isset($a['value']) ? (string) $a['value'] : null,
             'description' => $a['description'] ?? null,
         ], $raw));

@@ -23,8 +23,9 @@
 </head>
 <body class="min-h-screen antialiased text-[#222] {{ $fa }}" style="background-color: #F8F8F8;">
 
-    {{-- ── Header (landing-style — white bg so the gray hover is visible against it) ── --}}
-    <header class="w-full bg-white border-b border-[#ebebeb]">
+    {{-- ── Header (landing-style — white bg, sticky so it stays visible while scrolling long tables / review pages) ── --}}
+    <header class="w-full border-b border-[#ebebeb] sticky top-0 z-30 backdrop-blur"
+            style="background-color: rgba(255,255,255,0.92);">
         <div class="px-6 sm:px-10 lg:px-20 h-20 flex items-center justify-between">
             <a href="{{ route('admin.dashboard') }}" class="flex items-center" style="gap: 10px;">
                 <img src="/assets/logo/logo.png" alt="Calm" class="h-9 sm:h-10 w-auto select-none" draggable="false">

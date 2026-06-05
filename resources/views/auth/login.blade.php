@@ -60,12 +60,23 @@
                     {{ $isRtl ? 'رقم الجوال' : 'Phone number' }}
                 </label>
 
-                {{-- Force LTR on the phone field so the +966 prefix never flips --}}
+                {{-- Force LTR on the phone field so the dial-code prefix never flips --}}
                 <div class="flex items-center bg-[#fafafa] border-2 border-[#ebebeb] focus-within:border-[#222] transition-colors"
                      dir="ltr"
                      style="border-radius: 16px;">
-                    <span class="text-[15px] font-semibold text-[#717171] tabular-nums shrink-0"
-                          style="padding: 14px; border-right: 1px solid #ebebeb;">+966</span>
+                    {{-- Active-countries dial-code dropdown. New active rows seed in here automatically. --}}
+                    <select name="country_id"
+                            class="bg-transparent text-[15px] font-semibold text-[#222] tabular-nums shrink-0 focus:outline-none cursor-pointer"
+                            style="padding: 14px; padding-inline-end: 28px; border-right: 1px solid #ebebeb;"
+                            aria-label="Country dial code">
+                        @foreach($countries as $country)
+                            <option value="{{ $country->id }}"
+                                    data-code="{{ $country->country_code }}"
+                                    @selected(old('country_id', $countries->first()?->id) === $country->id)>
+                                {{ $country->avatar ? $country->avatar.'  ' : '' }}{{ $country->dial_code }}
+                            </option>
+                        @endforeach
+                    </select>
                     <input type="tel"
                            name="phone"
                            inputmode="numeric"
@@ -79,6 +90,10 @@
                            class="flex-1 bg-transparent text-[17px] text-[#222] focus:outline-none tabular-nums"
                            style="padding: 14px; min-width: 0; letter-spacing: 0.5px;">
                 </div>
+
+                @error('country_id')
+                    <p class="text-[13px] text-[#dc2626] {{ $fa }}" style="margin-top: 10px;">{{ $message }}</p>
+                @enderror
 
                 @error('phone')
                     <p class="text-[13px] text-[#dc2626] {{ $fa }}" style="margin-top: 10px;">{{ $message }}</p>

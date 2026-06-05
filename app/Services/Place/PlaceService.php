@@ -16,13 +16,72 @@ use Illuminate\Support\Facades\DB;
 
 final class PlaceService
 {
-    public function paginate(int $perPage = 25): LengthAwarePaginator
+    public function paginate(int $perPage = 25, ?string $search = null): LengthAwarePaginator
     {
         return Place::query()
             ->with(['host', 'type', 'cityArea.city'])
             ->withCount(['photos', 'attributeValues'])
+            ->when($search, fn ($q, string $term) => $q->where(function ($q) use ($term): void {
+                // Search is exact-match on the place uuid or LIKE on the host
+                // phone. Phone variants the admin might paste are normalized:
+                // leading "+", "966" prefix, and inner spaces all stripped.
+                $phone = preg_replace('/\D+/', '', $term);
+                $phone = preg_replace('/^966/', '', (string) $phone);
+
+                $q->where('id', $term)
+                  ->orWhereHas('host', fn ($h) => $h->where('phone', 'like', '%'.$phone.'%'));
+            }))
             ->latest()
-            ->paginate($perPage);
+            ->paginate($perPage)
+            ->withQueryString();
+    }
+
+    /**
+     * Everything the admin places index needs: paginated list, status-count
+     * cards, and the next-up review target for the "Start review" button.
+     * Combines what would otherwise be three service calls so the controller
+     * stays at one.
+     *
+     * @return array{places: LengthAwarePaginator<int, Place>, counts: array<string,int>, nextReview: ?Place}
+     */
+    public function indexData(?string $search = null, int $perPage = 25): array
+    {
+        return [
+            'places' => $this->paginate($perPage, $search),
+            'counts' => $this->statusCounts(),
+            'nextReview' => $this->nextPendingReview(),
+        ];
+    }
+
+    /**
+     * Counts grouped by review_status and status for the admin stats cards.
+     *
+     * @return array<string, int>
+     */
+    public function statusCounts(): array
+    {
+        return [
+            'total'          => Place::count(),
+            'draft'          => Place::query()->where('review_status', PlaceReviewStatus::Draft->value)->count(),
+            'pending_review' => Place::query()->where('review_status', PlaceReviewStatus::PendingReview->value)->count(),
+            'approved'       => Place::query()->where('review_status', PlaceReviewStatus::Approved->value)->count(),
+            'rejected'       => Place::query()->where('review_status', PlaceReviewStatus::Rejected->value)->count(),
+            'active'         => Place::query()->where('status', PlaceStatus::Active->value)->count(),
+            'inactive'       => Place::query()->where('status', PlaceStatus::Inactive->value)->count(),
+        ];
+    }
+
+    /**
+     * The next place an admin should review. Used by the "Start review" button
+     * — oldest pending row first so older submissions don't starve.
+     */
+    public function nextPendingReview(?Place $skip = null): ?Place
+    {
+        return Place::query()
+            ->where('review_status', PlaceReviewStatus::PendingReview->value)
+            ->when($skip, fn ($q, Place $s) => $q->whereKeyNot($s->id))
+            ->oldest('updated_at')
+            ->first();
     }
 
     /**
@@ -53,7 +112,7 @@ final class PlaceService
     public function createForHost(
         User $host,
         array $data,
-        ?int $draftId = null,
+        ?string $draftId = null,
         array $attributes = [],
         array $photos = [],
     ): Place {
@@ -79,7 +138,7 @@ final class PlaceService
     public function saveDraftForHost(
         User $host,
         array $data,
-        ?int $draftId = null,
+        ?string $draftId = null,
         array $attributes = [],
         array $photos = [],
     ): Place {
@@ -97,14 +156,21 @@ final class PlaceService
      * matches one of this host's Draft places we update it; otherwise we
      * create a fresh row. Existing rows in non-Draft state are ignored.
      */
-    private function upsertPlace(User $host, array $data, ?int $draftId, PlaceReviewStatus $reviewStatus): Place
+    private function upsertPlace(User $host, array $data, ?string $draftId, PlaceReviewStatus $reviewStatus): Place
     {
         $existing = null;
         if ($draftId !== null) {
+            // Allow resuming Drafts AND Rejected places — Rejected rows are
+            // re-editable so the host can fix the admin's feedback and
+            // resubmit. The submit (createForHost → PendingReview here) also
+            // clears the previous rejection_reason for the same reason.
             $existing = Place::query()
                 ->where('id', $draftId)
                 ->where('host_user_id', $host->id)
-                ->where('review_status', PlaceReviewStatus::Draft->value)
+                ->whereIn('review_status', [
+                    PlaceReviewStatus::Draft->value,
+                    PlaceReviewStatus::Rejected->value,
+                ])
                 ->first();
         }
 
@@ -114,6 +180,12 @@ final class PlaceService
             'status' => PlaceStatus::Inactive->value,
             'review_status' => $reviewStatus->value,
         ];
+
+        // Final submit clears the previous rejection feedback — once the host
+        // has fixed it and resubmitted, the old reason no longer applies.
+        if ($reviewStatus === PlaceReviewStatus::PendingReview) {
+            $payload['rejection_reason'] = null;
+        }
 
         if ($existing) {
             $existing->update($payload);
@@ -144,9 +216,16 @@ final class PlaceService
             ->delete();
 
         $now = now();
+        // PlaceAttribute uses HasUuids — bulk upsert() bypasses Eloquent's
+        // `creating` event, so we have to mint the id ourselves for any new
+        // rows (and harmlessly re-supply one for existing rows; the unique
+        // (place_id, attribute_id) index drives the conflict path so the id
+        // on a hit row is overwritten via the `update` list anyway).
+        $stub = new PlaceAttribute;
         $rows = array_map(fn (array $a): array => [
+            'id' => $stub->newUniqueId(),
             'place_id' => $place->id,
-            'attribute_id' => (int) $a['attribute_id'],
+            'attribute_id' => (string) $a['attribute_id'],
             'value' => isset($a['value']) ? (string) $a['value'] : null,
             'description' => $a['description'] ?? null,
             'created_at' => $now,
@@ -187,13 +266,18 @@ final class PlaceService
         $now       = now();
         $sortOrder = 0;
         $rows      = [];
+        // PlacePhoto uses HasUuids — but bulk insert() bypasses Eloquent's
+        // `creating` event, so we must mint the primary key ourselves here.
+        // Same trick we use in seeders to avoid the NOT NULL id error.
+        $stub = new PlacePhoto;
 
         foreach ($attributePaths as $attributeId => $paths) {
             foreach ($paths as $i => $path) {
                 $key = "attribute_images.{$attributeId}.{$i}";
                 $rows[] = [
+                    'id' => $stub->newUniqueId(),
                     'place_id' => $place->id,
-                    'place_attribute_id' => (int) $attributeId,
+                    'place_attribute_id' => (string) $attributeId,
                     'path' => (string) $path,
                     'is_cover' => $key === $coverKey,
                     'sort_order' => $sortOrder++,
@@ -206,6 +290,7 @@ final class PlaceService
         foreach ($extraPaths as $i => $path) {
             $key = "extra_images.{$i}";
             $rows[] = [
+                'id' => $stub->newUniqueId(),
                 'place_id' => $place->id,
                 'place_attribute_id' => null,
                 'path' => (string) $path,

@@ -1,6 +1,14 @@
 @extends('layouts.admin')
 
-@php $locale = app()->getLocale(); $isRtl = $locale === 'ar'; @endphp
+@php
+    use App\Enums\GeoStatus;
+    $locale = app()->getLocale();
+    $isRtl = $locale === 'ar';
+
+    $statusPill = fn (?GeoStatus $s): array => $s === GeoStatus::Active
+        ? ['bg' => '#10b981', 'dot' => '#a7f3d0']
+        : ['bg' => '#9ca3af', 'dot' => '#e5e7eb'];
+@endphp
 
 @section('title', $isRtl ? 'أنواع الأماكن' : 'Place types')
 @section('heading', $isRtl ? 'أنواع الأماكن' : 'Place types')
@@ -18,23 +26,33 @@
     <div class="bg-white overflow-hidden"
          style="border-radius: 28px; box-shadow: 0px 10px 30px 0px rgba(0,0,0,0.05);">
         <table class="w-full">
-            <thead class="bg-[#fafafa] text-[12px] uppercase text-[#717171] tracking-wider">
+            <thead class="bg-[#fafafa] text-[12px] text-[#717171] tracking-wider">
                 <tr>
-                    <th class="text-center" style="padding: 14px 12px; width: 56px;">{{ $isRtl ? 'الأيقونة' : 'Icon' }}</th>
-                    <th class="text-start" style="padding: 14px 20px;">{{ $isRtl ? 'الاسم (عربي)' : 'Name (AR)' }}</th>
-                    <th class="text-start" style="padding: 14px 20px;">{{ $isRtl ? 'الاسم (إنجليزي)' : 'Name (EN)' }}</th>
-                    <th class="text-start" style="padding: 14px 20px;">{{ $isRtl ? 'الأماكن' : 'Places' }}</th>
+                    <th style="padding: 14px 20px;">{{ $isRtl ? 'النوع' : 'Type' }}</th>
+                    <th style="padding: 14px 20px;">{{ $isRtl ? 'الأماكن' : 'Places' }}</th>
+                    <th style="padding: 14px 20px;">{{ $isRtl ? 'الحالة' : 'Status' }}</th>
                     <th class="text-end" style="padding: 14px 20px;">{{ $isRtl ? 'إجراءات' : 'Actions' }}</th>
                 </tr>
             </thead>
             <tbody class="text-[14px]">
                 @forelse($placeTypes as $pt)
-                    <tr class="border-t border-[#ebebeb]">
-                        <td class="text-center" style="padding: 14px 12px; font-size: 24px; line-height: 1;">{{ $pt->icon ?: '—' }}</td>
-                        <td style="padding: 14px 20px;">{{ $pt->name_ar }}</td>
-                        <td style="padding: 14px 20px;">{{ $pt->name_en }}</td>
-                        <td style="padding: 14px 20px;" class="tabular-nums text-[#717171]">{{ $pt->places_count }}</td>
-                        <td style="padding: 14px 20px;" class="text-end whitespace-nowrap">
+                    @php $sp = $statusPill($pt->status); @endphp
+                    <tr class="border-t border-[#ebebeb] hover:bg-[#fafafa] transition-colors">
+                        <td style="padding: 14px 20px;">
+                            <span class="inline-flex items-center" style="gap: 12px;">
+                                <span style="font-size: 22px; line-height: 1;">{{ $pt->icon ?: '🏠' }}</span>
+                                <span class="font-medium text-[#222]">{{ $isRtl ? $pt->name_ar : $pt->name_en }}</span>
+                            </span>
+                        </td>
+                        <td class="text-[#717171] tabular-nums" style="padding: 14px 20px;">{{ $pt->places_count }}</td>
+                        <td style="padding: 14px 20px;">
+                            <span class="inline-flex items-center text-[11px] font-bold text-white"
+                                  style="padding: 4px 12px 4px 9px; border-radius: 999px; gap: 6px; background-color: {{ $sp['bg'] }};">
+                                <span style="width: 6px; height: 6px; border-radius: 999px; background-color: {{ $sp['dot'] }};"></span>
+                                {{ $pt->status?->value ?? 'inactive' }}
+                            </span>
+                        </td>
+                        <td class="text-end whitespace-nowrap" style="padding: 14px 20px;">
                             <a href="{{ route('admin.place-types.edit', $pt) }}" class="text-[#222] font-semibold hover:underline">{{ $isRtl ? 'تعديل' : 'Edit' }}</a>
                             <form method="POST" action="{{ route('admin.place-types.destroy', $pt) }}" class="inline" style="margin-inline-start: 14px;" onsubmit="return confirm('{{ $isRtl ? 'حذف هذا النوع؟' : 'Delete this type?' }}');">
                                 @csrf @method('DELETE')
@@ -43,7 +61,7 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="5" style="padding: 32px 20px;" class="text-center text-[#717171]">{{ $isRtl ? 'لا توجد أنواع بعد.' : 'No types yet.' }}</td></tr>
+                    <tr><td colspan="4" class="text-center text-[#717171]" style="padding: 32px 20px;">{{ $isRtl ? 'لا توجد أنواع بعد.' : 'No types yet.' }}</td></tr>
                 @endforelse
             </tbody>
         </table>

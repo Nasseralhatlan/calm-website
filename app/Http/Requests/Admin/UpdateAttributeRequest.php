@@ -37,7 +37,7 @@ class UpdateAttributeRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'group_id' => ['required', 'integer', 'exists:attribute_groups,id'],
+            'group_id' => ['required', 'uuid', 'exists:attribute_groups,id'],
             'name_ar' => ['required', 'string', 'max:255'],
             'name_en' => ['required', 'string', 'max:255'],
             'icon' => ['nullable', 'string', 'max:64'],

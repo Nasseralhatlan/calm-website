@@ -32,27 +32,43 @@ class PlacesController extends Controller
     public function create(Request $request): View
     {
         // Cities grouped with their areas — the wizard renders a 2-stage picker
-        // (city card with emoji → list of that city's areas).
-        $cities = City::with(['areas' => fn ($q) => $q->orderBy('name_en')])
+        // (city card with emoji → list of that city's areas). Inactive cities
+        // are hidden so we can pre-seed coverage we're not ready to launch yet.
+        $cities = City::query()
+            ->active()
+            ->with(['areas' => fn ($q) => $q->orderBy('name_en')])
             ->orderBy('name_en')
             ->get(['id', 'name_ar', 'name_en', 'avatar']);
 
-        // Resume an in-progress draft when `?draft={id}` is on the URL. Only
-        // the host who owns the row + only while it's still a Draft.
+        // Resume an in-progress place when `?draft={id}` is on the URL. The
+        // host can resume both Draft submissions AND Rejected ones — Rejected
+        // places are re-editable so the host can address the admin's feedback
+        // and resubmit. The wizard's banner surfaces the rejection_reason.
         $draft = null;
-        if ($draftId = $request->integer('draft')) {
+        if ($draftId = $request->string('draft')->toString()) {
             $draft = Place::query()
                 ->with(['cityArea:id,city_id', 'attributeValues', 'photos'])
                 ->where('id', $draftId)
                 ->where('host_user_id', $request->user()->id)
-                ->where('review_status', PlaceReviewStatus::Draft->value)
+                ->whereIn('review_status', [
+                    PlaceReviewStatus::Draft->value,
+                    PlaceReviewStatus::Rejected->value,
+                ])
                 ->first();
         }
 
         return view('host.places.create', [
-            'placeTypes' => PlaceType::orderBy('name_en')->get(['id', 'name_ar', 'name_en', 'icon']),
+            'placeTypes' => PlaceType::active()->orderBy('name_en')->get(['id', 'name_ar', 'name_en', 'icon']),
             'cities' => $cities,
-            'attributeGroups' => AttributeGroup::with(['attributes' => fn ($q) => $q->orderBy('name_en')])
+            // Attributes are sorted by how often hosts have actually picked
+            // them (the place_attributes count) so the most-used facilities
+            // surface at the top of each group's chip row. Cold-start fallback
+            // is alphabetical when nothing has been chosen yet.
+            'attributeGroups' => AttributeGroup::query()
+                ->with(['attributes' => fn ($q) => $q
+                    ->withCount('placeValues')
+                    ->orderByDesc('place_values_count')
+                    ->orderBy('name_en')])
                 ->orderBy('name_en')
                 ->get(),
             'draft' => $draft,
@@ -69,7 +85,7 @@ class PlacesController extends Controller
         $draft = $this->service->saveDraftForHost(
             $request->user(),
             $request->placeData(),
-            $request->integer('draft_id') ?: null,
+            $request->string('draft_id')->toString() ?: null,
             $request->attributesData(),
             $request->photosData(),
         );
@@ -124,7 +140,7 @@ class PlacesController extends Controller
         $place = $this->service->createForHost(
             $request->user(),
             $request->placeData(),
-            $request->integer('draft_id') ?: null,
+            $request->string('draft_id')->toString() ?: null,
             $request->attributesData(),
             $request->photosData(),
         );

@@ -11,15 +11,21 @@ use App\Models\Place;
 use App\Models\PlaceType;
 use App\Services\Place\PlaceService;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class PlacesController extends Controller
 {
     public function __construct(private readonly PlaceService $service) {}
 
-    public function index(): View
+    public function index(Request $request): View
     {
-        return view('admin.places.index', ['places' => $this->service->paginate()]);
+        $search = trim((string) $request->query('q', '')) ?: null;
+
+        return view('admin.places.index', [
+            ...$this->service->indexData($search),
+            'search' => $search,
+        ]);
     }
 
     public function edit(Place $place): View

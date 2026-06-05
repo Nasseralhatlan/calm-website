@@ -19,7 +19,7 @@ class StoreCityAreaRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'city_id' => ['required', 'integer', 'exists:cities,id'],
+            'city_id' => ['required', 'uuid', 'exists:cities,id'],
             'name_ar' => ['required', 'string', 'max:255'],
             'name_en' => ['required', 'string', 'max:255'],
         ];

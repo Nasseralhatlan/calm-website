@@ -8,9 +8,12 @@ use App\Http\Controllers\Admin\CitiesController;
 use App\Http\Controllers\Admin\CityAreasController;
 use App\Http\Controllers\Admin\CountriesController;
 use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\PlaceReviewController;
 use App\Http\Controllers\Admin\PlaceTypesController;
 use App\Http\Controllers\Admin\PlacesController;
 use App\Http\Controllers\Admin\SettingsController;
+use App\Http\Controllers\Admin\UsersController;
+use App\Http\Controllers\PlaceController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Host\PlacesController as HostPlacesController;
 use App\Http\Controllers\LandingController;
@@ -21,6 +24,7 @@ use Illuminate\Support\Facades\Route;
 // ─── Public ──────────────────────────────────────────────────────────────────
 Route::get('/', [LandingController::class, 'index'])->name('landing');
 Route::post('/locale/{locale}', [LandingController::class, 'switchLocale'])->name('locale.switch');
+Route::get('/places/{place}', [PlaceController::class, 'show'])->name('places.show');
 
 // ─── Auth (web, OTP → JWT cookie) ────────────────────────────────────────────
 Route::middleware('guest')->group(function (): void {
@@ -77,7 +81,17 @@ Route::middleware(['auth:api', 'admin'])
             ->parameters(['attribute-groups' => 'attributeGroup']);
         Route::resource('attributes', AttributesController::class)->except(['show']);
 
+        // Place review workflow — three actions per place + skip.
+        Route::get('/places/{place}/review', [PlaceReviewController::class, 'show'])->name('places.review');
+        Route::post('/places/{place}/review/approve', [PlaceReviewController::class, 'approve'])->name('places.review.approve');
+        Route::post('/places/{place}/review/reject', [PlaceReviewController::class, 'reject'])->name('places.review.reject');
+        Route::post('/places/{place}/review/skip', [PlaceReviewController::class, 'skip'])->name('places.review.skip');
+
         // Places + settings
         Route::resource('places', PlacesController::class)->except(['create', 'store']);
         Route::resource('settings', SettingsController::class)->except(['show', 'create']);
+
+        // Users — list + edit. Self-registration handles creation; deletion is
+        // intentionally not exposed here.
+        Route::resource('users', UsersController::class)->only(['index', 'edit', 'update']);
     });

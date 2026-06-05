@@ -3,26 +3,24 @@
 declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
 
+/*
+ * Historical: this migration previously made `places.title` and
+ * `places.city_area_id` nullable to support wizard draft rows that are
+ * created the moment the host picks a place type (before the title or
+ * area are entered). With the UUID PK refactor we folded those nullable
+ * declarations into the original create_places migration, so this file
+ * is now a deliberate no-op kept for migration-history continuity.
+ */
 return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('places', function (Blueprint $table): void {
-            // Drafts are created the moment a host picks a place type — the
-            // title and area only land in step 2 / step 3 of the wizard.
-            $table->string('title')->nullable()->change();
-            $table->foreignId('city_area_id')->nullable()->change();
-        });
+        // no-op — handled by create_places migration directly.
     }
 
     public function down(): void
     {
-        Schema::table('places', function (Blueprint $table): void {
-            $table->string('title')->nullable(false)->change();
-            $table->foreignId('city_area_id')->nullable(false)->change();
-        });
+        // no-op.
     }
 };

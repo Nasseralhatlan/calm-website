@@ -8,6 +8,9 @@ use App\Enums\OtpType;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\Web\RequestLoginOtpRequest;
 use App\Http\Requests\Auth\Web\VerifyLoginOtpRequest;
+use App\Models\Country;
+use App\Models\Otp;
+use App\Models\User;
 use App\Services\Auth\OtpAuthService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -20,8 +23,17 @@ class LoginController extends Controller
 
     public function showLogin(Request $request): View
     {
+        // Active countries drive the dial-code dropdown. Seeding more rows as
+        // Active automatically widens the picker — no view change required.
+        $countries = Country::query()
+            ->active()
+            ->whereNotNull('dial_code')
+            ->orderBy('name_en')
+            ->get(['id', 'country_code', 'dial_code', 'name_ar', 'name_en']);
+
         return view('auth.login', [
             'next' => $this->safeNext($request),
+            'countries' => $countries,
         ]);
     }
 
@@ -42,9 +54,23 @@ class LoginController extends Controller
 
     public function showVerify(Request $request): View
     {
+        $phone = (string) $request->query('phone', '');
+
+        // Resolve the host's active OTP so the view can render an accurate
+        // countdown against `expires_at` instead of a hardcoded TTL.
+        $expiresAt = null;
+        if ($phone !== '') {
+            $user = User::query()->where('phone', $phone)->first();
+            $expiresAt = $user
+                ? Otp::query()->where('user_id', $user->id)->active()->forType(OtpType::Phone)->latest()->value('expires_at')
+                : null;
+        }
+
         return view('auth.verify', [
-            'phone' => (string) $request->query('phone', ''),
+            'phone' => $phone,
             'next' => $this->safeNext($request),
+            // Unix ms — easy to consume in JS as `new Date(value).getTime()`.
+            'expiresAtMs' => $expiresAt?->getTimestampMs(),
         ]);
     }
 

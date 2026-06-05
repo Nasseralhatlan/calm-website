@@ -11,8 +11,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('attributes', function (Blueprint $table): void {
-            $table->id();
-            $table->foreignId('group_id')->constrained('attribute_groups')->cascadeOnDelete();
+            $table->uuid('id')->primary();
+            $table->foreignUuid('group_id')->constrained('attribute_groups')->cascadeOnDelete();
             $table->string('name_ar');
             $table->string('name_en');
             $table->string('icon')->nullable();

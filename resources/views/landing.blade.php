@@ -300,8 +300,19 @@
                         {{ __('footer_contact') }}
                     </h4>
                     <ul class="mt-4 space-y-2 text-sm text-[#717171]">
-                        <li><a href="mailto:khaled@calmapp.co" class="hover:text-[#222]" dir="ltr">khaled@calmapp.co</a></li>
-                        <li><a href="https://wa.me/966582727970" target="_blank" rel="noopener" class="hover:text-[#222]" dir="ltr">+966 58 272 7970</a></li>
+                        {{-- Pulled from the admin-editable Settings (support_email / support_phone)
+                             so the footer reflects whatever the admin has set without code changes. --}}
+                        @if(! empty($supportEmail))
+                            <li><a href="mailto:{{ $supportEmail }}" class="hover:text-[#222]" dir="ltr">{{ $supportEmail }}</a></li>
+                        @endif
+                        @if(! empty($supportPhone))
+                            @php
+                                // Build a tel: URL by stripping spaces; keep the display form readable.
+                                $telHref = preg_replace('/\s+/', '', $supportPhone);
+                                $waHref  = 'https://wa.me/'.ltrim(preg_replace('/\D+/', '', $supportPhone), '0');
+                            @endphp
+                            <li><a href="{{ $waHref }}" target="_blank" rel="noopener" class="hover:text-[#222]" dir="ltr">{{ $supportPhone }}</a></li>
+                        @endif
                     </ul>
                 </div>
 

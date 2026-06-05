@@ -41,12 +41,30 @@
     font-display: swap;
 }
 
+/*
+ * Thmanyah is the brand Arabic face. We scope each @font-face to the Arabic
+ * Unicode ranges via `unicode-range` so the browser automatically picks
+ * Thmanyah for any Arabic glyph it encounters — regardless of class, locale,
+ * or which font-family rule is in effect. Latin glyphs fall through to the
+ * next family in the stack (Satoshi). Result: Arabic always renders in the
+ * brand face, whether it appears in a Blade ternary, a host-entered title
+ * shown on an EN page, or a status pill.
+ *
+ * Covered ranges:
+ *   U+0600-06FF  Arabic
+ *   U+0750-077F  Arabic Supplement
+ *   U+0870-089F  Arabic Extended-B
+ *   U+08A0-08FF  Arabic Extended-A
+ *   U+FB50-FDFF  Arabic Presentation Forms-A
+ *   U+FE70-FEFF  Arabic Presentation Forms-B
+ */
 @font-face {
     font-family: 'Thmanyah';
     src: url('/assets/fonts/thmanyahsans-Light.otf') format('opentype');
     font-weight: 300;
     font-style: normal;
     font-display: swap;
+    unicode-range: U+0600-06FF, U+0750-077F, U+0870-089F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF;
 }
 @font-face {
     font-family: 'Thmanyah';
@@ -54,6 +72,7 @@
     font-weight: 400;
     font-style: normal;
     font-display: swap;
+    unicode-range: U+0600-06FF, U+0750-077F, U+0870-089F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF;
 }
 @font-face {
     font-family: 'Thmanyah';
@@ -61,6 +80,7 @@
     font-weight: 500;
     font-style: normal;
     font-display: swap;
+    unicode-range: U+0600-06FF, U+0750-077F, U+0870-089F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF;
 }
 @font-face {
     font-family: 'Thmanyah';
@@ -68,6 +88,7 @@
     font-weight: 700;
     font-style: normal;
     font-display: swap;
+    unicode-range: U+0600-06FF, U+0750-077F, U+0870-089F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF;
 }
 @font-face {
     font-family: 'Thmanyah';
@@ -75,11 +96,17 @@
     font-weight: 900;
     font-style: normal;
     font-display: swap;
+    unicode-range: U+0600-06FF, U+0750-077F, U+0870-089F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF;
 }
 
 @theme {
-    --font-sans: 'Satoshi', ui-sans-serif, system-ui, sans-serif;
-    --font-arabic: 'Thmanyah', ui-sans-serif, system-ui, sans-serif;
+    /* Both stacks include Satoshi + Thmanyah. Because Thmanyah is unicode-range
+     * scoped to Arabic, the browser uses Satoshi for Latin glyphs and Thmanyah
+     * for Arabic glyphs no matter which variable is active. The two variables
+     * only differ in WHICH face leads — useful for cases where one tone is
+     * preferred for the dominant text direction. */
+    --font-sans: 'Satoshi', 'Thmanyah', ui-sans-serif, system-ui, sans-serif;
+    --font-arabic: 'Thmanyah', 'Satoshi', ui-sans-serif, system-ui, sans-serif;
     --color-calm-bg: #ffffff;
     --color-calm-ink: #222222;
     --color-calm-muted: #717171;
@@ -99,6 +126,17 @@ html, body {
     color: var(--color-calm-ink);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
+}
+
+/*
+ * Table-header reset — the browser UA stylesheet defaults `th { text-align: center }`.
+ * We put this in `@layer base` so Tailwind's utility classes (`text-center`,
+ * `text-end`, etc.) — which live in `@layer utilities` — still win when applied.
+ * Outside of `@layer`, unlayered styles always beat layered ones, which was
+ * blocking utility classes on th elements.
+ */
+@layer base {
+    th { text-align: start; }
 }
 
 /* iOS-flavoured continuous-feel corners — applied to anything rounded,

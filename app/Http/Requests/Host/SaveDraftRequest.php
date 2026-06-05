@@ -23,21 +23,22 @@ class SaveDraftRequest extends FormRequest
     public function rules(): array
     {
         $rules = [
-            'draft_id' => ['nullable', 'integer'],
-            'place_type_id' => ['required', 'integer', 'exists:place_types,id'],
+            'draft_id' => ['nullable', 'uuid'],
+            'place_type_id' => ['required', 'uuid', 'exists:place_types,id'],
             'title' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:10000'],
-            'city_area_id' => ['nullable', 'integer', 'exists:city_areas,id'],
+            'city_area_id' => ['nullable', 'uuid', 'exists:city_areas,id'],
             'price' => ['nullable', 'integer', 'min:0'],
             'check_in_time' => ['nullable', 'string', 'max:8'],
             'check_out_time' => ['nullable', 'string', 'max:8'],
             'rules' => ['nullable', 'string', 'max:10000'],
+            'last_step' => ['nullable', 'integer', 'min:1', 'max:20'],
 
             // Attributes — host's selected facilities. Sent as an array of objects
             // keyed by attribute_id in either array form ([0 => {attribute_id,...}])
             // or the form-encoded shape ([<id> => {attribute_id,...}]).
             'attributes' => ['nullable', 'array'],
-            'attributes.*.attribute_id' => ['required', 'integer', 'exists:attributes,id'],
+            'attributes.*.attribute_id' => ['required', 'uuid', 'exists:attributes,id'],
             'attributes.*.value' => ['nullable', 'string', 'max:255'],
             'attributes.*.description' => ['nullable', 'string', 'max:1000'],
 
@@ -81,7 +82,7 @@ class SaveDraftRequest extends FormRequest
         $raw = $this->validated()['attributes'] ?? [];
 
         return array_values(array_map(fn (array $a): array => [
-            'attribute_id' => (int) $a['attribute_id'],
+            'attribute_id' => (string) $a['attribute_id'],
             'value' => isset($a['value']) ? (string) $a['value'] : null,
             'description' => $a['description'] ?? null,
         ], $raw));

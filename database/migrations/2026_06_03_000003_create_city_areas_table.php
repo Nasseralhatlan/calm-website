@@ -11,8 +11,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('city_areas', function (Blueprint $table): void {
-            $table->id();
-            $table->foreignId('city_id')->constrained()->cascadeOnDelete();
+            $table->uuid('id')->primary();
+            $table->foreignUuid('city_id')->constrained()->cascadeOnDelete();
             $table->string('name_ar');
             $table->string('name_en');
             $table->timestamps();

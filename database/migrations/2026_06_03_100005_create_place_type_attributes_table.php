@@ -11,9 +11,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('place_type_attributes', function (Blueprint $table): void {
-            $table->id();
-            $table->foreignId('place_type_id')->constrained('place_types')->cascadeOnDelete();
-            $table->foreignId('attribute_id')->constrained('attributes')->cascadeOnDelete();
+            $table->uuid('id')->primary();
+            $table->foreignUuid('place_type_id')->constrained('place_types')->cascadeOnDelete();
+            $table->foreignUuid('attribute_id')->constrained('attributes')->cascadeOnDelete();
             $table->string('requirement_level', 16);
             $table->unsignedInteger('sort_order')->default(0);
             $table->timestamps();

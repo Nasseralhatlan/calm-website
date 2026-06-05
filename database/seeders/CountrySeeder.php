@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Database\Seeders;
 
+use App\Enums\GeoStatus;
 use App\Models\Country;
 use Illuminate\Database\Seeder;
 
@@ -16,6 +17,9 @@ class CountrySeeder extends Seeder
             [
                 'name_ar' => 'المملكة العربية السعودية',
                 'name_en' => 'Saudi Arabia',
+                'dial_code' => '+966',
+                'avatar' => '🇸🇦',
+                'status' => GeoStatus::Active->value,
             ],
         );
     }

@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Enums\PlaceReviewStatus;
 use App\Enums\PlaceStatus;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -13,6 +14,8 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Place extends Model
 {
+    use HasUuids;
+
     /**
      * Canonical day → column-name map. Useful when iterating per-day prices
      * in views, services, or pricing-calculation logic.
@@ -48,6 +51,9 @@ class Place extends Model
         'rules',
         'status',
         'review_status',
+        'rejection_reason',
+        'reviewed_at',
+        'last_step',
     ];
 
     protected function casts(): array
@@ -63,6 +69,7 @@ class Place extends Model
             'price_thursday' => 'integer',
             'price_friday' => 'integer',
             'price_saturday' => 'integer',
+            'reviewed_at' => 'datetime',
         ];
     }
 

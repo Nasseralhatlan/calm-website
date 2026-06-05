@@ -1,6 +1,8 @@
 @php
+    use App\Enums\GeoStatus;
     $locale = app()->getLocale();
     $isRtl = $locale === 'ar';
+    $currentStatus = old('status', $placeType->status?->value ?? GeoStatus::Active->value);
 @endphp
 
 <div class="grid grid-cols-1 sm:grid-cols-[80px_1fr_1fr]" style="gap: 16px;">
@@ -21,6 +23,23 @@
         <input type="text" name="name_en" value="{{ old('name_en', $placeType->name_en) }}" required dir="ltr"
                class="w-full bg-[#fafafa] border border-[#ebebeb] focus:border-[#222] text-[15px] focus:outline-none"
                style="padding: 11px 14px; border-radius: 12px;">
+    </div>
+</div>
+
+<div class="grid grid-cols-1 sm:grid-cols-2" style="gap: 16px; margin-top: 16px;">
+    <div>
+        <label class="block text-[13px] font-semibold text-[#222]" style="margin-bottom: 6px;">{{ $isRtl ? 'الحالة' : 'Status' }}</label>
+        <select name="status" required
+                class="w-full bg-[#fafafa] border border-[#ebebeb] focus:border-[#222] text-[15px] text-[#222] focus:outline-none"
+                style="padding: 11px 14px; border-radius: 12px;">
+            @foreach(GeoStatus::cases() as $case)
+                <option value="{{ $case->value }}" @selected($currentStatus === $case->value)>
+                    {{ $isRtl
+                        ? ($case === GeoStatus::Active ? 'مفعّل' : 'موقوف')
+                        : ucfirst($case->value) }}
+                </option>
+            @endforeach
+        </select>
     </div>
 </div>
 

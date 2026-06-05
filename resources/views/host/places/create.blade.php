@@ -64,6 +64,9 @@
         'check_in_time' => $draft->check_in_time,
         'check_out_time' => $draft->check_out_time,
         'rules' => $draft->rules,
+        'review_status' => $draft->review_status?->value,
+        'rejection_reason' => $draft->rejection_reason,
+        'last_step' => (int) ($draft->last_step ?: 1),
         // Restore the host's facility picks.
         'attributes' => $draft->attributeValues->map(fn ($pa) => [
             'attribute_id' => $pa->attribute_id,
@@ -139,6 +142,31 @@
                 </div>
             @endif
 
+            {{-- Admin's feedback on a previously-rejected submission. Surfaces
+                 at the top of the wizard so the host sees what to fix before
+                 they re-submit. Disappears on the next submit because the
+                 service clears the rejection_reason when status flips back to
+                 PendingReview. --}}
+            @if($draft && $draft->review_status?->value === 'rejected' && $draft->rejection_reason)
+                <div class="r-ios-lg bg-[#fef2f2] border border-[#fecaca] {{ $fa }}"
+                     style="padding: 18px 20px; margin-bottom: 24px;">
+                    <div class="flex items-center" style="gap: 10px; margin-bottom: 8px;">
+                        <span class="inline-flex items-center text-[11px] font-bold uppercase tracking-wider text-white"
+                              style="padding: 4px 12px 4px 9px; border-radius: 999px; gap: 6px; background-color: #ef4444;">
+                            <span style="width: 6px; height: 6px; border-radius: 999px; background-color: #fecaca;"></span>
+                            {{ $isRtl ? 'مرفوض' : 'Rejected' }}
+                        </span>
+                        <span class="text-[13px] font-bold text-[#7a2018] {{ $fa }}">
+                            {{ $isRtl ? 'ملاحظات المراجع' : 'Reviewer feedback' }}
+                        </span>
+                    </div>
+                    <p class="text-[14px] text-[#7a2018] whitespace-pre-line {{ $fa }}">{{ $draft->rejection_reason }}</p>
+                    <p class="text-[12px] text-[#a85a4a] {{ $fa }}" style="margin-top: 10px;">
+                        {{ $isRtl ? 'صحّح ما طُلب وأعد الإرسال — سيُعاد إرسال طلبك للمراجعة تلقائياً.' : 'Fix what was flagged and resubmit — your place will return to the review queue automatically.' }}
+                    </p>
+                </div>
+            @endif
+
             <form method="POST" action="{{ route('host.places.store') }}" @submit="submitting = true" x-ref="form" dir="{{ $dirAttr }}">
                 @csrf
                 {{-- Carries the draft we've been auto-saving so the server promotes it
@@ -154,7 +182,7 @@
                         <template x-for="t in placeTypes" :key="t.id">
                             <label class="cursor-pointer r-ios-lg bg-white p-6 transition-all shadow-card shadow-card-hover flex flex-col items-start gap-4 min-h-[150px] border-2"
                                    :class="placeTypeId === t.id ? 'border-[#222]' : 'border-transparent'">
-                                <input type="radio" name="place_type_id" :value="t.id" x-model.number="placeTypeId" class="sr-only">
+                                <input type="radio" name="place_type_id" :value="t.id" x-model="placeTypeId" class="sr-only">
                                 <div class="text-4xl" style="line-height: 1;" x-text="t.icon || '🏠'"></div>
                                 <div class="font-semibold text-[#222] {{ $fa }}" x-text="t.label"></div>
                             </label>
@@ -286,10 +314,7 @@
                                                 :class="hasAttribute(a.id)
                                                     ? 'border-[#222] bg-[#222] text-white shadow-card'
                                                     : 'border-[#dddddd] bg-white text-[#222] hover:border-[#222]'">
-                                            {{-- Per-chip selected indicator: a leading ✓ in a white circle when picked. --}}
-                                            <span x-show="hasAttribute(a.id)"
-                                                  class="inline-flex items-center justify-center bg-white text-[#222] font-bold"
-                                                  style="width: 16px; height: 16px; border-radius: 999px; font-size: 10px; line-height: 1;">✓</span>
+                                            {{-- Selection state is communicated entirely by the dark fill — no leading check mark, just the colour flip. --}}
                                             <span x-text="a.icon" class="text-base leading-none"></span>
                                             <span x-text="a.label" class="{{ $fa }}"></span>
                                         </button>
@@ -502,19 +527,38 @@
                     <h2 class="text-3xl sm:text-[34px] font-bold tracking-tight text-[#222] {{ $fa }}">{{ $isRtl ? 'تفاصيل الإقامة' : 'House rules & timing' }}</h2>
                     <p class="mt-2 text-[#717171] text-base {{ $fa }}">{{ $isRtl ? 'الوقت والقواعد التي تحدد تجربة الضيوف.' : 'Set the timing and the rules guests should follow.' }}</p>
 
+                    @php
+                        // 24 hourly options — value is the 24h wire format we store
+                        // (HH:00), label is the 12h presentation the host picks from.
+                        $hours = [];
+                        for ($h = 0; $h < 24; $h++) {
+                            $value = sprintf('%02d:00', $h);
+                            $period = $h < 12 ? 'AM' : 'PM';
+                            $hour12 = $h === 0 ? 12 : ($h > 12 ? $h - 12 : $h);
+                            $hours[$value] = sprintf('%d:00 %s', $hour12, $period);
+                        }
+                    @endphp
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-10">
                         <label>
                             <span class="text-sm font-semibold text-[#222] {{ $fa }}">{{ $isRtl ? 'وقت الوصول' : 'Check-in' }}</span>
                             <div class="mt-3 border border-[#dddddd] focus-within:border-[#222] transition-all bg-white shadow-card r-ios-lg overflow-hidden">
-                                <input name="check_in_time" x-model="checkInTime" type="text" placeholder="15:00" dir="ltr"
-                                       class="w-full bg-transparent outline-none text-[16px] tabular-nums text-[#222] py-4 px-5">
+                                <select name="check_in_time" x-model="checkInTime" dir="ltr"
+                                        class="w-full bg-transparent outline-none text-[16px] tabular-nums text-[#222] py-4 px-5 cursor-pointer">
+                                    @foreach($hours as $val => $label)
+                                        <option value="{{ $val }}">{{ $label }}</option>
+                                    @endforeach
+                                </select>
                             </div>
                         </label>
                         <label>
                             <span class="text-sm font-semibold text-[#222] {{ $fa }}">{{ $isRtl ? 'وقت المغادرة' : 'Check-out' }}</span>
                             <div class="mt-3 border border-[#dddddd] focus-within:border-[#222] transition-all bg-white shadow-card r-ios-lg overflow-hidden">
-                                <input name="check_out_time" x-model="checkOutTime" type="text" placeholder="12:00" dir="ltr"
-                                       class="w-full bg-transparent outline-none text-[16px] tabular-nums text-[#222] py-4 px-5">
+                                <select name="check_out_time" x-model="checkOutTime" dir="ltr"
+                                        class="w-full bg-transparent outline-none text-[16px] tabular-nums text-[#222] py-4 px-5 cursor-pointer">
+                                    @foreach($hours as $val => $label)
+                                        <option value="{{ $val }}">{{ $label }}</option>
+                                    @endforeach
+                                </select>
                             </div>
                         </label>
                     </div>
@@ -643,6 +687,20 @@ function registerWizard() {
                     }
                     if (p.is_cover) this.coverUploadId = id;
                 });
+
+                // Resume at the right step. Priority order:
+                //   1. ?step=N on the URL (set by saveDraft via history.replaceState,
+                //      and by the language switch's back()-with-Referer round-trip)
+                //   2. The draft row's persisted `last_step` column (set every
+                //      time saveDraft runs server-side), used when the host
+                //      clicks "Continue" from /my-places without a step in the URL
+                //   3. Step 1 as a final fallback
+                const urlStep = parseInt(new URLSearchParams(window.location.search).get('step') || '0', 10);
+                const persistedStep = parseInt(init.draft.last_step || '0', 10);
+                const resumeStep = urlStep || persistedStep || 1;
+                if (resumeStep >= 1 && resumeStep <= this.totalSteps) {
+                    this.step = resumeStep;
+                }
             }
         },
 
@@ -651,9 +709,26 @@ function registerWizard() {
             if (this.step >= this.totalSteps || !this.canAdvance()) return;
             await this.saveDraft();   // persist what we have so far
             this.step++;
+            this.syncUrl();
         },
         back() {
-            if (this.step > 1) this.step--;
+            if (this.step > 1) {
+                this.step--;
+                this.syncUrl();
+            }
+        },
+        /**
+         * Reflect (draftId, step) in the address bar via history.replaceState
+         * so a page reload — e.g. the language switch which POSTs and then
+         * `back()`s — lands on the same draft + same step instead of starting
+         * the wizard over from step 1. Only mutates the URL; no nav.
+         */
+        syncUrl() {
+            if (!this.draftId) return;
+            const url = new URL(window.location.href);
+            url.searchParams.set('draft', String(this.draftId));
+            url.searchParams.set('step',  String(this.step));
+            window.history.replaceState({}, '', url.toString());
         },
 
         /**
@@ -715,7 +790,8 @@ function registerWizard() {
         },
         selectedAttributesList() {
             return Object.keys(this.selectedAttributes).map((rawId) => {
-                const id = Number(rawId);
+                // rawId is the UUID string key from selectedAttributes; keep it as a string.
+                const id = rawId;
                 const entry = this.selectedAttributes[rawId];
                 return {
                     id,
@@ -895,6 +971,7 @@ function registerWizard() {
                 check_in_time: this.checkInTime || '15:00',
                 check_out_time: this.checkOutTime || '12:00',
                 rules: this.rules || null,
+                last_step: this.step,
                 price_sunday:    this.dayPrices.sunday    || 0,
                 price_monday:    this.dayPrices.monday    || 0,
                 price_tuesday:   this.dayPrices.tuesday   || 0,
@@ -909,7 +986,7 @@ function registerWizard() {
             const attrIds = Object.keys(this.selectedAttributes);
             if (attrIds.length > 0) {
                 payload.attributes = attrIds.map((id) => ({
-                    attribute_id: Number(id),
+                    attribute_id: String(id),
                     value: String(this.selectedAttributes[id].count),
                     description: this.selectedAttributes[id].description || null,
                 }));

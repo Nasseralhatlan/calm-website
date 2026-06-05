@@ -23,9 +23,12 @@ it('non-admin cannot list countries', function (): void {
 it('lists countries', function (): void {
     Country::query()->create(['country_code' => 'AE', 'name_ar' => 'الإمارات', 'name_en' => 'UAE']);
 
+    // The redesigned table renders one column per row: an emoji + the
+    // locale-appropriate name, plus a separate ISO code column. On the
+    // default locale (ar) the Arabic name is visible alongside the code.
     $this->get('/admin/countries')
         ->assertOk()
-        ->assertSee('UAE')
+        ->assertSee('AE')
         ->assertSee('الإمارات', escape: false);
 });
 

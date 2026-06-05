@@ -11,9 +11,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('place_attributes', function (Blueprint $table): void {
-            $table->id();
-            $table->foreignId('place_id')->constrained('places')->cascadeOnDelete();
-            $table->foreignId('attribute_id')->constrained('attributes')->cascadeOnDelete();
+            $table->uuid('id')->primary();
+            $table->foreignUuid('place_id')->constrained('places')->cascadeOnDelete();
+            $table->foreignUuid('attribute_id')->constrained('attributes')->cascadeOnDelete();
             // value is stored as text; multi-select uses JSON, numbers stringified
             $table->text('value')->nullable();
             $table->timestamps();

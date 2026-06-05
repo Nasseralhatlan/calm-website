@@ -11,13 +11,13 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('users', function (Blueprint $table): void {
-            $table->id();
+            $table->uuid('id')->primary();
             $table->string('name')->nullable();
             $table->string('gender', 16)->nullable();
             $table->unsignedTinyInteger('age')->nullable();
             $table->string('phone', 32)->nullable()->unique();
             $table->string('email')->nullable()->unique();
-            $table->foreignId('country_id')->nullable()->constrained()->nullOnDelete();
+            $table->foreignUuid('country_id')->nullable()->constrained()->nullOnDelete();
             $table->string('role', 16)->default('user')->index();
             $table->timestamp('phone_verified_at')->nullable();
             $table->timestamp('email_verified_at')->nullable();

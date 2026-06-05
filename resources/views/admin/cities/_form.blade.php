@@ -1,6 +1,8 @@
 @php
+    use App\Enums\GeoStatus;
     $locale = app()->getLocale();
     $isRtl = $locale === 'ar';
+    $currentStatus = old('status', $city->status?->value ?? GeoStatus::Active->value);
 @endphp
 
 <div class="grid grid-cols-1 sm:grid-cols-2" style="gap: 16px;">
@@ -15,7 +17,23 @@
             @foreach($countries as $c)
                 <option value="{{ $c->id }}"
                         @selected(old('country_id', $city->country_id) == $c->id)>
-                    {{ $isRtl ? $c->name_ar : $c->name_en }}
+                    {{ $c->avatar ? $c->avatar.' ' : '' }}{{ $isRtl ? $c->name_ar : $c->name_en }}
+                </option>
+            @endforeach
+        </select>
+    </div>
+    <div>
+        <label class="block text-[13px] font-semibold text-[#222]" style="margin-bottom: 6px;">
+            {{ $isRtl ? 'الحالة' : 'Status' }}
+        </label>
+        <select name="status" required
+                class="w-full bg-[#fafafa] border border-[#ebebeb] focus:border-[#222] text-[15px] text-[#222] focus:outline-none"
+                style="padding: 11px 14px; border-radius: 12px;">
+            @foreach(GeoStatus::cases() as $case)
+                <option value="{{ $case->value }}" @selected($currentStatus === $case->value)>
+                    {{ $isRtl
+                        ? ($case === GeoStatus::Active ? 'مفعّل' : 'موقوف')
+                        : ucfirst($case->value) }}
                 </option>
             @endforeach
         </select>
@@ -51,15 +69,15 @@
 
 <div style="margin-top: 16px;">
     <label class="block text-[13px] font-semibold text-[#222]" style="margin-bottom: 6px;">
-        {{ $isRtl ? 'صورة المدينة (رابط)' : 'Avatar URL' }}
+        {{ $isRtl ? 'الأيقونة (إيموجي أو رابط صورة)' : 'Avatar (emoji or image URL)' }}
     </label>
-    <input type="url"
+    <input type="text"
            name="avatar"
            value="{{ old('avatar', $city->avatar) }}"
            class="w-full bg-[#fafafa] border border-[#ebebeb] focus:border-[#222] text-[15px] text-[#222] focus:outline-none"
            style="padding: 11px 14px; border-radius: 12px;"
            dir="ltr"
-           placeholder="https://...">
+           placeholder="🌴 / https://...">
 </div>
 
 <div class="flex items-center" style="gap: 12px; margin-top: 24px;">

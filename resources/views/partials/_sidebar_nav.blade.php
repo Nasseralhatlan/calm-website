@@ -15,50 +15,81 @@
     $current = request()->route()?->getName();
     $isRtl = app()->getLocale() === 'ar';
 
+    // Each section is now an associative entry — `title_*` shows a small
+    // section header above the group; admin has no title because it IS the
+    // primary surface, the others get labelled so multi-role users can scan
+    // quickly between Host / Guest / Account groups.
     $sections = [];
 
     if ($isAdmin) {
         $sections[] = [
-            ['route' => 'admin.dashboard',              'label_ar' => 'الرئيسية',          'label_en' => 'Dashboard',        'icon' => 'grid'],
-            ['route' => 'admin.places.index',           'label_ar' => 'الأماكن',           'label_en' => 'Places',           'icon' => 'house'],
-            ['route' => 'admin.place-types.index',      'label_ar' => 'أنواع الأماكن',     'label_en' => 'Place types',      'icon' => 'layers'],
-            ['route' => 'admin.attribute-groups.index', 'label_ar' => 'مجموعات الخصائص',   'label_en' => 'Attribute groups', 'icon' => 'folder'],
-            ['route' => 'admin.attributes.index',       'label_ar' => 'الخصائص',           'label_en' => 'Attributes',       'icon' => 'tag'],
-            ['route' => 'admin.countries.index',        'label_ar' => 'الدول',             'label_en' => 'Countries',        'icon' => 'globe'],
-            ['route' => 'admin.cities.index',           'label_ar' => 'المدن',             'label_en' => 'Cities',           'icon' => 'building'],
-            ['route' => 'admin.city-areas.index',       'label_ar' => 'الأحياء',           'label_en' => 'City areas',       'icon' => 'map'],
-            ['route' => 'admin.settings.index',         'label_ar' => 'الإعدادات',         'label_en' => 'Settings',         'icon' => 'gear'],
+            'title_ar' => null,
+            'title_en' => null,
+            'items' => [
+                ['route' => 'admin.dashboard',              'label_ar' => 'الرئيسية',          'label_en' => 'Dashboard',        'icon' => 'grid'],
+                ['route' => 'admin.places.index',           'label_ar' => 'الأماكن',           'label_en' => 'Places',           'icon' => 'house'],
+                ['route' => 'admin.place-types.index',      'label_ar' => 'أنواع الأماكن',     'label_en' => 'Place types',      'icon' => 'layers'],
+                ['route' => 'admin.attribute-groups.index', 'label_ar' => 'مجموعات الخصائص',   'label_en' => 'Attribute groups', 'icon' => 'folder'],
+                ['route' => 'admin.attributes.index',       'label_ar' => 'الخصائص',           'label_en' => 'Attributes',       'icon' => 'tag'],
+                ['route' => 'admin.users.index',            'label_ar' => 'المستخدمون',        'label_en' => 'Users',            'icon' => 'user'],
+                ['route' => 'admin.countries.index',        'label_ar' => 'الدول',             'label_en' => 'Countries',        'icon' => 'globe'],
+                ['route' => 'admin.cities.index',           'label_ar' => 'المدن',             'label_en' => 'Cities',           'icon' => 'building'],
+                ['route' => 'admin.city-areas.index',       'label_ar' => 'الأحياء',           'label_en' => 'City areas',       'icon' => 'map'],
+                ['route' => 'admin.settings.index',         'label_ar' => 'الإعدادات',         'label_en' => 'Settings',         'icon' => 'gear'],
+            ],
         ];
     }
 
     if ($isAdmin || $isHost) {
         $sections[] = [
-            ['route' => 'user.places',     'label_ar' => 'أماكني',         'label_en' => 'My places',      'icon' => 'house'],
-            ['route' => 'user.bookings',   'label_ar' => 'حجوزات الضيوف',  'label_en' => 'Guest bookings', 'icon' => 'calendar'],
-            ['route' => 'user.financials', 'label_ar' => 'المالية',        'label_en' => 'Finances',       'icon' => 'wallet'],
+            'title_ar' => 'مضيف',
+            'title_en' => 'Host',
+            'items' => [
+                ['route' => 'user.places',     'label_ar' => 'أماكني',         'label_en' => 'My places',      'icon' => 'house'],
+                ['route' => 'user.bookings',   'label_ar' => 'حجوزات الضيوف',  'label_en' => 'Guest bookings', 'icon' => 'calendar'],
+                ['route' => 'user.financials', 'label_ar' => 'المالية',        'label_en' => 'Finances',       'icon' => 'wallet'],
+            ],
         ];
     }
 
     // Guest section — always shown for authenticated users
     $sections[] = [
-        ['route' => 'user.my-bookings', 'label_ar' => 'حجوزاتي', 'label_en' => 'My bookings', 'icon' => 'ticket'],
-        ['route' => 'user.favorites',   'label_ar' => 'المفضلة', 'label_en' => 'Favorites',   'icon' => 'heart'],
+        'title_ar' => 'ضيف',
+        'title_en' => 'Guest',
+        'items' => [
+            ['route' => 'user.my-bookings', 'label_ar' => 'حجوزاتي', 'label_en' => 'My bookings', 'icon' => 'ticket'],
+            ['route' => 'user.favorites',   'label_ar' => 'المفضلة', 'label_en' => 'Favorites',   'icon' => 'heart'],
+        ],
     ];
 
     // Account section — Profile covers all roles, Support is shared
     $sections[] = [
-        ['route' => 'profile',       'label_ar' => 'الملف الشخصي', 'label_en' => 'Profile', 'icon' => 'user'],
-        ['route' => 'user.support',  'label_ar' => 'الدعم',         'label_en' => 'Support', 'icon' => 'help'],
+        'title_ar' => 'الحساب',
+        'title_en' => 'Account',
+        'items' => [
+            ['route' => 'profile',       'label_ar' => 'الملف الشخصي', 'label_en' => 'Profile', 'icon' => 'user'],
+            ['route' => 'user.support',  'label_ar' => 'الدعم',         'label_en' => 'Support', 'icon' => 'help'],
+        ],
     ];
 @endphp
 
-@foreach($sections as $sectionIdx => $items)
+@foreach($sections as $sectionIdx => $section)
     @if($sectionIdx > 0)
         {{-- Light divider between sections --}}
         <div aria-hidden="true" style="height: 1px; background-color: #ebebeb; margin: 12px 14px;"></div>
     @endif
 
-    @foreach($items as $item)
+    @php $sectionTitle = $isRtl ? $section['title_ar'] : $section['title_en']; @endphp
+    @if($sectionTitle)
+        {{-- Sentence-cased so Arabic doesn't get force-uppercased (which has no
+             notion of case) and English reads naturally instead of shouting. --}}
+        <div class="text-[11px] font-semibold text-[#9ca3af]"
+             style="padding: 4px 14px 6px 14px;">
+            {{ $sectionTitle }}
+        </div>
+    @endif
+
+    @foreach($section['items'] as $item)
         @php
             $active = $current === $item['route'];
             $label = $isRtl ? $item['label_ar'] : $item['label_en'];

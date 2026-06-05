@@ -11,9 +11,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('place_photos', function (Blueprint $table): void {
-            $table->id();
-            $table->foreignId('place_id')->constrained('places')->cascadeOnDelete();
-            $table->foreignId('place_attribute_id')->nullable()->constrained('attributes')->nullOnDelete();
+            $table->uuid('id')->primary();
+            $table->foreignUuid('place_id')->constrained('places')->cascadeOnDelete();
+            $table->foreignUuid('place_attribute_id')->nullable()->constrained('attributes')->nullOnDelete();
             $table->string('path');
             $table->boolean('is_cover')->default(false);
             $table->unsignedInteger('sort_order')->default(0);

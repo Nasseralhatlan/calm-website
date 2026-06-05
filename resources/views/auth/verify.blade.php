@@ -51,10 +51,37 @@
             <h1 class="text-[22px] sm:text-[24px] font-bold text-center text-[#222] {{ $fa }}" style="margin-bottom: 8px; line-height: 1.25;">
                 {{ $isRtl ? 'أدخل رمز التحقق' : 'Enter the code' }}
             </h1>
-            <p class="text-[14px] text-center text-[#717171] {{ $fa }}" style="margin-bottom: 24px; line-height: 1.6;">
+            <p class="text-[14px] text-center text-[#717171] {{ $fa }}" style="margin-bottom: 16px; line-height: 1.6;">
                 {{ $isRtl ? 'أرسلنا رمزاً مكوناً من 6 أرقام إلى' : 'We sent a 6-digit code to' }}<br>
                 <span dir="ltr" class="font-semibold text-[#222]">+966 {{ $phone }}</span>
             </p>
+
+            @if(! empty($expiresAtMs))
+                {{-- Countdown timer driven by the OTP row's expires_at. Counts to 0,
+                     then locks the input and surfaces the Resend link. --}}
+                <div x-data="otpCountdown({{ (int) $expiresAtMs }})"
+                     x-init="start"
+                     class="flex items-center justify-center {{ $fa }}"
+                     style="margin-bottom: 22px; gap: 8px;">
+                    {{-- Live region: time remaining --}}
+                    <template x-if="remainingMs > 0">
+                        <span class="inline-flex items-center text-[13px] font-semibold tabular-nums {{ $fa }}"
+                              style="padding: 6px 12px; border-radius: 999px; background-color: #f4f6f8; color: #222; gap: 6px;">
+                            <span aria-hidden="true">⏱</span>
+                            <span dir="ltr" x-text="format"></span>
+                            <span class="text-[#717171]">{{ $isRtl ? 'متبقّي' : 'left' }}</span>
+                        </span>
+                    </template>
+                    {{-- Expired state --}}
+                    <template x-if="remainingMs === 0">
+                        <span class="inline-flex items-center text-[13px] font-semibold tabular-nums {{ $fa }}"
+                              style="padding: 6px 12px; border-radius: 999px; background-color: #fef2f2; color: #b91c1c; gap: 6px;">
+                            <span aria-hidden="true">⌛</span>
+                            <span>{{ $isRtl ? 'انتهت صلاحية الرمز' : 'Code expired' }}</span>
+                        </span>
+                    </template>
+                </div>
+            @endif
 
             @if(session('status'))
                 <div class="text-[13px] text-[#15803d] bg-[#f0fdf4] border border-[#bbf7d0] {{ $fa }}"
@@ -101,4 +128,34 @@
         </div>
     </div>
 </div>
+
+<script>
+    // Local countdown driven by the server-supplied expires_at. We don't trust
+    // the client clock to be correct, but the displayed value is for UX only —
+    // the server still re-checks `expires_at` on submit.
+    function otpCountdown(expiresAtMs) {
+        return {
+            expiresAtMs,
+            remainingMs: Math.max(0, expiresAtMs - Date.now()),
+            timer: null,
+            get format() {
+                const total = Math.floor(this.remainingMs / 1000);
+                const m = Math.floor(total / 60);
+                const s = total % 60;
+                return `${m}:${s.toString().padStart(2, '0')}`;
+            },
+            start() {
+                this.tick();
+                this.timer = setInterval(() => this.tick(), 1000);
+            },
+            tick() {
+                this.remainingMs = Math.max(0, this.expiresAtMs - Date.now());
+                if (this.remainingMs === 0 && this.timer) {
+                    clearInterval(this.timer);
+                    this.timer = null;
+                }
+            },
+        };
+    }
+</script>
 @endsection

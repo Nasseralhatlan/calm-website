@@ -59,8 +59,7 @@
             <table class="w-full">
                 <thead class="bg-[#fafafa] text-[12px] uppercase text-[#717171] tracking-wider">
                     <tr>
-                        <th class="text-center" style="padding: 14px 12px; width: 56px;">{{ $isRtl ? 'النوع' : 'Type' }}</th>
-                        <th class="text-start" style="padding: 14px 20px;">{{ $isRtl ? 'العنوان' : 'Title' }}</th>
+                        <th class="text-start" style="padding: 14px 20px;">{{ $isRtl ? 'المكان' : 'Place' }}</th>
                         <th class="text-start" style="padding: 14px 20px;">{{ $isRtl ? 'المدينة' : 'City' }}</th>
                         <th class="text-start" style="padding: 14px 20px;">{{ $isRtl ? 'السعر' : 'Price' }}</th>
                         <th class="text-start" style="padding: 14px 20px;">{{ $isRtl ? 'الحالة' : 'Status' }}</th>
@@ -74,20 +73,30 @@
                             $rp = $reviewPill($place->review_status);
                             $sp = $statusPill($place->status);
                             $isDraft = $place->review_status === PlaceReviewStatus::Draft;
+                            $city = $place->cityArea?->city;
                         @endphp
                         <tr class="border-t border-[#ebebeb] {{ $isDraft ? 'bg-[#fffbeb]/40 hover:bg-[#fffbeb]' : 'hover:bg-[#fafafa]' }} transition-colors">
-                            <td class="text-center" style="padding: 14px 12px; font-size: 22px; line-height: 1;">{{ $place->type?->icon ?: '🏠' }}</td>
-                            <td style="padding: 14px 20px;" class="font-medium">{{ $place->title ?: ($isRtl ? '— بدون عنوان —' : '— Untitled —') }}</td>
-                            <td style="padding: 14px 20px;" class="text-[#717171]">{{ $isRtl ? $place->cityArea?->city?->name_ar : $place->cityArea?->city?->name_en }}</td>
-                            <td style="padding: 14px 20px;" class="font-semibold tabular-nums" dir="ltr">{{ number_format($place->price) }} SAR</td>
-                            <td style="padding: 14px 20px;">
+                            <td class="text-start" style="padding: 14px 20px;">
+                                <span class="inline-flex items-center" style="gap: 12px;">
+                                    <span style="font-size: 22px; line-height: 1;">{{ $place->type?->icon ?: '🏠' }}</span>
+                                    <span class="font-medium text-[#222]">{{ $place->title ?: ($isRtl ? '— بدون عنوان —' : '— Untitled —') }}</span>
+                                </span>
+                            </td>
+                            <td class="text-start text-[#717171]" style="padding: 14px 20px;">
+                                <span class="inline-flex items-center" style="gap: 8px;">
+                                    <span>{{ $city?->avatar ?: '📍' }}</span>
+                                    <span>{{ $isRtl ? $city?->name_ar : $city?->name_en }}</span>
+                                </span>
+                            </td>
+                            <td class="text-start font-semibold tabular-nums" style="padding: 14px 20px;" dir="ltr">{{ number_format($place->price) }} SAR</td>
+                            <td class="text-start" style="padding: 14px 20px;">
                                 <span class="inline-flex items-center text-[11px] font-bold uppercase tracking-wider text-white {{ $fa }}"
                                       style="padding: 4px 12px 4px 9px; border-radius: 999px; gap: 6px; background-color: {{ $sp['bg'] }};">
                                     <span style="width: 6px; height: 6px; border-radius: 999px; background-color: {{ $sp['dot'] }};"></span>
                                     {{ $statusLabel($place->status) }}
                                 </span>
                             </td>
-                            <td style="padding: 14px 20px;">
+                            <td class="text-start" style="padding: 14px 20px;">
                                 <span class="inline-flex items-center text-[11px] font-bold uppercase tracking-wider text-white {{ $fa }}"
                                       style="padding: 4px 12px 4px 9px; border-radius: 999px; gap: 6px; background-color: {{ $rp['bg'] }};">
                                     <span style="width: 6px; height: 6px; border-radius: 999px; background-color: {{ $rp['dot'] }};"></span>
@@ -95,16 +104,35 @@
                                 </span>
                             </td>
                             <td class="text-end" style="padding: 14px 20px;">
+                                @php $isRejected = $place->review_status === PlaceReviewStatus::Rejected; @endphp
                                 @if($isDraft)
                                     <a href="{{ route('host.places.create', ['draft' => $place->id]) }}"
                                        class="inline-flex items-center gap-1 text-[13px] font-bold text-[#F88379] hover:text-[#f56b60] {{ $fa }}">
                                         {{ $isRtl ? '↩ متابعة الإكمال' : 'Continue ↪' }}
+                                    </a>
+                                @elseif($isRejected)
+                                    <a href="{{ route('host.places.create', ['draft' => $place->id]) }}"
+                                       class="inline-flex items-center gap-1 text-[13px] font-bold text-[#ef4444] hover:text-[#dc2626] {{ $fa }}"
+                                       title="{{ $place->rejection_reason }}">
+                                        {{ $isRtl ? '✎ التعديل وإعادة الإرسال' : 'Edit & resubmit ✎' }}
                                     </a>
                                 @else
                                     <span class="text-[12px] text-[#cccccc]">—</span>
                                 @endif
                             </td>
                         </tr>
+                        @if($isRejected && $place->rejection_reason)
+                            {{-- Inline reviewer feedback on the rejected row so the host
+                                 sees what to fix without leaving the listing. --}}
+                            <tr class="bg-[#fef2f2]/60">
+                                <td colspan="6" style="padding: 12px 20px 16px 20px;">
+                                    <div class="text-[12px] {{ $fa }}">
+                                        <span class="font-bold text-[#7a2018]">{{ $isRtl ? 'ملاحظات المراجع:' : 'Reviewer feedback:' }}</span>
+                                        <span class="text-[#7a2018]">{{ $place->rejection_reason }}</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        @endif
                     @endforeach
                 </tbody>
             </table>
