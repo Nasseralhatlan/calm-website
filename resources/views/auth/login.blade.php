@@ -64,10 +64,18 @@
                 <div class="flex items-center bg-[#fafafa] border-2 border-[#ebebeb] focus-within:border-[#222] transition-colors"
                      dir="ltr"
                      style="border-radius: 16px;">
-                    {{-- Active-countries dial-code dropdown. New active rows seed in here automatically. --}}
+                    {{-- Active-countries dial-code dropdown. `appearance: none` strips
+                         the browser's native chevron — we draw our own via the SVG
+                         background-image, sitting 8px after the dial-code text so it
+                         doesn't drift to the right border. --}}
                     <select name="country_id"
                             class="bg-transparent text-[15px] font-semibold text-[#222] tabular-nums shrink-0 focus:outline-none cursor-pointer"
-                            style="padding: 14px; padding-inline-end: 28px; border-right: 1px solid #ebebeb;"
+                            style="appearance: none; -webkit-appearance: none; -moz-appearance: none;
+                                   padding: 14px 28px 14px 14px;
+                                   border-right: 1px solid #ebebeb;
+                                   background-image: url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2210%22 height=%2210%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%23222%22 stroke-width=%223%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22><polyline points=%226 9 12 15 18 9%22/></svg>');
+                                   background-repeat: no-repeat;
+                                   background-position: right 10px center;"
                             aria-label="Country dial code">
                         @foreach($countries as $country)
                             <option value="{{ $country->id }}"

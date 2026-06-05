@@ -14,8 +14,12 @@ return new class extends Migration
             $table->uuid('id')->primary();
             $table->foreignUuid('place_id')->constrained('places')->cascadeOnDelete();
             $table->foreignUuid('attribute_id')->constrained('attributes')->cascadeOnDelete();
-            // value is stored as text; multi-select uses JSON, numbers stringified
+            // value is stored as text; multi-select uses JSON, numbers stringified.
             $table->text('value')->nullable();
+            // Free-form text beside the value (e.g. "heated, 4m deep" next to a
+            // "pool" select value). Surfaces in the customer-facing place view
+            // and the wizard's configure-step.
+            $table->text('description')->nullable();
             $table->timestamps();
 
             $table->unique(['place_id', 'attribute_id']);

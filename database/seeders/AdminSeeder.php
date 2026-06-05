@@ -12,13 +12,16 @@ class AdminSeeder extends Seeder
 {
     public function run(): void
     {
-        $phone = (string) env('ADMIN_PHONE', '500000001');
-        $email = (string) env('ADMIN_EMAIL', 'admin@calmapp.co');
+        // Nasser's number — stored in the 9-digit national format the app
+        // expects (no leading 0, no +966). Override via ADMIN_PHONE in .env
+        // if you're running this on a different account.
+        $phone = (string) env('ADMIN_PHONE', '501203845');
+        $email = (string) env('ADMIN_EMAIL', 'nasser@calmapp.co');
 
         User::query()->updateOrCreate(
             ['phone' => $phone],
             [
-                'name' => 'Calm Admin',
+                'name' => 'Nassser Alhatlan',
                 'email' => $email,
                 'role' => UserRole::Admin->value,
             ],

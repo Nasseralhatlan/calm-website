@@ -18,7 +18,10 @@ return new class extends Migration
             $table->string('icon')->nullable();
             $table->string('question_ar')->nullable();
             $table->string('question_en')->nullable();
-            $table->boolean('photo_required')->default(false);
+            // Tri-state: 'none' (default), 'optional', or 'required'.
+            // Drives whether the host must / can / can't attach photos to the
+            // attribute when filling out their place. See App\Enums\AttributePhotoRule.
+            $table->string('photo_rule', 16)->default('none');
             $table->string('type', 32);
             $table->json('options')->nullable();
             $table->timestamps();

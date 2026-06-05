@@ -15,7 +15,11 @@ return new class extends Migration
             $table->foreignUuid('country_id')->constrained()->cascadeOnDelete();
             $table->string('name_ar');
             $table->string('name_en');
+            // Emoji or icon — rendered in the host wizard's city picker.
             $table->string('avatar')->nullable();
+            // Lifecycle flag — only Active cities surface in pickers. See
+            // App\Enums\GeoStatus.
+            $table->string('status', 16)->default('active')->index();
             $table->timestamps();
         });
     }

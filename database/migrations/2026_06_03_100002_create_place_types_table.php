@@ -14,6 +14,12 @@ return new class extends Migration
             $table->uuid('id')->primary();
             $table->string('name_ar');
             $table->string('name_en');
+            // Emoji rendered next to the place-type name in the host wizard's
+            // "What kind of place is it?" picker and the admin lists.
+            $table->string('icon', 32)->nullable();
+            // Lifecycle flag — only Active types appear in the host wizard.
+            // Lets us pre-seed types we're not ready to launch yet.
+            $table->string('status', 16)->default('active')->index();
             $table->timestamps();
         });
     }

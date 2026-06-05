@@ -45,6 +45,10 @@ class PlacePhoto extends Model
             return $this->path;
         }
 
-        return (string) Storage::disk(config('filesystems.default'))->url($this->path);
+        // Photos are uploaded straight to S3 via presigned PUT URLs (wizard
+        // step 8), so paths live on the `s3` disk regardless of what
+        // `filesystems.default` happens to be. Reading from the default disk
+        // pointed at `public` was returning broken `/storage/...` URLs.
+        return (string) Storage::disk('s3')->url($this->path);
     }
 }
