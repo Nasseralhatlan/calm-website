@@ -41,6 +41,16 @@ final class UserService
     }
 
     /**
+     * Phone-flavored alias for {@see findOrCreateForOtp()}. Used by the host
+     * wizard when an admin types a "attach to host phone" — same find-or-create
+     * semantics, but the call site reads naturally outside the OTP context.
+     */
+    public function findOrCreateByPhone(string $phone): User
+    {
+        return $this->findOrCreateForOtp(OtpType::Phone, $phone);
+    }
+
+    /**
      * Apply a validated attribute set to the user.
      * Only mass-assigned columns make it through; role is never editable here.
      *

@@ -18,8 +18,8 @@ class ResultException extends Exception
         $this->result = [
             'success' => false,
             'message' => $message,
-            'data'    => $data,
-            'status'  => $status,
+            'data' => $data,
+            'status' => $status,
         ];
     }
 

@@ -8,6 +8,7 @@ use App\Enums\UserRole;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -23,6 +24,7 @@ class User extends Authenticatable implements JWTSubject
         'name',
         'gender',
         'age',
+        'birth_date',
         'phone',
         'email',
         'country_id',
@@ -43,6 +45,7 @@ class User extends Authenticatable implements JWTSubject
             'password' => 'hashed',
             'role' => UserRole::class,
             'age' => 'integer',
+            'birth_date' => 'date',
         ];
     }
 
@@ -68,6 +71,20 @@ class User extends Authenticatable implements JWTSubject
     public function isHost(): bool
     {
         return $this->places()->exists();
+    }
+
+    /** Bookings this user has made as a guest. */
+    public function bookings(): HasMany
+    {
+        return $this->hasMany(Booking::class, 'guest_user_id');
+    }
+
+    /** Places this user has liked (powers the heart icon + favorites list). */
+    public function likedPlaces(): BelongsToMany
+    {
+        return $this->belongsToMany(Place::class, 'place_likes')
+            ->using(PlaceLike::class)
+            ->withTimestamps();
     }
 
     public function isAdmin(): bool

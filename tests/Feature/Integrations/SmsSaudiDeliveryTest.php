@@ -56,7 +56,7 @@ it('throws SmsDeliveryException when the gateway returns "error,..."', function 
 
 it('throws SmsDeliveryException when the network call fails', function (): void {
     Http::fake([
-        'api-server14.com/*' => fn () => throw new \RuntimeException('Connection refused'),
+        'api-server14.com/*' => fn () => throw new RuntimeException('Connection refused'),
     ]);
 
     makeSmsSaudi()->send('512345678', 'msg');

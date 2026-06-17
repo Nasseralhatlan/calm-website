@@ -17,15 +17,15 @@ class PlacePhoto extends Model
         'place_id',
         'place_attribute_id',
         'path',
-        'is_cover',
         'sort_order',
+        'featured_order',
     ];
 
     protected function casts(): array
     {
         return [
-            'is_cover' => 'boolean',
             'sort_order' => 'integer',
+            'featured_order' => 'integer',
         ];
     }
 

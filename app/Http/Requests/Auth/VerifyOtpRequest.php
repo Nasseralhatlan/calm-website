@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Auth;
 
-use App\Enums\OtpType;
 use App\Http\Requests\Concerns\HasSaudiPhoneRule;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
+/**
+ * Phone-only OTP verify. Mirrors {@see RequestOtpRequest} — when email
+ * arrives, give it its own request class instead of bringing back `type`.
+ */
 class VerifyOtpRequest extends FormRequest
 {
     use HasSaudiPhoneRule;
@@ -24,31 +26,14 @@ class VerifyOtpRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'type' => ['required', 'string', Rule::enum(OtpType::class)],
-            'identifier' => [
-                'required',
-                'string',
-                Rule::when(
-                    $this->input('type') === OtpType::Phone->value,
-                    $this->saudiPhoneRule(),
-                ),
-                Rule::when(
-                    $this->input('type') === OtpType::Email->value,
-                    ['email:rfc', 'max:254'],
-                ),
-            ],
+            'phone' => $this->saudiPhoneRule(),
             'otp' => ['required', 'string', 'regex:/^\d{6}$/'],
         ];
     }
 
-    public function otpType(): OtpType
+    public function phone(): string
     {
-        return OtpType::from($this->string('type')->toString());
-    }
-
-    public function identifier(): string
-    {
-        return $this->string('identifier')->toString();
+        return $this->string('phone')->toString();
     }
 
     public function code(): string

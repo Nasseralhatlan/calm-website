@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Http\Requests\User\UpdateProfileRequest;
+use App\Models\User;
 use App\Services\User\UserService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -21,7 +22,7 @@ class ProfileController extends Controller
 
     public function update(UpdateProfileRequest $request, UserService $userService): RedirectResponse
     {
-        /** @var \App\Models\User $user */
+        /** @var User $user */
         $user = $request->user();
 
         $userService->update($user, $request->validated());

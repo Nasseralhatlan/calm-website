@@ -11,7 +11,8 @@
     $ogDescription = $place->description
         ? Str::limit(strip_tags($place->description), 180)
         : ($isRtl ? 'إقامة فاخرة من كالم' : 'A luxury stay on Calm');
-    $firstPhoto = $place->photos->first();
+    // OG image = the host's cover (first "shown outside" photo), else first photo.
+    $firstPhoto = $place->coverPhoto ?? $place->photos->first();
     $ogImage = $firstPhoto?->url;
     $ogUrl   = url()->current();
 @endphp
@@ -105,6 +106,26 @@
         : ['sunday' => 'Sun', 'monday' => 'Mon', 'tuesday' => 'Tue', 'wednesday' => 'Wed', 'thursday' => 'Thu', 'friday' => 'Fri', 'saturday' => 'Sat'];
 
     $totalImages = $allImages->count();
+
+    // ─── "Shown outside" showcase ─────────────────────────────────────────
+    // The host curates up to 10 featured photos for the place page (ordered;
+    // first = cover). The hero/carousel shows those; falls back to the full
+    // set when the host hasn't featured any.
+    $featuredImages = $place->photos
+        ->whereNotNull('featured_order')
+        ->sortBy('featured_order')
+        ->values();
+    $heroImages = $featuredImages->isNotEmpty() ? $featuredImages : $allImages;
+
+    // ─── Grouped "view images" gallery ────────────────────────────────────
+    // Section order follows the host's arrangement: facilities are ordered by
+    // their earliest photo's sort_order, so a section the host pushed down
+    // (e.g. the bathroom) leads later. Photoless facilities sink to the end.
+    $galleryFacilities = $facilities
+        ->sortBy(fn ($f) => $facilityImages($f)->isNotEmpty()
+            ? $facilityImages($f)->min('sort_order')
+            : PHP_INT_MAX)
+        ->values();
 @endphp
 
 <div
@@ -144,6 +165,55 @@
     }"
     @keydown.escape.window="closeGallery(); closeSheet(); closeDescription();"
 >
+    {{-- OWNER/ADMIN STATUS BANNER — pinned above the page so they always know
+         the listing's review + active status while previewing it as a guest. --}}
+    @if($showStatusBanner ?? false)
+        @php
+            $rpReview = match ($place->review_status) {
+                \App\Enums\PlaceReviewStatus::Draft         => ['#9ca3af', '#e5e7eb'],
+                \App\Enums\PlaceReviewStatus::PendingReview => ['#f59e0b', '#fde68a'],
+                \App\Enums\PlaceReviewStatus::Approved      => ['#10b981', '#a7f3d0'],
+                \App\Enums\PlaceReviewStatus::Rejected      => ['#ef4444', '#fecaca'],
+            };
+            $rpStatus = $place->status === \App\Enums\PlaceStatus::Active
+                ? ['#10b981', '#a7f3d0'] : ['#9ca3af', '#e5e7eb'];
+            $reviewText = $isRtl ? match ($place->review_status) {
+                \App\Enums\PlaceReviewStatus::Draft         => 'مسودة',
+                \App\Enums\PlaceReviewStatus::PendingReview => 'قيد المراجعة',
+                \App\Enums\PlaceReviewStatus::Approved      => 'موافق عليه',
+                \App\Enums\PlaceReviewStatus::Rejected      => 'مرفوض',
+            } : str_replace('_', ' ', $place->review_status->value);
+            $statusText = $isRtl
+                ? ($place->status === \App\Enums\PlaceStatus::Active ? 'مفعّل' : 'موقوف')
+                : $place->status->value;
+            $bannerEdit = ($viewerIsAdmin ?? false) ? route('admin.places.edit', $place) : route('host.places.edit', $place);
+            $bannerBack = ($viewerIsAdmin ?? false) ? route('admin.places.index') : route('user.places');
+        @endphp
+        <div class="w-full text-white" style="background-color: #222;" dir="{{ $isRtl ? 'rtl' : 'ltr' }}">
+            <div class="max-w-7xl mx-auto w-full px-6 sm:px-10 lg:px-20 flex items-center justify-between flex-wrap"
+                 style="padding-top: 10px; padding-bottom: 10px; gap: 10px 16px;">
+                <div class="flex items-center flex-wrap" style="gap: 8px 12px;">
+                    <span class="text-[12px] font-semibold opacity-80 {{ $fa }}">{{ $isRtl ? '👁️ معاينة — هذه نظرة الزائر' : '👁️ Preview — this is the guest view' }}</span>
+                    <span class="inline-flex items-center text-[11px] font-bold uppercase tracking-wider {{ $fa }}"
+                          style="padding: 4px 11px 4px 8px; border-radius: 999px; gap: 6px; background-color: {{ $rpReview[0] }};">
+                        <span style="width: 6px; height: 6px; border-radius: 999px; background-color: {{ $rpReview[1] }};"></span>
+                        {{ ($isRtl ? 'المراجعة: ' : 'Review: ') . $reviewText }}
+                    </span>
+                    <span class="inline-flex items-center text-[11px] font-bold uppercase tracking-wider {{ $fa }}"
+                          style="padding: 4px 11px 4px 8px; border-radius: 999px; gap: 6px; background-color: {{ $rpStatus[0] }};">
+                        <span style="width: 6px; height: 6px; border-radius: 999px; background-color: {{ $rpStatus[1] }};"></span>
+                        {{ ($isRtl ? 'الحالة: ' : 'Status: ') . $statusText }}
+                    </span>
+                </div>
+                <div class="flex items-center" style="gap: 8px;">
+                    <a href="{{ $bannerEdit }}" class="inline-flex items-center text-[12px] font-bold bg-white text-[#222] {{ $fa }}"
+                       style="padding: 6px 14px; border-radius: 999px; gap: 4px;">{{ $isRtl ? '✎ تعديل' : '✎ Edit' }}</a>
+                    <a href="{{ $bannerBack }}" class="inline-flex items-center text-[12px] font-semibold text-white hover:opacity-80 {{ $fa }}"
+                       style="padding: 6px 10px;">{{ $isRtl ? 'رجوع' : 'Back' }}</a>
+                </div>
+            </div>
+        </div>
+    @endif
 
     {{-- HEADER --}}
     <header class="w-full border-b border-[#ebebeb] sticky top-0 z-30"
@@ -190,18 +260,18 @@
         </div>
 
         {{-- AIRBNB-STYLE MOSAIC (desktop) / SCROLL CAROUSEL (mobile) --}}
-        @if($allImages->count() > 0)
-            @php $imgCount = $allImages->count(); @endphp
+        @if($heroImages->count() > 0)
+            @php $imgCount = $heroImages->count(); @endphp
             <div class="hidden sm:block relative">
                 @if($imgCount === 1)
                     <div class="r-ios-xl overflow-hidden bg-[#f7f7f7]" style="height: 480px;">
-                        <button type="button" @click="openGallery('{{ $sectionKeyFor($allImages[0]) }}')" class="block w-full h-full overflow-hidden group">
-                            <img src="{{ $allImages[0]->url }}" class="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-700" alt="" loading="eager">
+                        <button type="button" @click="openGallery('{{ $sectionKeyFor($heroImages[0]) }}')" class="block w-full h-full overflow-hidden group">
+                            <img src="{{ $heroImages[0]->url }}" class="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-700" alt="" loading="eager">
                         </button>
                     </div>
                 @elseif($imgCount === 2)
                     <div class="grid grid-cols-2 gap-2 r-ios-xl overflow-hidden" style="height: 480px;">
-                        @foreach($allImages as $i => $img)
+                        @foreach($heroImages as $i => $img)
                             <button type="button" @click="openGallery('{{ $sectionKeyFor($img) }}')" class="group relative overflow-hidden bg-[#f7f7f7]">
                                 <img src="{{ $img->url }}" class="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-700" alt="" loading="{{ $i === 0 ? 'eager' : 'lazy' }}">
                             </button>
@@ -209,25 +279,25 @@
                     </div>
                 @elseif($imgCount === 3)
                     <div class="r-ios-xl overflow-hidden" style="display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(2, 1fr); gap: 8px; height: 480px;">
-                        <button type="button" @click="openGallery('{{ $sectionKeyFor($allImages[0]) }}')" style="grid-column: span 2; grid-row: span 2;" class="group relative overflow-hidden bg-[#f7f7f7]">
-                            <img src="{{ $allImages[0]->url }}" class="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-700" alt="" loading="eager">
+                        <button type="button" @click="openGallery('{{ $sectionKeyFor($heroImages[0]) }}')" style="grid-column: span 2; grid-row: span 2;" class="group relative overflow-hidden bg-[#f7f7f7]">
+                            <img src="{{ $heroImages[0]->url }}" class="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-700" alt="" loading="eager">
                         </button>
-                        <button type="button" @click="openGallery('{{ $sectionKeyFor($allImages[1]) }}')" class="group relative overflow-hidden bg-[#f7f7f7]">
-                            <img src="{{ $allImages[1]->url }}" class="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-700" alt="" loading="lazy">
+                        <button type="button" @click="openGallery('{{ $sectionKeyFor($heroImages[1]) }}')" class="group relative overflow-hidden bg-[#f7f7f7]">
+                            <img src="{{ $heroImages[1]->url }}" class="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-700" alt="" loading="lazy">
                         </button>
-                        <button type="button" @click="openGallery('{{ $sectionKeyFor($allImages[2]) }}')" class="group relative overflow-hidden bg-[#f7f7f7]">
-                            <img src="{{ $allImages[2]->url }}" class="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-700" alt="" loading="lazy">
+                        <button type="button" @click="openGallery('{{ $sectionKeyFor($heroImages[2]) }}')" class="group relative overflow-hidden bg-[#f7f7f7]">
+                            <img src="{{ $heroImages[2]->url }}" class="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-700" alt="" loading="lazy">
                         </button>
                     </div>
                 @else
-                    @php $more = $imgCount - 4; @endphp
+                    @php $more = $totalImages - 4; @endphp
                     <div class="r-ios-xl overflow-hidden" style="display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(2, 1fr); gap: 8px; height: 480px;">
-                        <button type="button" @click="openGallery('{{ $sectionKeyFor($allImages[0]) }}')" style="grid-column: span 2; grid-row: span 2;" class="group relative overflow-hidden bg-[#f7f7f7]">
-                            <img src="{{ $allImages[0]->url }}" class="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-700" alt="" loading="eager">
+                        <button type="button" @click="openGallery('{{ $sectionKeyFor($heroImages[0]) }}')" style="grid-column: span 2; grid-row: span 2;" class="group relative overflow-hidden bg-[#f7f7f7]">
+                            <img src="{{ $heroImages[0]->url }}" class="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-700" alt="" loading="eager">
                         </button>
                         @for($i = 1; $i <= 3; $i++)
-                            <button type="button" @click="openGallery('{{ $sectionKeyFor($allImages[$i]) }}')" class="group relative overflow-hidden bg-[#f7f7f7]">
-                                <img src="{{ $allImages[$i]->url }}" class="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-700" alt="" loading="lazy">
+                            <button type="button" @click="openGallery('{{ $sectionKeyFor($heroImages[$i]) }}')" class="group relative overflow-hidden bg-[#f7f7f7]">
+                                <img src="{{ $heroImages[$i]->url }}" class="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-700" alt="" loading="lazy">
                             </button>
                         @endfor
                         <button type="button" @click="openGallery('')" class="group relative overflow-hidden flex flex-col items-center justify-center text-white bg-[#222] hover:bg-black transition-colors {{ $fa }}">
@@ -259,7 +329,7 @@
                          visual order regardless of the page's reading direction. --}}
                     <div class="flex no-scrollbar" style="overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; aspect-ratio: 4 / 3; width: 100%;"
                          x-ref="heroTrack" @scroll.passive="onScroll($event.target)" dir="ltr">
-                        @foreach($allImages as $i => $img)
+                        @foreach($heroImages as $i => $img)
                             <button type="button" @click="openGallery('{{ $sectionKeyFor($img) }}')" style="width: 100%; height: 100%; flex-shrink: 0; scroll-snap-align: center;">
                                 <img src="{{ $img->url }}" style="width: 100%; height: 100%; object-fit: cover; pointer-events: none;" alt="" draggable="false" loading="{{ $i === 0 ? 'eager' : 'lazy' }}">
                             </button>
@@ -285,7 +355,7 @@
                 @if($imgCount > 1)
                     @if($imgCount <= 12)
                         <div class="flex justify-center items-center" style="gap: 6px; margin-top: 14px;">
-                            @foreach($allImages as $i => $img)
+                            @foreach($heroImages as $i => $img)
                                 <span class="block transition-all"
                                       :style="idx === {{ $i }} ? 'width: 20px; height: 6px; border-radius: 999px; background-color: #222;' : 'width: 6px; height: 6px; border-radius: 999px; background-color: #9ca3af;'"></span>
                             @endforeach
@@ -299,7 +369,7 @@
                                 <rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect>
                                 <rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect>
                             </svg>
-                            <span>{{ $isRtl ? "عرض كل الصور ({$imgCount})" : "View all {$imgCount} photos" }}</span>
+                            <span>{{ $isRtl ? "عرض كل الصور ({$totalImages})" : "View all {$totalImages} photos" }}</span>
                         </button>
                     </div>
                 @endif
@@ -755,7 +825,7 @@
             {{-- Horizontal thumbnails strip (jump-to anchors) --}}
             <div class="overflow-x-auto no-scrollbar pt-8 pb-4">
                 <div class="flex gap-4 justify-start" style="width: max-content;">
-                    @foreach($facilities as $f)
+                    @foreach($galleryFacilities as $f)
                         @php $facImages = $facilityImages($f); $sectionKey = 'attr-' . $f->attribute_id; @endphp
                         @if($facImages->count() > 0)
                             <button type="button" @click="scrollToGallerySection('{{ $sectionKey }}')"
@@ -782,8 +852,8 @@
                 </div>
             </div>
 
-            {{-- Per-facility sections --}}
-            @foreach($facilities as $f)
+            {{-- Per-facility sections — ordered by the host's gallery arrangement --}}
+            @foreach($galleryFacilities as $f)
                 @php $facImages = $facilityImages($f); $sectionKey = 'attr-' . $f->attribute_id; @endphp
                 @if($facImages->count() > 0)
                     <section id="gallery-section-{{ $sectionKey }}" style="padding-top: 32px; scroll-margin-top: 100px;">

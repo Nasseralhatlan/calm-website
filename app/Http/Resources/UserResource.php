@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace App\Http\Resources;
 
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
- * @mixin \App\Models\User
+ * @mixin User
  */
 class UserResource extends JsonResource
 {
@@ -22,10 +23,15 @@ class UserResource extends JsonResource
             'name' => $this->name,
             'gender' => $this->gender,
             'age' => $this->age,
+            'birth_date' => $this->birth_date?->toDateString(),
             'phone' => $this->phone,
             'email' => $this->email,
             'country_id' => $this->country_id,
             'role' => $this->role?->value,
+            // True iff the user has at least one place row, regardless of
+            // status — drafts, rejected, approved all count. Frontend uses
+            // this to flip the "Become a host" CTA to "My listings".
+            'is_host' => $this->isHost(),
             'phone_verified_at' => $this->phone_verified_at?->toIso8601String(),
             'email_verified_at' => $this->email_verified_at?->toIso8601String(),
             'created_at' => $this->created_at?->toIso8601String(),

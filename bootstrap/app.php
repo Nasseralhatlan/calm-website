@@ -1,9 +1,11 @@
 <?php
 
 use App\Http\Middleware\EnsureAdmin;
+use App\Http\Middleware\SetLocale;
 use App\Http\Responses\ApiResponse;
-use Illuminate\Auth\AuthenticationException;
+use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Auth\AuthenticationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -26,7 +28,7 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->web(append: [
-            \App\Http\Middleware\SetLocale::class,
+            SetLocale::class,
         ]);
         $middleware->trustProxies(at: '*');
 
@@ -49,7 +51,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // When an *already authenticated* user hits a `guest`-only route (e.g. /login),
         // bounce them to their dashboard. Admin → admin panel, user → profile.
         $middleware->redirectUsersTo(function (Request $request): string {
-            /** @var \App\Models\User|null $user */
+            /** @var User|null $user */
             $user = $request->user();
 
             return $user?->isAdmin() ? route('admin.dashboard') : route('profile');

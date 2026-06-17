@@ -29,6 +29,8 @@ class UpdateProfileRequest extends FormRequest
             'name' => ['sometimes', 'nullable', 'string', 'max:120'],
             'gender' => ['sometimes', 'nullable', Rule::in(['male', 'female'])],
             'age' => ['sometimes', 'nullable', 'integer', 'between:13,120'],
+            // Frontend posts YYYY-MM-DD. Lower bound matches age:13.
+            'birth_date' => ['sometimes', 'nullable', 'date', 'date_format:Y-m-d', 'before:today', 'after:1900-01-01'],
             'email' => ['sometimes', 'nullable', 'email:rfc', 'max:254', Rule::unique('users', 'email')->ignore($userId)],
         ];
     }

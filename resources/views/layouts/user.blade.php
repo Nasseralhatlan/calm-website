@@ -74,8 +74,9 @@
         </div>
     </header>
 
-    {{-- Sidebar --}}
-    <aside class="fixed z-20 flex flex-col user-sidebar" style="top: 112px; width: 220px; gap: 6px;">
+    {{-- Sidebar — top + bottom anchors so it scrolls internally on short viewports. --}}
+    <aside class="fixed z-20 flex flex-col user-sidebar custom-thin-scroll"
+           style="top: 112px; bottom: 16px; width: 220px; gap: 6px; overflow-y: auto;">
         @include('partials._sidebar_nav')
     </aside>
 

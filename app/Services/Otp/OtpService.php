@@ -15,7 +15,9 @@ use Illuminate\Support\Facades\Mail;
 final class OtpService
 {
     private const OTP_LENGTH = 6;
+
     private const TTL_MINUTES = 3;
+
     private const MAX_ATTEMPTS = 3;
 
     public function __construct(

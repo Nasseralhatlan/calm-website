@@ -20,15 +20,16 @@ beforeEach(function (): void {
 
 it('issues an otp for a new phone number and auto-creates the user', function (): void {
     $response = $this->postJson('/api/auth/otp/request', [
-        'type' => 'phone',
-        'identifier' => '512345678',
+        'phone' => '512345678',
     ]);
 
     $response->assertOk()
-        ->assertJsonStructure(['status', 'message', 'data' => ['type', 'identifier']])
+        ->assertJsonStructure(['status', 'message', 'data' => ['phone', 'expires_at']])
         ->assertJsonPath('status', 200)
-        ->assertJsonPath('data.type', 'phone')
-        ->assertJsonPath('data.identifier', '512345678');
+        ->assertJsonPath('data.phone', '512345678');
+
+    // expires_at is an ISO 8601 timestamp roughly TTL_MINUTES in the future.
+    expect($response->json('data.expires_at'))->toMatch('/^\d{4}-\d{2}-\d{2}T/');
 
     expect(User::where('phone', '512345678')->exists())->toBeTrue();
     expect(Otp::count())->toBe(1);
@@ -39,33 +40,15 @@ it('issues an otp for a new phone number and auto-creates the user', function ()
 
 it('rejects invalid phone format', function (): void {
     $this->postJson('/api/auth/otp/request', [
-        'type' => 'phone',
-        'identifier' => '0512345678',
+        'phone' => '0512345678',
     ])->assertStatus(422)
         ->assertJsonPath('status', 422)
-        ->assertJsonStructure(['data' => ['errors' => ['identifier']]]);
+        ->assertJsonStructure(['data' => ['errors' => ['phone']]]);
 
     $this->postJson('/api/auth/otp/request', [
-        'type' => 'phone',
-        'identifier' => '4123456789',
+        'phone' => '4123456789',
     ])->assertStatus(422)
-        ->assertJsonStructure(['data' => ['errors' => ['identifier']]]);
-});
-
-it('rejects invalid email format', function (): void {
-    $this->postJson('/api/auth/otp/request', [
-        'type' => 'email',
-        'identifier' => 'not-an-email',
-    ])->assertStatus(422)
-        ->assertJsonStructure(['data' => ['errors' => ['identifier']]]);
-});
-
-it('rejects unknown otp type', function (): void {
-    $this->postJson('/api/auth/otp/request', [
-        'type' => 'sms',
-        'identifier' => '512345678',
-    ])->assertStatus(422)
-        ->assertJsonStructure(['data' => ['errors' => ['type']]]);
+        ->assertJsonStructure(['data' => ['errors' => ['phone']]]);
 });
 
 it('reuses the active otp instead of creating a new one or sending another sms', function (): void {
@@ -94,57 +77,48 @@ it('issues a fresh otp once the previous one is expired', function (): void {
 // ─── verify-otp ──────────────────────────────────────────────────────────────
 
 it('verifies a correct otp and returns a jwt token', function (): void {
-    $this->postJson('/api/auth/otp/request', [
-        'type' => 'phone',
-        'identifier' => '512345678',
-    ])->assertOk();
+    $this->postJson('/api/auth/otp/request', ['phone' => '512345678'])->assertOk();
 
     $code = $this->sink->lastCode();
 
     $response = $this->postJson('/api/auth/otp/verify', [
-        'type' => 'phone',
-        'identifier' => '512345678',
+        'phone' => '512345678',
         'otp' => $code,
     ]);
 
     $response->assertOk()
-        ->assertJsonStructure(['status', 'message', 'data' => ['token', 'token_type', 'expires_in', 'user' => ['id', 'phone', 'role']]])
+        ->assertJsonStructure(['status', 'message', 'data' => [
+            'token', 'token_type', 'expires_in', 'expires_at',
+            'user' => ['id', 'phone', 'role'],
+        ]])
         ->assertJsonPath('data.token_type', 'bearer')
         ->assertJsonPath('data.user.phone', '512345678');
 
+    expect($response->json('data.expires_at'))->toMatch('/^\d{4}-\d{2}-\d{2}T/');
     expect(User::where('phone', '512345678')->first()->phone_verified_at)->not->toBeNull();
 });
 
 it('rejects an incorrect otp', function (): void {
-    $this->postJson('/api/auth/otp/request', [
-        'type' => 'phone',
-        'identifier' => '512345678',
-    ])->assertOk();
+    $this->postJson('/api/auth/otp/request', ['phone' => '512345678'])->assertOk();
 
     $this->postJson('/api/auth/otp/verify', [
-        'type' => 'phone',
-        'identifier' => '512345678',
+        'phone' => '512345678',
         'otp' => '000000',
     ])->assertStatus(422)->assertJsonPath('message', 'Invalid or expired OTP.');
 });
 
 it('rejects a used otp', function (): void {
-    $this->postJson('/api/auth/otp/request', [
-        'type' => 'phone',
-        'identifier' => '512345678',
-    ])->assertOk();
+    $this->postJson('/api/auth/otp/request', ['phone' => '512345678'])->assertOk();
 
     $code = $this->sink->lastCode();
 
     $this->postJson('/api/auth/otp/verify', [
-        'type' => 'phone',
-        'identifier' => '512345678',
+        'phone' => '512345678',
         'otp' => $code,
     ])->assertOk();
 
     $this->postJson('/api/auth/otp/verify', [
-        'type' => 'phone',
-        'identifier' => '512345678',
+        'phone' => '512345678',
         'otp' => $code,
     ])->assertStatus(422);
 });
@@ -162,8 +136,7 @@ it('rejects an expired otp', function (): void {
     ]);
 
     $this->postJson('/api/auth/otp/verify', [
-        'type' => 'phone',
-        'identifier' => '512345678',
+        'phone' => '512345678',
         'otp' => '123456',
     ])->assertStatus(422);
 });
@@ -233,7 +206,7 @@ it('refreshes a token', function (): void {
     $this->withHeader('Authorization', 'Bearer '.$token)
         ->postJson('/api/auth/refresh')
         ->assertOk()
-        ->assertJsonStructure(['status', 'message', 'data' => ['token', 'token_type', 'expires_in']]);
+        ->assertJsonStructure(['status', 'message', 'data' => ['token', 'token_type', 'expires_in', 'expires_at']]);
 });
 
 it('puts the admin role in the jwt custom claims', function (): void {
