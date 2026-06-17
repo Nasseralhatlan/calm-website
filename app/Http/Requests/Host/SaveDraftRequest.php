@@ -24,6 +24,13 @@ class SaveDraftRequest extends FormRequest
     {
         $rules = [
             'draft_id' => ['nullable', 'uuid'],
+            // Admin-only: nullable on drafts so partial saves work before the
+            // admin types the host phone. The format rule still applies if
+            // anything is supplied. See StorePlaceRequest for the strict
+            // final-submit version.
+            'host_phone' => $this->user()?->isAdmin()
+                ? ['nullable', 'string', 'regex:/^5\d{8}$/']
+                : ['nullable'],
             'place_type_id' => ['required', 'uuid', 'exists:place_types,id'],
             'title' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:10000'],
@@ -31,6 +38,7 @@ class SaveDraftRequest extends FormRequest
             'price' => ['nullable', 'integer', 'min:0'],
             'check_in_time' => ['nullable', 'string', 'max:8'],
             'check_out_time' => ['nullable', 'string', 'max:8'],
+            'max_guests' => ['nullable', 'integer', 'between:1,50'],
             'rules' => ['nullable', 'string', 'max:10000'],
             'last_step' => ['nullable', 'integer', 'min:1', 'max:20'],
 
@@ -48,7 +56,8 @@ class SaveDraftRequest extends FormRequest
             'attribute_image_paths.*.*' => ['string', 'max:500'],
             'extra_image_paths' => ['nullable', 'array'],
             'extra_image_paths.*' => ['string', 'max:500'],
-            'cover_image' => ['nullable', 'string', 'max:255'],
+            'featured' => ['nullable', 'array', 'max:10'],
+            'featured.*' => ['string', 'max:255'],
         ];
 
         foreach (Place::PRICE_COLUMNS as $column) {
@@ -68,7 +77,7 @@ class SaveDraftRequest extends FormRequest
     public function placeData(): array
     {
         return collect($this->validated())
-            ->except(['draft_id', 'attributes', 'attribute_image_paths', 'extra_image_paths', 'cover_image'])
+            ->except(['draft_id', 'host_phone', 'attributes', 'attribute_image_paths', 'extra_image_paths', 'featured'])
             ->toArray();
     }
 
@@ -99,8 +108,8 @@ class SaveDraftRequest extends FormRequest
 
         return [
             'attribute_paths' => $validated['attribute_image_paths'] ?? [],
-            'extra_paths'     => $validated['extra_image_paths']     ?? [],
-            'cover_key'       => $validated['cover_image']           ?? null,
+            'extra_paths' => $validated['extra_image_paths'] ?? [],
+            'featured' => $validated['featured'] ?? [],
         ];
     }
 }

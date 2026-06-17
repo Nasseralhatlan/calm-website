@@ -63,6 +63,7 @@
         ],
         'check_in_time' => $draft->check_in_time,
         'check_out_time' => $draft->check_out_time,
+        'max_guests' => $draft->max_guests,
         'rules' => $draft->rules,
         'review_status' => $draft->review_status?->value,
         'rejection_reason' => $draft->rejection_reason,
@@ -73,14 +74,39 @@
             'value' => $pa->value,
             'description' => $pa->description,
         ])->values(),
-        // Restore uploaded photos as { attribute_id|null, path, url, is_cover }.
-        // The wizard reconstructs its in-memory upload state from these.
+        // Restore uploaded photos as { attribute_id|null, path, url, featured_order }.
+        // Ordered by sort_order (the relation default) so the wizard rebuilds
+        // the within-section and section order; featured_order drives the
+        // "shown outside" showcase. The wizard reconstructs its in-memory state.
         'photos' => $draft->photos->map(fn ($p) => [
             'place_attribute_id' => $p->place_attribute_id,
             'path' => $p->path,
             'url' => Storage::disk('s3')->url($p->path),
-            'is_cover' => (bool) $p->is_cover,
+            'featured_order' => $p->featured_order,
         ])->values(),
+    ] : null;
+
+    // Edit-mode config (null in create mode). When present, the wizard renders
+    // pre-filled, lets the user jump between steps, and shows a sticky
+    // Save / Discard / Cancel bar. Admins also get an extra "Admin settings"
+    // step (featured lists + status + review). Passed by the host/admin edit
+    // controllers; absent on the public add flow.
+    $editConfig = $editConfig ?? null;
+    $editing = (bool) ($editConfig['enabled'] ?? false);
+    // Step-nav labels for the edit-mode jump bar (admin gets the extra step).
+    $wizardStepLabels = $isRtl
+        ? ['النوع', 'العنوان', 'المدينة', 'الحي', 'التسعير', 'العناصر', 'الإعداد', 'الصور', 'القواعد']
+        : ['Type', 'Title', 'City', 'Area', 'Pricing', 'Amenities', 'Configure', 'Photos', 'Rules'];
+    $wizardAdminLabel = $isRtl ? 'المشرف' : 'Admin';
+    $jsonEdit = $editConfig ? [
+        'enabled' => true,
+        'isAdmin' => (bool) ($editConfig['isAdmin'] ?? false),
+        'cancelUrl' => $editConfig['cancelUrl'] ?? route('user.places'),
+        'lists' => $editConfig['lists'] ?? [],
+        'selectedListIds' => $editConfig['selectedListIds'] ?? [],
+        'status' => $editConfig['status'] ?? null,
+        'reviewStatus' => $editConfig['reviewStatus'] ?? null,
+        'rejectionReason' => $editConfig['rejectionReason'] ?? null,
     ] : null;
 @endphp
 
@@ -119,6 +145,8 @@
                 'attributeGroups' => $jsonAttributeGroups,
                 'draftEndpoint'   => route('host.places.draft'),
                 'draft'           => $jsonDraft,
+                'rates'           => $pricingRates,
+                'edit'            => $jsonEdit,
             ], JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) !!}
         </script>
 
@@ -132,6 +160,17 @@
                 </div>
                 <div class="mt-3 text-xs text-[#717171] font-medium {{ $fa }}">
                     <span x-text="step"></span> / <span x-text="totalSteps"></span>
+                </div>
+
+                {{-- Edit mode: jump straight to any step/section. --}}
+                <div class="mt-4 flex flex-wrap gap-2" x-show="editing" x-cloak>
+                    <template x-for="(label, i) in stepLabels()" :key="`stepnav-${i}`">
+                        <button type="button" @click="goToStep(i + 1)"
+                                class="text-[12px] font-semibold transition-all {{ $fa }}"
+                                :class="step === (i + 1) ? 'bg-[#222] text-white' : 'bg-[#f3f4f6] text-[#717171] hover:bg-[#e9eaec]'"
+                                style="padding: 6px 12px; border-radius: 999px;"
+                                x-text="`${i + 1}. ${label}`"></button>
+                    </template>
                 </div>
             </div>
 
@@ -167,11 +206,36 @@
                 </div>
             @endif
 
-            <form method="POST" action="{{ route('host.places.store') }}" @submit="submitting = true" x-ref="form" dir="{{ $dirAttr }}">
+            <form method="POST" action="{{ $editing ? $editConfig['submitUrl'] : route('host.places.store') }}" @submit="submitting = true" x-ref="form" dir="{{ $dirAttr }}">
                 @csrf
+                @if($editing) @method('PUT') @endif
                 {{-- Carries the draft we've been auto-saving so the server promotes it
                      instead of creating a duplicate row on final submit. --}}
                 <input type="hidden" name="draft_id" :value="draftId || ''">
+
+                {{-- Admin-only: attach the listing to this host's phone instead
+                     of the admin's own account. Hidden mirror posts on final
+                     submit; the same Alpine field is also sent on every draft
+                     auto-save (see saveDraft() payload). Non-admins never see
+                     the input AND the server-side rule ignores any post anyway. --}}
+                @if(auth()->user()?->isAdmin() && ! $editing)
+                    <div class="r-ios-lg bg-amber-50 border border-amber-200 {{ $fa }}"
+                         style="padding: 18px 20px; margin-bottom: 24px;">
+                        <label class="block text-[13px] font-bold text-[#222]" style="margin-bottom: 6px;">
+                            {{ $isRtl ? 'إضافة لرقم المضيف' : 'Attach to host phone' }}
+                        </label>
+                        <input type="tel" name="host_phone" x-model="hostPhone"
+                               placeholder="5XXXXXXXX" dir="ltr" maxlength="9"
+                               value="{{ old('host_phone') }}"
+                               class="w-full bg-white border border-[#ebebeb] focus:border-[#222] text-[15px] tabular-nums focus:outline-none"
+                               style="padding: 11px 14px; border-radius: 12px;">
+                        <p class="text-[12px] text-[#717171] {{ $fa }}" style="margin-top: 6px;">
+                            {{ $isRtl
+                                ? '٩ أرقام تبدأ بـ 5. إن لم يكن المستخدم موجوداً يُنشأ تلقائياً.'
+                                : '9-digit national format (5XXXXXXXX). If no user has this phone, a shell account is created automatically.' }}
+                        </p>
+                    </div>
+                @endif
 
                 {{-- ── Step 1: place type ── --}}
                 <section x-show="step === 1" x-transition.opacity>
@@ -214,6 +278,24 @@
                         <div class="mt-1.5 text-xs text-[#717171] tabular-nums {{ $isRtl ? 'text-left' : 'text-right' }}">
                             <span x-text="(description || '').length"></span> / 5000
                         </div>
+                    </label>
+
+                    <label class="block mt-8">
+                        <span class="text-sm font-semibold text-[#222] {{ $fa }}">{{ $isRtl ? 'عدد الضيوف الأقصى' : 'Max guests' }}</span>
+                        <div class="mt-3 border border-[#dddddd] focus-within:border-[#222] transition-all bg-white shadow-card r-ios-lg overflow-hidden inline-flex items-center" style="width: auto;">
+                            <button type="button" @click="maxGuests = Math.max(1, (parseInt(maxGuests) || 1) - 1)"
+                                    class="text-[#222] hover:bg-[#f7f7f7] flex items-center justify-center"
+                                    style="width: 52px; height: 52px; font-size: 24px; line-height: 1; font-weight: 600;">−</button>
+                            <input name="max_guests" x-model.number="maxGuests" type="number" min="1" max="50" inputmode="numeric"
+                                   class="bg-transparent outline-none text-[17px] text-[#222] text-center tabular-nums"
+                                   style="width: 80px; padding: 14px 0;">
+                            <button type="button" @click="maxGuests = Math.min(50, (parseInt(maxGuests) || 0) + 1)"
+                                    class="text-[#222] hover:bg-[#f7f7f7] flex items-center justify-center"
+                                    style="width: 52px; height: 52px; font-size: 24px; line-height: 1; font-weight: 600;">+</button>
+                        </div>
+                        <p class="mt-2 text-[12px] text-[#717171] {{ $fa }}">
+                            {{ $isRtl ? 'كم شخصاً يمكن أن يقيم في مكانك بشكل مريح؟' : 'How many guests can comfortably stay?' }}
+                        </p>
                     </label>
                 </section>
 
@@ -273,12 +355,32 @@
                     <p class="mt-2 text-[#717171] text-base {{ $fa }}">{{ $isRtl ? 'حدد سعراً أساسياً، ويمكنك تخصيص كل يوم.' : 'Set a base price, then optionally adjust per day.' }}</p>
 
                     <label class="block mt-10">
-                        <span class="text-sm font-semibold text-[#222] {{ $fa }}">{{ $isRtl ? 'السعر الأساسي (ريال / ليلة)' : 'Base price (SAR / night)' }}</span>
+                        <span class="text-sm font-semibold text-[#222] {{ $fa }}">{{ $isRtl ? 'السعر الأساسي (ريال / يوم)' : 'Base price (SAR / day)' }}</span>
                         <div class="mt-3 border border-[#dddddd] focus-within:border-[#222] transition-all bg-white shadow-card r-ios-lg overflow-hidden">
                             <input name="price" x-model.number="price" type="number" min="0"
                                    class="w-full bg-transparent outline-none text-[17px] text-[#222] tabular-nums py-4 px-5" dir="ltr">
                         </div>
                     </label>
+
+                    {{-- Live breakdown from the base price (per day): the price the
+                         guest sees, Calm's cut, and what the host takes home. --}}
+                    <div x-show="_basePrice > 0" x-cloak
+                         class="mt-5 r-ios-lg border border-[#ebebeb] bg-[#fafafa] p-5 {{ $fa }}">
+                        <div class="flex items-center justify-between text-[15px]">
+                            <span class="text-[#717171]">{{ $isRtl ? 'السعر الظاهر للضيف / يوم' : 'Price shown to guest / day' }}</span>
+                            <span class="font-bold text-[#222] tabular-nums" dir="ltr"><span x-text="money(_basePrice)"></span> {{ $isRtl ? 'ر.س' : 'SAR' }}</span>
+                        </div>
+
+                        <div class="flex items-center justify-between text-[15px] mt-3 pt-3 border-t border-[#ebebeb]">
+                            <span class="text-[#717171] mt-10">{{ $isRtl ? 'كالم' : 'Calm' }} (<span x-text="commissionRate"></span>%)</span>
+                            <span class="font-semibold mt-10 text-[#222] tabular-nums" dir="ltr"><span x-text="money(commissionAmount)"></span> {{ $isRtl ? 'ر.س' : 'SAR' }}</span>
+                        </div>
+
+                        <div class="flex items-center justify-between text-[15px] mt-2">
+                            <span class="font-bold text-[#222]">{{ $isRtl ? 'لك' : 'You' }}</span>
+                            <span class="font-bold text-[#10b981] tabular-nums" style="color: #10b981" dir="ltr"><span x-text="money(hostNet)"></span> {{ $isRtl ? 'ر.س' : 'SAR' }}</span>
+                        </div>
+                    </div>
 
                     <div class="mt-8">
                         <div class="text-sm font-semibold text-[#222] {{ $fa }}">{{ $isRtl ? 'السعر لكل يوم (اختياري)' : 'Per-day pricing (optional)' }}</div>
@@ -376,29 +478,46 @@
                     </template>
                 </section>
 
-                {{-- ── Step 8: photos (per-attribute + extras + cover) ── --}}
+                {{-- ── Step 8: photos (gallery order + "shown outside" showcase) ── --}}
                 <section x-show="step === 8" x-transition.opacity>
                     <h2 class="text-3xl sm:text-[34px] font-bold tracking-tight text-[#222] {{ $fa }}">{{ $isRtl ? 'صور المكان' : 'Photos of your place' }}</h2>
-                    <p class="mt-2 text-[#717171] text-base {{ $fa }}">{{ $isRtl ? 'أضف صوراً للعناصر، صوراً عامة، وحدّد صورة الغلاف.' : 'Add per-attribute photos, general photos, then pick a cover.' }}</p>
+                    <p class="mt-2 text-[#717171] text-base {{ $fa }}">{{ $isRtl ? 'أضف الصور، اسحبها لإعادة الترتيب أو نقلها بين الأقسام (أو استخدم الأسهم)، ثم اختر الصور التي تظهر في صفحة المكان.' : 'Add photos, drag to reorder or move them between sections (or use the arrows), then choose which appear on the place page.' }}</p>
 
-                    {{-- A. Per-attribute uploads — only for attributes whose photo_rule is required/optional --}}
+                    {{-- A. Per-attribute uploads — reorderable sections, reorderable photos within --}}
                     <div class="mt-10 space-y-4">
-                        <template x-for="entry in photoNeedingAttributes()" :key="`up-${entry.id}`">
-                            <div class="r-ios-lg bg-white shadow-card p-5 border-2"
-                                 :class="entry.attribute.photoRule === 'required' && uploadCountFor(entry.id, false) === 0
-                                     ? 'border-[#F88379]/40'
-                                     : 'border-transparent'">
-                                <div class="flex items-center justify-between mb-3">
-                                    <div class="flex items-center gap-3 min-w-0">
+                        <template x-for="(entry, secIdx) in orderedPhotoSections()" :key="`up-${entry.id}`">
+                            <div data-section-card class="relative r-ios-lg bg-white shadow-card p-5 border-2 transition-all"
+                                 :class="(entry.attribute.photoRule === 'required' && uploadCountFor(entry.id, false) === 0 ? 'border-[#F88379]/40' : 'border-transparent')
+                                     + (dnd.kind === 'photo' && dnd.overSection === entry.id ? ' ring-2 ring-[#F88379]/50' : (dnd.kind === 'photo' ? ' ring-2 ring-[#F88379]/15' : ''))
+                                     + (dnd.kind === 'section' && dnd.id === entry.id ? ' opacity-50' : '')"
+                                 @dragover.prevent="dnd.over = null; dnd.overSection = entry.id" @drop.prevent="dropOnSectionArea(entry.id)">
+                                {{-- Section drop indicator (Trello-style insertion bar) --}}
+                                <div x-show="dnd.kind === 'section' && dnd.overSection === entry.id && dnd.id !== entry.id"
+                                     class="absolute -top-2.5 left-4 right-4 h-1.5 rounded-full bg-[#F88379] z-20 pointer-events-none"></div>
+                                <div class="flex items-center justify-between mb-3 gap-2">
+                                    <div class="flex items-center gap-2 min-w-0">
+                                        {{-- Drag handle — reorder this amenity section --}}
+                                        <button type="button" draggable="true" @dragstart.stop="beginSectionDrag($event, entry.id)" @dragend="dndEnd()"
+                                                class="shrink-0 w-8 h-8 inline-flex items-center justify-center text-xl text-[#bbb] hover:text-[#222] cursor-grab active:cursor-grabbing"
+                                                title="{{ $isRtl ? 'اسحب لإعادة ترتيب القسم' : 'Drag to reorder section' }}">⠿</button>
                                         <span x-text="entry.attribute.icon" class="text-2xl leading-none shrink-0"></span>
                                         <div class="font-semibold text-[#222] truncate {{ $fa }}" x-text="entry.attribute.label"></div>
                                     </div>
-                                    <span class="text-xs font-medium {{ $fa }}"
-                                          :class="entry.attribute.photoRule === 'required' ? 'text-[#F88379]' : 'text-[#717171]'">
-                                        <span x-text="entry.attribute.photoRule === 'required'
-                                            ? '{{ $isRtl ? 'مطلوب' : 'Required' }}'
-                                            : '{{ $isRtl ? 'اختياري' : 'Optional' }}'"></span>
-                                    </span>
+                                    <div class="flex items-center gap-1.5 shrink-0">
+                                        {{-- Section reorder: move this amenity earlier / later in the gallery --}}
+                                        <button type="button" @click="moveSection(entry.id, -1)" :disabled="secIdx === 0"
+                                                class="w-9 h-9 inline-flex items-center justify-center text-base font-bold text-[#222] bg-white shadow-card hover:bg-[#f7f7f7] active:scale-95 disabled:opacity-30 disabled:active:scale-100 transition-all"
+                                                style="border-radius: 12px;" title="{{ $isRtl ? 'تقديم القسم' : 'Move section up' }}">↑</button>
+                                        <button type="button" @click="moveSection(entry.id, 1)" :disabled="secIdx === orderedPhotoSections().length - 1"
+                                                class="w-9 h-9 inline-flex items-center justify-center text-base font-bold text-[#222] bg-white shadow-card hover:bg-[#f7f7f7] active:scale-95 disabled:opacity-30 disabled:active:scale-100 transition-all"
+                                                style="border-radius: 12px;" title="{{ $isRtl ? 'تأخير القسم' : 'Move section down' }}">↓</button>
+                                        <span class="text-xs font-medium ml-1 {{ $fa }}"
+                                              :class="entry.attribute.photoRule === 'required' ? 'text-[#F88379]' : 'text-[#717171]'">
+                                            <span x-text="entry.attribute.photoRule === 'required'
+                                                ? '{{ $isRtl ? 'مطلوب' : 'Required' }}'
+                                                : '{{ $isRtl ? 'اختياري' : 'Optional' }}'"></span>
+                                        </span>
+                                    </div>
                                 </div>
 
                                 <label class="block relative cursor-pointer hover:bg-[#f7f7f7] transition-colors {{ $fa }}"
@@ -411,18 +530,24 @@
                                            class="absolute inset-0 opacity-0 cursor-pointer">
                                 </label>
 
-                                {{-- Upload tiles --}}
-                                <div class="mt-4 grid grid-cols-3 sm:grid-cols-4 gap-2" x-show="(attributeUploads[entry.id] || []).length > 0">
+                                {{-- Upload tiles — reorder within the section --}}
+                                <div class="mt-5 grid grid-cols-3 sm:grid-cols-4 gap-3 sm:gap-4" x-show="(attributeUploads[entry.id] || []).length > 0">
                                     <template x-for="(u, uIdx) in attributeUploads[entry.id] || []" :key="`au-${entry.id}-${u.id}`">
-                                        <div class="relative group">
-                                            <img :src="u.preview || u.url" class="block w-full aspect-square object-cover r-ios"
-                                                 :class="u.status === 'uploading' ? 'opacity-40' : ''">
-                                            {{-- Cover badge --}}
-                                            <span x-show="u.id === coverUploadId"
-                                                  class="absolute top-1 left-1 inline-flex items-center gap-1 text-[10px] font-bold bg-[#F88379] text-white px-2 py-0.5 {{ $fa }}"
-                                                  style="border-radius: 999px;">
-                                                <span>★</span><span>{{ $isRtl ? 'غلاف' : 'COVER' }}</span>
-                                            </span>
+                                        <div class="relative group"
+                                             :draggable="u.status === 'done' ? 'true' : 'false'"
+                                             :style="u.status === 'done' ? 'cursor: grab;' : ''"
+                                             @dragstart.stop="beginPhotoDrag($event, entry.id, u.id)" @dragend="dndEnd()"
+                                             @dragover.prevent.stop="dnd.over = u.id" @drop.prevent.stop="dropOnPhoto(entry.id, u.id)">
+                                            {{-- Drop indicator (Trello-style insertion bar) --}}
+                                            <div x-show="dnd.kind === 'photo' && dnd.over === u.id && dnd.id !== u.id"
+                                                 class="absolute inset-y-1 ltr:-left-2 rtl:-right-2 w-1.5 rounded-full bg-[#F88379] z-20 pointer-events-none"></div>
+                                            <img :src="u.preview || u.url" class="block w-full aspect-square object-cover r-ios pointer-events-none transition-all"
+                                                 :class="(u.status === 'uploading' ? 'opacity-40' : '') + (dnd.kind === 'photo' && dnd.id === u.id ? ' opacity-30 outline-2 outline-dashed outline-[#F88379] outline-offset-2' : '')">
+                                            {{-- Featured rank badge (#1 = cover) --}}
+                                            <span x-show="isFeatured(u.id)"
+                                                  class="absolute top-2 ltr:left-2 rtl:right-2 inline-flex items-center gap-1 text-[10px] font-bold bg-[#F88379] text-white px-2 py-0.5 shadow {{ $fa }}"
+                                                  style="border-radius: 999px;"
+                                                  x-text="featuredRank(u.id) === 1 ? '★ {{ $isRtl ? 'غلاف' : 'COVER' }}' : ('#' + featuredRank(u.id))"></span>
                                             {{-- Status overlay --}}
                                             <div x-show="u.status === 'uploading'" class="absolute inset-0 flex items-center justify-center text-[11px] font-bold text-[#222] {{ $fa }}">
                                                 {{ $isRtl ? '...جارٍ الرفع' : 'Uploading...' }}
@@ -431,15 +556,17 @@
                                                  class="absolute inset-0 flex items-center justify-center text-[11px] font-bold bg-[#fef3f2]/90 text-[#b91c1c] {{ $fa }}">
                                                 {{ $isRtl ? 'فشل الرفع' : 'Upload failed' }}
                                             </div>
-                                            {{-- Hover toolbar --}}
-                                            <div class="absolute inset-x-1 bottom-1 flex items-center justify-between opacity-0 group-hover:opacity-100 transition-opacity"
+                                            {{-- Hover toolbar: reorder ↑↓ + remove --}}
+                                            <div class="absolute inset-x-2 bottom-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
                                                  x-show="u.status === 'done'">
-                                                <button type="button" @click="coverUploadId = u.id"
-                                                        class="text-[10px] font-bold bg-white/90 text-[#222] px-2 py-0.5"
-                                                        style="border-radius: 999px;"
-                                                        x-show="u.id !== coverUploadId">★ {{ $isRtl ? 'غلاف' : 'Cover' }}</button>
+                                                <button type="button" @click="moveUpload(attributeUploads[entry.id], u.id, -1)" :disabled="uIdx === 0"
+                                                        class="text-[11px] font-bold bg-white text-[#222] w-7 h-7 inline-flex items-center justify-center shadow disabled:opacity-30 active:scale-95 transition-all"
+                                                        style="border-radius: 999px;" title="{{ $isRtl ? 'تقديم' : 'Earlier' }}">↑</button>
+                                                <button type="button" @click="moveUpload(attributeUploads[entry.id], u.id, 1)" :disabled="uIdx === (attributeUploads[entry.id].length - 1)"
+                                                        class="text-[11px] font-bold bg-white text-[#222] w-7 h-7 inline-flex items-center justify-center shadow disabled:opacity-30 active:scale-95 transition-all"
+                                                        style="border-radius: 999px;" title="{{ $isRtl ? 'تأخير' : 'Later' }}">↓</button>
                                                 <button type="button" @click="removeAttributeUpload(entry.id, u.id)"
-                                                        class="text-[10px] font-bold bg-white/90 text-[#b91c1c] px-2 py-0.5 ml-auto"
+                                                        class="text-[11px] font-bold bg-white text-[#b91c1c] w-7 h-7 inline-flex items-center justify-center shadow ml-auto active:scale-95 transition-all"
                                                         style="border-radius: 999px;">✕</button>
                                             </div>
                                         </div>
@@ -448,14 +575,17 @@
                             </div>
                         </template>
 
-                        <div x-show="photoNeedingAttributes().length === 0"
+                        <div x-show="orderedPhotoSections().length === 0"
                              class="r-ios-lg bg-[#fafafa] p-6 text-center text-[#717171] text-sm {{ $fa }}">
                             {{ $isRtl ? 'لا يوجد عنصر مختار يتطلب صوراً — يمكنك المتابعة عبر إضافة صور عامة.' : "None of your picks need attribute-specific photos — use the general photos below if you'd like." }}
                         </div>
                     </div>
 
-                    {{-- B. Extra (general) photos — not tied to any attribute --}}
-                    <div class="mt-10">
+                    {{-- B. Extra (general) photos — not tied to any attribute. Also a
+                         drop target so photos can be dragged out of any section. --}}
+                    <div class="mt-10 transition-all" style="border-radius: 24px;"
+                         :class="dnd.kind === 'photo' && dnd.overSection === 'extra' ? 'ring-2 ring-[#F88379]/50' : (dnd.kind === 'photo' ? 'ring-2 ring-[#F88379]/15' : '')"
+                         @dragover.prevent="dnd.over = null; dnd.overSection = 'extra'" @drop.prevent="dropOnSectionArea('extra')">
                         <h3 class="text-lg font-bold text-[#222] mb-3 {{ $fa }}">{{ $isRtl ? 'صور إضافية' : 'More photos' }}</h3>
                         <p class="text-[13px] text-[#717171] mb-4 {{ $fa }}">{{ $isRtl ? 'صور للمكان غير مرتبطة بعنصر محدد.' : "Place photos that aren't tied to any specific attribute." }}</p>
 
@@ -469,16 +599,21 @@
                                    class="absolute inset-0 opacity-0 cursor-pointer">
                         </label>
 
-                        <div class="mt-4 grid grid-cols-3 sm:grid-cols-4 gap-2" x-show="extraUploads.length > 0">
+                        <div class="mt-4 grid grid-cols-3 sm:grid-cols-4 gap-3 sm:gap-4" x-show="extraUploads.length > 0">
                             <template x-for="(u, uIdx) in extraUploads" :key="`ex-${u.id}`">
-                                <div class="relative group">
-                                    <img :src="u.preview || u.url" class="block w-full aspect-square object-cover r-ios"
-                                         :class="u.status === 'uploading' ? 'opacity-40' : ''">
-                                    <span x-show="u.id === coverUploadId"
-                                          class="absolute top-1 left-1 inline-flex items-center gap-1 text-[10px] font-bold bg-[#F88379] text-white px-2 py-0.5 {{ $fa }}"
-                                          style="border-radius: 999px;">
-                                        <span>★</span><span>{{ $isRtl ? 'غلاف' : 'COVER' }}</span>
-                                    </span>
+                                <div class="relative group"
+                                     :draggable="u.status === 'done' ? 'true' : 'false'"
+                                     :style="u.status === 'done' ? 'cursor: grab;' : ''"
+                                     @dragstart.stop="beginPhotoDrag($event, 'extra', u.id)" @dragend="dndEnd()"
+                                     @dragover.prevent.stop="dnd.over = u.id" @drop.prevent.stop="dropOnPhoto('extra', u.id)">
+                                    <div x-show="dnd.kind === 'photo' && dnd.over === u.id && dnd.id !== u.id"
+                                         class="absolute inset-y-1 ltr:-left-2 rtl:-right-2 w-1.5 rounded-full bg-[#F88379] z-20 pointer-events-none"></div>
+                                    <img :src="u.preview || u.url" class="block w-full aspect-square object-cover r-ios pointer-events-none transition-all"
+                                         :class="(u.status === 'uploading' ? 'opacity-40' : '') + (dnd.kind === 'photo' && dnd.id === u.id ? ' opacity-30 outline-2 outline-dashed outline-[#F88379] outline-offset-2' : '')">
+                                    <span x-show="isFeatured(u.id)"
+                                          class="absolute top-2 ltr:left-2 rtl:right-2 inline-flex items-center gap-1 text-[10px] font-bold bg-[#F88379] text-white px-2 py-0.5 shadow {{ $fa }}"
+                                          style="border-radius: 999px;"
+                                          x-text="featuredRank(u.id) === 1 ? '★ {{ $isRtl ? 'غلاف' : 'COVER' }}' : ('#' + featuredRank(u.id))"></span>
                                     <div x-show="u.status === 'uploading'" class="absolute inset-0 flex items-center justify-center text-[11px] font-bold text-[#222] {{ $fa }}">
                                         {{ $isRtl ? '...جارٍ الرفع' : 'Uploading...' }}
                                     </div>
@@ -486,14 +621,16 @@
                                          class="absolute inset-0 flex items-center justify-center text-[11px] font-bold bg-[#fef3f2]/90 text-[#b91c1c] {{ $fa }}">
                                         {{ $isRtl ? 'فشل الرفع' : 'Upload failed' }}
                                     </div>
-                                    <div class="absolute inset-x-1 bottom-1 flex items-center justify-between opacity-0 group-hover:opacity-100 transition-opacity"
+                                    <div class="absolute inset-x-2 bottom-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
                                          x-show="u.status === 'done'">
-                                        <button type="button" @click="coverUploadId = u.id"
-                                                class="text-[10px] font-bold bg-white/90 text-[#222] px-2 py-0.5"
-                                                style="border-radius: 999px;"
-                                                x-show="u.id !== coverUploadId">★ {{ $isRtl ? 'غلاف' : 'Cover' }}</button>
+                                        <button type="button" @click="moveUpload(extraUploads, u.id, -1)" :disabled="uIdx === 0"
+                                                class="text-[11px] font-bold bg-white text-[#222] w-7 h-7 inline-flex items-center justify-center shadow disabled:opacity-30 active:scale-95 transition-all"
+                                                style="border-radius: 999px;" title="{{ $isRtl ? 'تقديم' : 'Earlier' }}">↑</button>
+                                        <button type="button" @click="moveUpload(extraUploads, u.id, 1)" :disabled="uIdx === (extraUploads.length - 1)"
+                                                class="text-[11px] font-bold bg-white text-[#222] w-7 h-7 inline-flex items-center justify-center shadow disabled:opacity-30 active:scale-95 transition-all"
+                                                style="border-radius: 999px;" title="{{ $isRtl ? 'تأخير' : 'Later' }}">↓</button>
                                         <button type="button" @click="removeExtraUpload(u.id)"
-                                                class="text-[10px] font-bold bg-white/90 text-[#b91c1c] px-2 py-0.5 ml-auto"
+                                                class="text-[11px] font-bold bg-white text-[#b91c1c] w-7 h-7 inline-flex items-center justify-center shadow ml-auto active:scale-95 transition-all"
                                                 style="border-radius: 999px;">✕</button>
                                     </div>
                                 </div>
@@ -501,14 +638,65 @@
                         </div>
                     </div>
 
-                    {{-- C. Cover image hint --}}
-                    <div class="mt-8 r-ios-lg bg-[#fafafa] p-4 text-[13px] text-[#717171] {{ $fa }}"
-                         x-show="totalDoneUploads() > 0 && coverUploadId === null">
-                        {{ $isRtl ? '⭐ مرّر فوق أي صورة وانقر "غلاف" لاختيار صورة الواجهة.' : '⭐ Hover any photo and tap "Cover" to mark it as the listing cover.' }}
+                    {{-- C. "Shown outside" showcase — pick up to 10 for the place page; first = cover --}}
+                    <div class="mt-12" x-show="totalDoneUploads() > 0">
+                        <h3 class="text-lg font-bold text-[#222] mb-1 {{ $fa }}">{{ $isRtl ? 'الصور الظاهرة في صفحة المكان' : 'Photos shown on the place page' }}</h3>
+                        <p class="text-[13px] text-[#717171] mb-4 {{ $fa }}">
+                            {{ $isRtl ? 'اختر حتى ١٠ صور لعرضها في صفحة المكان. الأولى هي صورة الغلاف. إن لم تختر شيئاً سنعرض أول صورة.' : 'Pick up to 10 photos for the place page. The first is the cover. If you pick none, the first photo is used.' }}
+                            <span class="font-semibold text-[#222]" x-text="`(${featured.length}/${featuredMax})`"></span>
+                        </p>
+
+                        {{-- Tap to add/remove from the showcase --}}
+                        <div class="grid grid-cols-3 sm:grid-cols-5 gap-2">
+                            <template x-for="p in allDonePhotos()" :key="`feat-pick-${p.id}`">
+                                <button type="button" @click="toggleFeatured(p.id)"
+                                        class="relative block w-full aspect-square r-ios overflow-hidden border-2 transition-all"
+                                        :class="isFeatured(p.id) ? 'border-[#F88379]' : (featured.length >= featuredMax ? 'border-transparent opacity-40' : 'border-transparent opacity-70 hover:opacity-100')">
+                                    <img :src="p.preview || p.url" class="block w-full h-full object-cover">
+                                    <span x-show="isFeatured(p.id)"
+                                          class="absolute top-1 ltr:left-1 rtl:right-1 w-6 h-6 inline-flex items-center justify-center text-[11px] font-bold bg-[#F88379] text-white {{ $fa }}"
+                                          style="border-radius: 999px;"
+                                          x-text="featuredRank(p.id) === 1 ? '★' : featuredRank(p.id)"></span>
+                                </button>
+                            </template>
+                        </div>
+
+                        {{-- Ordered showcase strip — reorder / drop --}}
+                        <div x-show="featured.length > 0" class="mt-6 space-y-3">
+                            <template x-for="(fid, fIdx) in featured" :key="`fo-${fid}`">
+                                <div class="relative flex items-center gap-3 r-ios-lg bg-white shadow-card p-3 transition-all"
+                                     draggable="true"
+                                     @dragstart.stop="beginFeaturedDrag($event, fid)" @dragend="dndEnd()"
+                                     @dragover.prevent.stop="dnd.overFeatured = fid" @drop.prevent.stop="dropOnFeatured(fid)"
+                                     :class="dnd.kind === 'featured' && dnd.id === fid ? 'opacity-50 outline-2 outline-dashed outline-[#F88379]' : ''"
+                                     style="cursor: grab;">
+                                    {{-- Drop indicator line --}}
+                                    <div x-show="dnd.kind === 'featured' && dnd.overFeatured === fid && dnd.id !== fid"
+                                         class="absolute -top-2 left-3 right-3 h-1.5 rounded-full bg-[#F88379] z-20 pointer-events-none"></div>
+                                    <span class="text-xl text-[#bbb] shrink-0 select-none" title="{{ $isRtl ? 'اسحب لإعادة الترتيب' : 'Drag to reorder' }}">⠿</span>
+                                    <span class="w-7 text-center text-sm font-bold shrink-0"
+                                          :class="fIdx === 0 ? 'text-[#F88379]' : 'text-[#717171]'"
+                                          x-text="fIdx === 0 ? '★' : (fIdx + 1)"></span>
+                                    <img :src="photoById(fid)?.preview || photoById(fid)?.url" class="w-16 h-16 object-cover r-ios shrink-0 pointer-events-none">
+                                    <span class="text-sm font-medium text-[#717171] truncate flex-1 {{ $fa }}"
+                                          x-text="fIdx === 0 ? '{{ $isRtl ? 'صورة الغلاف' : 'Cover photo' }}' : '{{ $isRtl ? 'صورة معروضة' : 'Shown' }}'"></span>
+                                    <button type="button" @click="moveFeatured(fid, -1)" :disabled="fIdx === 0"
+                                            class="w-9 h-9 inline-flex items-center justify-center text-base font-bold text-[#222] bg-white shadow-card hover:bg-[#f7f7f7] active:scale-95 disabled:opacity-30 disabled:active:scale-100 transition-all"
+                                            style="border-radius: 12px;" title="{{ $isRtl ? 'تقديم' : 'Earlier' }}">↑</button>
+                                    <button type="button" @click="moveFeatured(fid, 1)" :disabled="fIdx === featured.length - 1"
+                                            class="w-9 h-9 inline-flex items-center justify-center text-base font-bold text-[#222] bg-white shadow-card hover:bg-[#f7f7f7] active:scale-95 disabled:opacity-30 disabled:active:scale-100 transition-all"
+                                            style="border-radius: 12px;" title="{{ $isRtl ? 'تأخير' : 'Later' }}">↓</button>
+                                    <button type="button" @click="toggleFeatured(fid)"
+                                            class="w-9 h-9 inline-flex items-center justify-center text-base font-bold text-[#b91c1c] bg-white shadow-card hover:bg-[#fef3f2] active:scale-95 transition-all"
+                                            style="border-radius: 12px;">✕</button>
+                                </div>
+                            </template>
+                        </div>
                     </div>
 
-                    {{-- Hidden inputs — form-submit payload --}}
-                    <template x-for="entry in selectedAttributesList()" :key="`aphid-${entry.id}`">
+                    {{-- Hidden inputs — form-submit payload. Attribute groups POST in
+                         the host's section order so sort_order follows the gallery. --}}
+                    <template x-for="entry in orderedPhotoSections()" :key="`aphid-${entry.id}`">
                         <div>
                             <template x-for="(u, uIdx) in (attributeUploads[entry.id] || []).filter(x => x.status === 'done')"
                                       :key="`aphidv-${entry.id}-${u.id}`">
@@ -519,7 +707,9 @@
                     <template x-for="(u, uIdx) in extraUploads.filter(x => x.status === 'done')" :key="`exhid-${u.id}`">
                         <input type="hidden" :name="`extra_image_paths[${uIdx}]`" :value="u.path">
                     </template>
-                    <input type="hidden" name="cover_image" :value="coverImageMarker()">
+                    <template x-for="(marker, fIdx) in featuredMarkers()" :key="`feathid-${fIdx}`">
+                        <input type="hidden" :name="`featured[${fIdx}]`" :value="marker">
+                    </template>
                 </section>
 
                 {{-- ── Step 9: check-in/out + rules + submit ── --}}
@@ -573,8 +763,65 @@
                     </label>
                 </section>
 
-                {{-- ── Nav buttons ── --}}
-                <div class="mt-12 flex items-center justify-between gap-4">
+                {{-- ── Admin settings step (admins only, edit mode) ── --}}
+                <section x-show="editing && isAdmin && step === totalSteps" x-transition.opacity x-cloak>
+                    <h2 class="text-3xl sm:text-[34px] font-bold tracking-tight text-[#222] {{ $fa }}">{{ $isRtl ? 'إعدادات المشرف' : 'Admin settings' }}</h2>
+                    <p class="mt-2 text-[#717171] text-base {{ $fa }}">{{ $isRtl ? 'القوائم المميزة وحالة الإعلان — تظهر للمشرفين فقط.' : 'Featured lists and listing status — visible to admins only.' }}</p>
+
+                    {{-- Featured-list membership --}}
+                    <div class="mt-10">
+                        <h3 class="text-lg font-bold text-[#222] mb-3 {{ $fa }}">{{ $isRtl ? 'القوائم المميزة' : 'Featured lists' }}</h3>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <template x-for="l in adminLists" :key="`adminlist-${l.id}`">
+                                <label class="flex items-center gap-3 r-ios-lg bg-white shadow-card p-4 cursor-pointer border-2 transition-all"
+                                       :class="selectedLists.includes(l.id) ? 'border-[#222]' : 'border-transparent'">
+                                    <input type="checkbox" :value="l.id" :checked="selectedLists.includes(l.id)" @change="toggleList(l.id)" class="sr-only">
+                                    <span class="text-sm font-semibold text-[#222] {{ $fa }}" x-text="l.label"></span>
+                                </label>
+                            </template>
+                        </div>
+                        <div x-show="adminLists.length === 0" class="r-ios-lg bg-[#fafafa] p-5 text-center text-[#717171] text-sm {{ $fa }}">
+                            {{ $isRtl ? 'لا توجد قوائم مميزة بعد.' : 'No featured lists yet.' }}
+                        </div>
+                        <template x-for="id in selectedLists" :key="`listhid-${id}`">
+                            <input type="hidden" name="lists[]" :value="id">
+                        </template>
+                    </div>
+
+                    {{-- Status + review controls (admin keeps full control) --}}
+                    <div class="mt-10 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <label>
+                            <span class="text-sm font-semibold text-[#222] {{ $fa }}">{{ $isRtl ? 'حالة الإعلان' : 'Active status' }}</span>
+                            <div class="mt-3 border border-[#dddddd] focus-within:border-[#222] transition-all bg-white shadow-card r-ios-lg overflow-hidden">
+                                <select name="status" x-model="statusValue" class="w-full bg-transparent outline-none text-[15px] text-[#222] py-4 px-5 cursor-pointer {{ $fa }}">
+                                    <option value="active">{{ $isRtl ? 'مفعّل' : 'Active' }}</option>
+                                    <option value="inactive">{{ $isRtl ? 'موقوف' : 'Inactive' }}</option>
+                                </select>
+                            </div>
+                        </label>
+                        <label>
+                            <span class="text-sm font-semibold text-[#222] {{ $fa }}">{{ $isRtl ? 'حالة المراجعة' : 'Review status' }}</span>
+                            <div class="mt-3 border border-[#dddddd] focus-within:border-[#222] transition-all bg-white shadow-card r-ios-lg overflow-hidden">
+                                <select name="review_status" x-model="reviewValue" class="w-full bg-transparent outline-none text-[15px] text-[#222] py-4 px-5 cursor-pointer {{ $fa }}">
+                                    <option value="draft">{{ $isRtl ? 'مسودة' : 'Draft' }}</option>
+                                    <option value="pending_review">{{ $isRtl ? 'قيد المراجعة' : 'Pending review' }}</option>
+                                    <option value="approved">{{ $isRtl ? 'موافق عليه' : 'Approved' }}</option>
+                                    <option value="rejected">{{ $isRtl ? 'مرفوض' : 'Rejected' }}</option>
+                                </select>
+                            </div>
+                        </label>
+                    </div>
+                    <label class="block mt-4">
+                        <span class="text-sm font-semibold text-[#222] {{ $fa }}">{{ $isRtl ? 'سبب الرفض (اختياري)' : 'Rejection reason (optional)' }}</span>
+                        <div class="mt-3 border border-[#dddddd] focus-within:border-[#222] transition-all bg-white shadow-card r-ios-lg overflow-hidden">
+                            <textarea name="rejection_reason" x-model="rejectionReason" rows="3" maxlength="2000"
+                                      class="w-full bg-transparent outline-none resize-none text-[15px] text-[#222] py-4 px-5 leading-relaxed {{ $fa }}"></textarea>
+                        </div>
+                    </label>
+                </section>
+
+                {{-- ── Nav buttons (create flow) ── --}}
+                <div class="mt-12 flex items-center justify-between gap-4" x-show="!editing">
                     <button type="button" @click="back" x-show="step > 1"
                             class="px-6 py-3 text-[#717171] hover:text-[#222] font-semibold transition-colors {{ $fa }}">
                         {{ $isRtl ? '← السابق' : '← Back' }}
@@ -602,6 +849,33 @@
                         <span x-show="submitting" x-cloak>{{ $isRtl ? 'جاري الإنشاء...' : 'Creating...' }}</span>
                     </button>
                 </div>
+
+                {{-- ── Sticky action bar (edit flow) ── --}}
+                <div x-show="editing" x-cloak
+                     class="sticky bottom-0 z-20 mt-12 -mx-5 sm:-mx-8 px-5 sm:px-8 py-4 bg-white/95 backdrop-blur border-t border-[#ebebeb] flex items-center justify-between gap-3 flex-wrap">
+                    <div class="flex items-center gap-2">
+                        <button type="button" @click="back" :disabled="step === 1"
+                                class="inline-flex items-center font-semibold text-[#222] bg-[#f3f4f6] hover:bg-[#e9eaec] disabled:opacity-30 transition-all {{ $fa }}"
+                                style="padding: 11px 18px; border-radius: 14px;">{{ $isRtl ? '← السابق' : '← Back' }}</button>
+                        <button type="button" @click="editNext" :disabled="step >= totalSteps"
+                                class="inline-flex items-center font-semibold text-[#222] bg-[#f3f4f6] hover:bg-[#e9eaec] disabled:opacity-30 transition-all {{ $fa }}"
+                                style="padding: 11px 18px; border-radius: 14px;">{{ $isRtl ? 'التالي →' : 'Next →' }}</button>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button type="button" @click="discard()"
+                                class="inline-flex items-center font-semibold text-[#b91c1c] hover:bg-[#fef2f2] transition-all {{ $fa }}"
+                                style="padding: 11px 16px; border-radius: 14px;">{{ $isRtl ? 'تجاهل التغييرات' : 'Discard' }}</button>
+                        <a :href="editCancelUrl"
+                           class="inline-flex items-center font-semibold text-[#717171] hover:text-[#222] border border-[#ebebeb] transition-all {{ $fa }}"
+                           style="padding: 11px 18px; border-radius: 14px;">{{ $isRtl ? 'إلغاء' : 'Cancel' }}</a>
+                        <button type="submit" :disabled="submitting"
+                                class="inline-flex items-center font-bold text-white bg-[#F88379] hover:bg-[#f56b60] disabled:bg-[#dddddd] disabled:cursor-not-allowed active:scale-[0.98] transition-all {{ $fa }}"
+                                style="padding: 11px 24px; border-radius: 14px; box-shadow: 0 6px 14px rgba(248,131,121,0.3);">
+                            <span x-show="!submitting">{{ $isRtl ? 'حفظ' : 'Save' }}</span>
+                            <span x-show="submitting" x-cloak>{{ $isRtl ? 'جاري الحفظ...' : 'Saving...' }}</span>
+                        </button>
+                    </div>
+                </div>
             </form>
         </div>
     </main>
@@ -619,6 +893,17 @@ function registerWizard() {
         draftSaving: false,
         draftError: '',
 
+        // Edit mode (null = fresh "add" flow). Pre-fills, enables step jumping
+        // + sticky Save/Discard/Cancel, and (for admins) an extra settings step.
+        editing: !!(init.edit && init.edit.enabled),
+        isAdmin: !!(init.edit && init.edit.isAdmin),
+        editCancelUrl: init.edit?.cancelUrl || '',
+        adminLists: init.edit?.lists || [],
+        selectedLists: [...(init.edit?.selectedListIds || [])],
+        statusValue: init.edit?.status || 'inactive',
+        reviewValue: init.edit?.reviewStatus || 'draft',
+        rejectionReason: init.edit?.rejectionReason || '',
+
         // Catalog data from the backend
         placeTypes: init.placeTypes,
         cities: init.cities,
@@ -627,6 +912,10 @@ function registerWizard() {
 
         // Form state
         draftId: null,                  // server-assigned once step 1 advances
+        // Admin-only: phone the listing should attach to. Stays '' for hosts
+        // (the field isn't rendered) so saveDraft() sends an empty string the
+        // server ignores. Form submit also posts this via the visible input.
+        hostPhone: '',
         placeTypeId: null,
         title: '',
         description: '',
@@ -636,8 +925,20 @@ function registerWizard() {
         dayPrices: {
             sunday: 0, monday: 0, tuesday: 0, wednesday: 0, thursday: 0, friday: 0, saturday: 0,
         },
+
+        // Commission percentage from settings — drives the pricing preview.
+        commissionRate: Number(init.rates?.commission ?? 15),
+
+        // Pricing preview (per day), from the base price.
+        get _basePrice() { return Number(this.price) || 0; },
+        get commissionAmount() { return this._basePrice * this.commissionRate / 100; },   // Calm's cut
+        get hostNet() { return this._basePrice - this.commissionAmount; },                 // host take-home
+        money(n) { return (Math.round(n * 100) / 100).toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); },
         checkInTime: '15:00',
         checkOutTime: '12:00',
+        // Default to 1 — UI starts at the minimum so the +/− stepper has
+        // something sensible to mutate. Required at final submit.
+        maxGuests: 1,
         rules: '',
         // attribute_id → { count, description }
         selectedAttributes: {},
@@ -646,7 +947,9 @@ function registerWizard() {
         // { id, status: 'uploading'|'done'|'failed', preview, path, url, name, error? }
         attributeUploads: {},   // attribute_id → list
         extraUploads: [],       // general photos, no attribute
-        coverUploadId: null,    // upload id currently flagged as the cover
+        featured: [],           // ordered upload ids "shown outside" (first = cover)
+        featuredMax: 10,        // cap on the showcase set
+        sectionOrder: [],       // attribute_ids in host-chosen gallery section order
         uploadCounter: 0,       // monotonic id source for upload rows
 
         init() {
@@ -669,6 +972,7 @@ function registerWizard() {
                 Object.assign(this.dayPrices, init.draft.day_prices || {});
                 this.checkInTime  = init.draft.check_in_time || '15:00';
                 this.checkOutTime = init.draft.check_out_time || '12:00';
+                this.maxGuests    = init.draft.max_guests || 1;
                 this.rules        = init.draft.rules || '';
                 this.draftId      = init.draft.id;
 
@@ -683,18 +987,26 @@ function registerWizard() {
                 // Restore uploaded photos into the same in-memory shape the upload
                 // pipeline builds. `status: 'done'` so they render as fully-uploaded
                 // and persist back through the next saveDraft() round-trip.
+                // Photos arrive ordered by sort_order, so pushing in sequence
+                // restores both the within-section order and (via first-seen)
+                // the gallery section order.
+                const featuredRows = [];
                 (init.draft.photos || []).forEach((p) => {
                     const id = ++this.uploadCounter;
-                    const key = (p.place_attribute_id != null) ? `attribute_images.${p.place_attribute_id}` : 'extra_images';
                     const entry = { id, status: 'done', preview: p.url, path: p.path, url: p.url, name: '' };
                     if (p.place_attribute_id != null) {
                         if (!this.attributeUploads[p.place_attribute_id]) this.attributeUploads[p.place_attribute_id] = [];
                         this.attributeUploads[p.place_attribute_id].push(entry);
+                        if (!this.sectionOrder.includes(p.place_attribute_id)) this.sectionOrder.push(p.place_attribute_id);
                     } else {
                         this.extraUploads.push(entry);
                     }
-                    if (p.is_cover) this.coverUploadId = id;
+                    if (p.featured_order !== null && p.featured_order !== undefined) {
+                        featuredRows.push({ id, order: p.featured_order });
+                    }
                 });
+                // Rebuild the showcase order from the stored featured_order.
+                this.featured = featuredRows.sort((a, b) => a.order - b.order).map((r) => r.id);
 
                 // Resume at the right step. Priority order:
                 //   1. ?step=N on the URL (set by saveDraft via history.replaceState,
@@ -710,12 +1022,19 @@ function registerWizard() {
                     this.step = resumeStep;
                 }
             }
+
+            // Edit mode: admins get an extra "Admin settings" step; always
+            // start at step 1 (the host is reviewing, not resuming a draft).
+            if (this.editing) {
+                this.totalSteps = this.isAdmin ? 10 : 9;
+                this.step = 1;
+            }
         },
 
         // ── Navigation
         async next() {
             if (this.step >= this.totalSteps || !this.canAdvance()) return;
-            await this.saveDraft();   // persist what we have so far
+            if (!this.editing) await this.saveDraft();   // create flow auto-saves; edit doesn't
             this.step++;
             this.syncUrl();
         },
@@ -724,6 +1043,26 @@ function registerWizard() {
                 this.step--;
                 this.syncUrl();
             }
+        },
+        // ── Edit-mode navigation (free jumping + sticky bar)
+        stepLabels() {
+            const labels = @json($wizardStepLabels);
+            if (this.isAdmin) labels.push(@json($wizardAdminLabel));
+            return labels.slice(0, this.totalSteps);
+        },
+        goToStep(n) {
+            if (!this.editing) return;
+            this.step = Math.min(Math.max(1, n), this.totalSteps);
+        },
+        editNext() { this.goToStep(this.step + 1); },
+        discard() {
+            const msg = @json($isRtl ? 'تجاهل كل التغييرات غير المحفوظة؟' : 'Discard all unsaved changes?');
+            if (window.confirm(msg)) window.location.reload();
+        },
+        toggleList(id) {
+            const i = this.selectedLists.indexOf(id);
+            if (i >= 0) this.selectedLists.splice(i, 1);
+            else this.selectedLists.push(id);
         },
         /**
          * Reflect (draftId, step) in the address bar via history.replaceState
@@ -838,33 +1177,180 @@ function registerWizard() {
             return n;
         },
         /**
-         * Build the composite key the server expects for the cover marker:
+         * The composite key the server expects for a single upload:
          *   - `attribute_images.<attrId>.<i>` for an attribute upload
          *   - `extra_images.<i>` for a general upload
-         * The index `i` is the position within the `.filter(u => u.status === 'done')`
-         * list — matching the same shape we use for hidden inputs.
+         * `i` is the position within that group's `.filter(status==='done')`
+         * list — the exact shape the hidden inputs POST, so featured markers
+         * line up with the stored paths regardless of section order.
          */
-        coverImageMarker() {
-            if (this.coverUploadId === null) return '';
+        markerFor(uploadId) {
             const attrIds = Object.keys(this.attributeUploads);
             for (const aid of attrIds) {
                 const done = (this.attributeUploads[aid] || []).filter((u) => u.status === 'done');
-                const idx = done.findIndex((u) => u.id === this.coverUploadId);
+                const idx = done.findIndex((u) => u.id === uploadId);
                 if (idx >= 0) return `attribute_images.${aid}.${idx}`;
             }
             const extras = this.extraUploads.filter((u) => u.status === 'done');
-            const idx = extras.findIndex((u) => u.id === this.coverUploadId);
+            const idx = extras.findIndex((u) => u.id === uploadId);
             if (idx >= 0) return `extra_images.${idx}`;
             return '';
+        },
+        // Find a done upload row by id across attribute + extra lists.
+        photoById(uploadId) {
+            for (const aid of Object.keys(this.attributeUploads)) {
+                const row = (this.attributeUploads[aid] || []).find((u) => u.id === uploadId);
+                if (row) return row;
+            }
+            return this.extraUploads.find((u) => u.id === uploadId) || null;
+        },
+        // Every done photo, flat, in gallery order (sections → within → extras last).
+        allDonePhotos() {
+            const out = [];
+            this.orderedPhotoSections().forEach((entry) => {
+                (this.attributeUploads[entry.id] || [])
+                    .filter((u) => u.status === 'done')
+                    .forEach((u) => out.push(u));
+            });
+            this.extraUploads.filter((u) => u.status === 'done').forEach((u) => out.push(u));
+            return out;
+        },
+        // ── Featured ("shown outside") showcase
+        isFeatured(id) { return this.featured.includes(id); },
+        featuredRank(id) { return this.featured.indexOf(id) + 1; }, // 1-based; 0 = not featured
+        toggleFeatured(id) {
+            const i = this.featured.indexOf(id);
+            if (i >= 0) { this.featured.splice(i, 1); return; }
+            if (this.featured.length >= this.featuredMax) return;
+            this.featured.push(id);
+        },
+        moveFeatured(id, dir) {
+            const i = this.featured.indexOf(id);
+            const j = i + dir;
+            if (i < 0 || j < 0 || j >= this.featured.length) return;
+            [this.featured[i], this.featured[j]] = [this.featured[j], this.featured[i]];
+        },
+        /**
+         * Featured markers in showcase order. If the host picked none, default
+         * to the first gallery photo so the place page always has a cover.
+         */
+        featuredMarkers() {
+            let ids = this.featured.filter((id) => this.markerFor(id) !== '');
+            if (ids.length === 0) {
+                const first = this.allDonePhotos()[0];
+                if (first) ids = [first.id];
+            }
+            return ids.map((id) => this.markerFor(id)).filter((m) => m !== '');
+        },
+        // ── Gallery section ordering
+        syncSectionOrder() {
+            const needing = this.photoNeedingAttributes();
+            needing.forEach((e) => { if (!this.sectionOrder.includes(e.id)) this.sectionOrder.push(e.id); });
+            this.sectionOrder = this.sectionOrder.filter((id) => needing.some((e) => e.id === id));
+        },
+        orderedPhotoSections() {
+            this.syncSectionOrder();
+            const order = this.sectionOrder;
+            return [...this.photoNeedingAttributes()].sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
+        },
+        moveSection(id, dir) {
+            this.syncSectionOrder();
+            const i = this.sectionOrder.indexOf(id);
+            const j = i + dir;
+            if (i < 0 || j < 0 || j >= this.sectionOrder.length) return;
+            [this.sectionOrder[i], this.sectionOrder[j]] = [this.sectionOrder[j], this.sectionOrder[i]];
+        },
+        // Reorder a photo within its own list (an attribute list or the extras).
+        moveUpload(list, id, dir) {
+            const i = list.findIndex((u) => u.id === id);
+            const j = i + dir;
+            if (i < 0 || j < 0 || j >= list.length) return;
+            [list[i], list[j]] = [list[j], list[i]];
+        },
+
+        // ── Drag & drop (desktop). Touch users use the ↑↓ buttons. A single
+        // `dnd` record tracks what's in flight; two dispatchers route a drop
+        // by kind so sections, photos (within + across sections) and the
+        // featured strip all share the same gesture.
+        dnd: { kind: null, listKey: null, id: null, over: null, overSection: null, overFeatured: null },
+        // The real backing array for a photo list key ('extra' or an attrId).
+        // Creates the attribute array on demand so cross-section drops land in
+        // the live (reactive) array, not a throwaway copy.
+        listByKey(key) {
+            if (key === 'extra') return this.extraUploads;
+            if (!this.attributeUploads[key]) this.attributeUploads[key] = [];
+            return this.attributeUploads[key];
+        },
+        sectionDragStart(id) { this.dnd = { kind: 'section', listKey: null, id, over: null, overSection: null, overFeatured: null }; },
+        photoDragStart(listKey, id) { this.dnd = { kind: 'photo', listKey, id, over: null, overSection: null, overFeatured: null }; },
+        featuredDragStart(id) { this.dnd = { kind: 'featured', listKey: null, id, over: null, overSection: null, overFeatured: null }; },
+        dndEnd() { this.dnd = { kind: null, listKey: null, id: null, over: null, overSection: null, overFeatured: null }; },
+        // Give the cursor a clean "picked-up" preview (the photo / card itself,
+        // centred under the pointer) and a move cursor — the Trello feel.
+        _setDragImage(ev, el) {
+            if (!ev.dataTransfer || !el) return;
+            ev.dataTransfer.effectAllowed = 'move';
+            const r = el.getBoundingClientRect();
+            try { ev.dataTransfer.setDragImage(el, r.width / 2, r.height / 2); } catch (e) {}
+        },
+        beginPhotoDrag(ev, listKey, id) {
+            this.photoDragStart(listKey, id);
+            this._setDragImage(ev, ev.currentTarget.querySelector('img'));
+        },
+        beginSectionDrag(ev, id) {
+            this.sectionDragStart(id);
+            this._setDragImage(ev, ev.currentTarget.closest('[data-section-card]'));
+        },
+        beginFeaturedDrag(ev, id) {
+            this.featuredDragStart(id);
+            this._setDragImage(ev, ev.currentTarget);
+        },
+        _reorder(list, fromId, toId) {
+            const from = list.indexOf(fromId);
+            const to = list.indexOf(toId);
+            if (from < 0 || to < 0 || from === to) return;
+            const [m] = list.splice(from, 1);
+            list.splice(to, 0, m);
+        },
+        _movePhoto(srcKey, id, destKey, destId) {
+            if (id === destId) return;
+            const src = this.listByKey(srcKey);
+            const i = src.findIndex((u) => u.id === id);
+            if (i < 0) return;
+            const [item] = src.splice(i, 1);
+            const dest = this.listByKey(destKey);
+            let idx = dest.length;
+            if (destId != null) {
+                const t = dest.findIndex((u) => u.id === destId);
+                if (t >= 0) idx = t;
+            }
+            dest.splice(idx, 0, item);
+        },
+        // Drop onto a specific photo tile (insert before it / reorder).
+        dropOnPhoto(destKey, destId) {
+            if (this.dnd.kind === 'photo') this._movePhoto(this.dnd.listKey, this.dnd.id, destKey, destId);
+            else if (this.dnd.kind === 'section') { this.syncSectionOrder(); this._reorder(this.sectionOrder, this.dnd.id, destKey); }
+            this.dndEnd();
+        },
+        // Drop onto a section's open area (append to the end of that list).
+        dropOnSectionArea(destKey) {
+            if (this.dnd.kind === 'section') { this.syncSectionOrder(); this._reorder(this.sectionOrder, this.dnd.id, destKey); }
+            else if (this.dnd.kind === 'photo') this._movePhoto(this.dnd.listKey, this.dnd.id, destKey, null);
+            this.dndEnd();
+        },
+        // Drop onto a featured-strip row (reorder the showcase).
+        dropOnFeatured(targetId) {
+            if (this.dnd.kind === 'featured') this._reorder(this.featured, this.dnd.id, targetId);
+            this.dndEnd();
         },
         removeAttributeUpload(attributeId, uploadId) {
             this.attributeUploads[attributeId] = (this.attributeUploads[attributeId] || [])
                 .filter((u) => u.id !== uploadId);
-            if (this.coverUploadId === uploadId) this.coverUploadId = null;
+            this.featured = this.featured.filter((id) => id !== uploadId);
         },
         removeExtraUpload(uploadId) {
             this.extraUploads = this.extraUploads.filter((u) => u.id !== uploadId);
-            if (this.coverUploadId === uploadId) this.coverUploadId = null;
+            this.featured = this.featured.filter((id) => id !== uploadId);
         },
         _readPreview(file) {
             return new Promise((resolve) => {
@@ -971,6 +1457,10 @@ function registerWizard() {
             // Place column subset.
             const payload = {
                 draft_id: this.draftId,
+                // Empty string when the admin hasn't typed it yet (or for non-
+                // admins where the field isn't rendered) — the server ignores
+                // an empty value and falls back to the current user.
+                host_phone: (this.hostPhone || '').trim(),
                 place_type_id: this.placeTypeId,
                 title: this.title || null,
                 description: this.description || null,
@@ -978,6 +1468,7 @@ function registerWizard() {
                 price: Number(this.price) || 0,
                 check_in_time: this.checkInTime || '15:00',
                 check_out_time: this.checkOutTime || '12:00',
+                max_guests: Number(this.maxGuests) || null,
                 rules: this.rules || null,
                 last_step: this.step,
                 price_sunday:    this.dayPrices.sunday    || 0,
@@ -1013,7 +1504,7 @@ function registerWizard() {
 
                 payload.attribute_image_paths = attrPaths;
                 payload.extra_image_paths = extras;
-                payload.cover_image = this.coverImageMarker();
+                payload.featured = this.featuredMarkers();
             }
 
             try {

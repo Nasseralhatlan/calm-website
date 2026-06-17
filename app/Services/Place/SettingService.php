@@ -30,6 +30,28 @@ final class SettingService
     }
 
     /**
+     * Settings the mobile app is allowed to read. The exposed keys are a
+     * hardcoded whitelist on purpose — clients can't ask for arbitrary settings,
+     * so admin-only values (e.g. commission_percentage) never leak. Every
+     * whitelisted key is always present (null when unset). Expose another
+     * setting to the app by adding its key here.
+     *
+     * @return array<string, string|null>
+     */
+    public function publicSettings(): array
+    {
+        $keys = ['support_phone', 'support_email'];
+
+        $values = $this->byKeys($keys);
+
+        return array_reduce(
+            $keys,
+            fn (array $carry, string $key): array => [...$carry, $key => $values[$key] ?? null],
+            [],
+        );
+    }
+
+    /**
      * @param  array<string, mixed>  $data
      */
     public function create(array $data): Setting

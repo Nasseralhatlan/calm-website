@@ -14,8 +14,8 @@ trait ResultTrait
         return [
             'success' => true,
             'message' => $message,
-            'data'    => $data,
-            'status'  => $status,
+            'data' => $data,
+            'status' => $status,
         ];
     }
 

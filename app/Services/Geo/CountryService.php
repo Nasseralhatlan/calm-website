@@ -6,6 +6,7 @@ namespace App\Services\Geo;
 
 use App\Models\Country;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Collection;
 
 final class CountryService
 {
@@ -15,6 +16,17 @@ final class CountryService
             ->withCount('cities')
             ->orderBy('name_en')
             ->paginate($perPage);
+    }
+
+    /**
+     * Active countries for the mobile API — used by the country picker in
+     * the login flow (dial-code dropdown) and any country-filter chips.
+     *
+     * @return Collection<int, Country>
+     */
+    public function activeForApi(): Collection
+    {
+        return Country::query()->active()->orderBy('name_en')->get();
     }
 
     /**

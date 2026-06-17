@@ -105,20 +105,41 @@
                             </td>
                             <td class="text-end" style="padding: 14px 20px;">
                                 @php $isRejected = $place->review_status === PlaceReviewStatus::Rejected; @endphp
-                                @if($isDraft)
-                                    <a href="{{ route('host.places.create', ['draft' => $place->id]) }}"
-                                       class="inline-flex items-center gap-1 text-[13px] font-bold text-[#F88379] hover:text-[#f56b60] {{ $fa }}">
-                                        {{ $isRtl ? '↩ متابعة الإكمال' : 'Continue ↪' }}
+                                <span class="inline-flex items-center justify-end flex-wrap" style="gap: 6px 14px;">
+                                    {{-- View as a guest (owner sees a status banner on top). --}}
+                                    <a href="{{ route('places.show', $place) }}"
+                                       class="inline-flex items-center gap-1 text-[13px] font-semibold text-[#717171] hover:text-[#222] {{ $fa }}">
+                                        {{ $isRtl ? '👁 عرض' : '👁 View' }}
                                     </a>
-                                @elseif($isRejected)
-                                    <a href="{{ route('host.places.create', ['draft' => $place->id]) }}"
-                                       class="inline-flex items-center gap-1 text-[13px] font-bold text-[#ef4444] hover:text-[#dc2626] {{ $fa }}"
-                                       title="{{ $place->rejection_reason }}">
-                                        {{ $isRtl ? '✎ التعديل وإعادة الإرسال' : 'Edit & resubmit ✎' }}
-                                    </a>
-                                @else
-                                    <span class="text-[12px] text-[#cccccc]">—</span>
-                                @endif
+                                    {{-- Edit: drafts continue building in the wizard; everything
+                                         else opens the pre-filled editor (saving resubmits). --}}
+                                    @if($isDraft)
+                                        <a href="{{ route('host.places.create', ['draft' => $place->id]) }}"
+                                           class="inline-flex items-center gap-1 text-[13px] font-bold text-[#F88379] hover:text-[#f56b60] {{ $fa }}">
+                                            {{ $isRtl ? '↩ متابعة' : 'Continue ↪' }}
+                                        </a>
+                                    @else
+                                        <a href="{{ route('host.places.edit', $place) }}"
+                                           class="inline-flex items-center gap-1 text-[13px] font-bold {{ $isRejected ? 'text-[#ef4444] hover:text-[#dc2626]' : 'text-[#222] hover:text-[#000]' }} {{ $fa }}"
+                                           @if($isRejected) title="{{ $place->rejection_reason }}" @endif>
+                                            {{ $isRtl ? '✎ تعديل' : '✎ Edit' }}
+                                        </a>
+                                    @endif
+                                    @if($place->review_status === PlaceReviewStatus::Approved)
+                                        <a href="{{ route('host.places.availability', $place) }}"
+                                           class="inline-flex items-center gap-1 text-[13px] font-bold text-[#F88379] hover:text-[#f56b60] {{ $fa }}">
+                                            {{ $isRtl ? '📅 التواريخ' : '📅 Dates' }}
+                                        </a>
+                                    @endif
+                                    {{-- Delete archives the place (soft delete, reversible). --}}
+                                    <form method="POST" action="{{ route('host.places.destroy', $place) }}" class="inline m-0"
+                                          onsubmit="return confirm('{{ $isRtl ? 'حذف هذا المكان؟ يمكن استعادته لاحقاً.' : 'Delete this place? It can be restored later.' }}');">
+                                        @csrf @method('DELETE')
+                                        <button type="submit" class="inline-flex items-center gap-1 text-[13px] font-bold text-[#dc2626] hover:text-[#b91c1c] {{ $fa }}">
+                                            {{ $isRtl ? '🗑 حذف' : '🗑 Delete' }}
+                                        </button>
+                                    </form>
+                                </span>
                             </td>
                         </tr>
                         @if($isRejected && $place->rejection_reason)

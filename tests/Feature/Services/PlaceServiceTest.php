@@ -23,7 +23,6 @@ use App\Services\Place\PlaceService;
  * step 1. We exercise the full draft → resume → promote flow here so any
  * future type drift fails in CI instead of in the browser.
  */
-
 beforeEach(function (): void {
     $this->service = app(PlaceService::class);
     $this->host = User::factory()->create(['role' => UserRole::User->value]);
@@ -104,17 +103,80 @@ it('persists attributes + photos through saveDraftForHost without NULL-id errors
             'value' => '1',
             'description' => 'Heated',
         ]],
-        // Photos: a per-attribute upload + an extra + a cover marker.
+        // Photos: a per-attribute upload + an extra + a featured/cover marker.
         [
             'attribute_paths' => [$attribute->id => ['places/uploads/a.jpg', 'places/uploads/b.jpg']],
             'extra_paths' => ['places/uploads/c.jpg'],
-            'cover_key' => 'extra_images.0',
+            'featured' => ['extra_images.0'],
         ],
     );
 
     expect(PlaceAttribute::query()->where('place_id', $place->id)->count())->toBe(1)
         ->and(PlacePhoto::query()->where('place_id', $place->id)->count())->toBe(3)
-        ->and(PlacePhoto::query()->where('place_id', $place->id)->where('is_cover', true)->count())->toBe(1);
+        // The single featured photo (the extra) is the cover at featured_order 0.
+        ->and(PlacePhoto::query()->where('place_id', $place->id)->where('featured_order', 0)->count())->toBe(1)
+        ->and(PlacePhoto::query()->where('place_id', $place->id)->where('path', 'places/uploads/c.jpg')->value('featured_order'))->toBe(0);
+});
+
+/**
+ * The wizard POSTs attribute groups in the host's chosen section order and
+ * photos within each group in their arranged order. syncPhotos must assign
+ * sort_order group-then-within (extras last) and resolve featured_order from
+ * the featured markers — `featured_order === 0` is the cover.
+ */
+it('orders photos by section then within, and maps featured_order from markers', function (): void {
+    $group = AttributeGroup::query()->create(['name_ar' => 'مرافق', 'name_en' => 'Facilities']);
+    $pool = Attribute::query()->create([
+        'group_id' => $group->id, 'name_ar' => 'مسبح', 'name_en' => 'Pool',
+        'type' => 'boolean', 'photo_rule' => 'optional',
+    ]);
+    $bath = Attribute::query()->create([
+        'group_id' => $group->id, 'name_ar' => 'حمام', 'name_en' => 'Bathroom',
+        'type' => 'boolean', 'photo_rule' => 'optional',
+    ]);
+
+    $place = $this->service->saveDraftForHost(
+        $this->host,
+        ['place_type_id' => $this->placeType->id],
+        null,
+        [
+            ['attribute_id' => $pool->id, 'value' => '1', 'description' => null],
+            ['attribute_id' => $bath->id, 'value' => '1', 'description' => null],
+        ],
+        [
+            // Host arranged the pool section first, bathroom second, extras last.
+            'attribute_paths' => [
+                $pool->id => ['places/uploads/pool-1.jpg', 'places/uploads/pool-2.jpg'],
+                $bath->id => ['places/uploads/bath-1.jpg'],
+            ],
+            'extra_paths' => ['places/uploads/extra-1.jpg'],
+            // Showcase: bathroom photo is the cover, then the second pool photo.
+            'featured' => ['attribute_images.'.$bath->id.'.0', 'attribute_images.'.$pool->id.'.1'],
+        ],
+    );
+
+    $ordered = PlacePhoto::query()->where('place_id', $place->id)->orderBy('sort_order')->pluck('path')->all();
+    expect($ordered)->toBe([
+        'places/uploads/pool-1.jpg',
+        'places/uploads/pool-2.jpg',
+        'places/uploads/bath-1.jpg',
+        'places/uploads/extra-1.jpg',
+    ]);
+
+    // Cover (featured_order 0) is the bathroom photo; rank 1 is the 2nd pool photo.
+    expect(PlacePhoto::query()->where('place_id', $place->id)->where('path', 'places/uploads/bath-1.jpg')->value('featured_order'))->toBe(0)
+        ->and(PlacePhoto::query()->where('place_id', $place->id)->where('path', 'places/uploads/pool-2.jpg')->value('featured_order'))->toBe(1)
+        // The unfeatured photos carry a null featured_order.
+        ->and(PlacePhoto::query()->where('place_id', $place->id)->where('path', 'places/uploads/pool-1.jpg')->value('featured_order'))->toBeNull()
+        ->and(PlacePhoto::query()->where('place_id', $place->id)->where('path', 'places/uploads/extra-1.jpg')->value('featured_order'))->toBeNull();
+
+    // Relations: coverPhoto = first featured; featuredPhotos = ordered showcase.
+    $place->refresh();
+    expect($place->coverPhoto?->path)->toBe('places/uploads/bath-1.jpg')
+        ->and($place->featuredPhotos->pluck('path')->all())->toBe([
+            'places/uploads/bath-1.jpg',
+            'places/uploads/pool-2.jpg',
+        ]);
 });
 
 it('promotes a draft to PendingReview on final submit (createForHost)', function (): void {

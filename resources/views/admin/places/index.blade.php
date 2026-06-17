@@ -66,17 +66,29 @@
             @endif
         </form>
 
-        @if($nextReview)
-            <a href="{{ route('admin.places.review', $nextReview) }}"
-               class="inline-flex items-center font-bold text-white bg-[#F88379] hover:bg-[#f56b60] {{ $isRtl ? 'font-arabic' : '' }}"
-               style="padding: 10px 18px; gap: 8px; border-radius: 14px; font-size: 14px; box-shadow: 0 6px 14px rgba(248,131,121,0.3);">
-                <span>{{ $counts['pending_review'] }}</span>
-                <span>{{ $isRtl ? 'بدء المراجعة' : 'Start review' }}</span>
-                <span class="rtl:scale-x-[-1] inline-block">→</span>
+        <div class="flex items-center" style="gap: 10px;">
+            {{-- Admin onboards a host: same wizard with an extra "attach to
+                 host phone" field shown only because the current user is an
+                 admin. See Host\PlacesController::resolveHost(). --}}
+            <a href="{{ route('host.places.create') }}"
+               class="inline-flex items-center font-bold text-white bg-[#222] hover:bg-black {{ $isRtl ? 'font-arabic' : '' }}"
+               style="padding: 10px 18px; gap: 6px; border-radius: 14px; font-size: 14px;">
+                <span>+</span>
+                <span>{{ $isRtl ? 'إضافة مكان' : 'Add place' }}</span>
             </a>
-        @else
-            <span class="text-[13px] text-[#717171] {{ $isRtl ? 'font-arabic' : '' }}">{{ $isRtl ? 'لا توجد طلبات مراجعة' : 'No pending reviews' }}</span>
-        @endif
+
+            @if($nextReview)
+                <a href="{{ route('admin.places.review', $nextReview) }}"
+                   class="inline-flex items-center font-bold text-white bg-[#F88379] hover:bg-[#f56b60] {{ $isRtl ? 'font-arabic' : '' }}"
+                   style="padding: 10px 18px; gap: 8px; border-radius: 14px; font-size: 14px; box-shadow: 0 6px 14px rgba(248,131,121,0.3);">
+                    <span>{{ $counts['pending_review'] }}</span>
+                    <span>{{ $isRtl ? 'بدء المراجعة' : 'Start review' }}</span>
+                    <span class="rtl:scale-x-[-1] inline-block">→</span>
+                </a>
+            @else
+                <span class="text-[13px] text-[#717171] {{ $isRtl ? 'font-arabic' : '' }}">{{ $isRtl ? 'لا توجد طلبات مراجعة' : 'No pending reviews' }}</span>
+            @endif
+        </div>
     </div>
 
     <p class="text-[14px] text-[#717171]" style="margin-bottom: 12px;">
@@ -121,8 +133,9 @@
                             </span>
                         </td>
                         <td style="padding: 14px 20px;" class="text-end whitespace-nowrap">
-                            <a href="{{ route('admin.places.edit', $place) }}" class="text-[#222] font-semibold hover:underline">{{ $isRtl ? 'تعديل' : 'Edit' }}</a>
-                            <form method="POST" action="{{ route('admin.places.destroy', $place) }}" class="inline" style="margin-inline-start: 14px;" onsubmit="return confirm('{{ $isRtl ? 'حذف هذا المكان؟' : 'Delete this place?' }}');">
+                            <a href="{{ route('places.show', $place) }}" class="text-[#717171] font-semibold hover:underline">{{ $isRtl ? 'عرض' : 'View' }}</a>
+                            <a href="{{ route('admin.places.edit', $place) }}" class="text-[#222] font-semibold hover:underline" style="margin-inline-start: 14px;">{{ $isRtl ? 'تعديل' : 'Edit' }}</a>
+                            <form method="POST" action="{{ route('admin.places.destroy', $place) }}" class="inline" style="margin-inline-start: 14px;" onsubmit="return confirm('{{ $isRtl ? 'حذف هذا المكان؟ يمكن استعادته لاحقاً.' : 'Delete this place? It can be restored later.' }}');">
                                 @csrf @method('DELETE')
                                 <button type="submit" class="text-[#dc2626] font-semibold hover:underline">{{ $isRtl ? 'حذف' : 'Delete' }}</button>
                             </form>

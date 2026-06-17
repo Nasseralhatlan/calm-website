@@ -50,7 +50,7 @@ it('signs in a regular user and redirects to /profile', function (): void {
     $response->assertRedirect('/profile');
 
     // The JWT cookie must be set on the response with a non-empty value.
-    $cookie = collect($response->headers->getCookies())->first(fn($c) => $c->getName() === 'calm_token');
+    $cookie = collect($response->headers->getCookies())->first(fn ($c) => $c->getName() === 'calm_token');
     expect($cookie)->not->toBeNull();
     expect($cookie->getValue())->not->toBeEmpty();
 });
@@ -76,7 +76,7 @@ it('rejects a bad otp on verify', function (): void {
     $response->assertRedirect()->assertSessionHasErrors('otp');
 
     // No JWT cookie should be set on a failed verify.
-    $cookie = collect($response->headers->getCookies())->first(fn($c) => $c->getName() === 'calm_token');
+    $cookie = collect($response->headers->getCookies())->first(fn ($c) => $c->getName() === 'calm_token');
     expect($cookie)->toBeNull();
 });
 
@@ -90,7 +90,7 @@ it('logs out and clears the jwt cookie', function (): void {
     $response->assertRedirect('/');
 
     // Logout response carries a forget-cookie for calm_token (empty value, past expiry).
-    $cookie = collect($response->headers->getCookies())->first(fn($c) => $c->getName() === 'calm_token');
+    $cookie = collect($response->headers->getCookies())->first(fn ($c) => $c->getName() === 'calm_token');
     expect($cookie)->not->toBeNull();
     expect($cookie->getValue())->toBeEmpty();
 });

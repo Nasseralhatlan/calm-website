@@ -63,9 +63,12 @@
         </div>
     </header>
 
-    {{-- ── Sidebar (unified: admin + host + guest + account sections, separated by dividers) ── --}}
-    <aside class="fixed z-20 flex flex-col admin-sidebar"
-           style="top: 112px; width: 220px; gap: 6px;">
+    {{-- ── Sidebar (unified: admin + host + guest + account sections, separated by dividers) ──
+         Anchors top + bottom so the sidebar gets a bounded height and scrolls
+         internally when content is taller than the viewport. The thin custom
+         scrollbar appears only on hover so it doesn't visually clutter the nav. --}}
+    <aside class="fixed z-20 flex flex-col admin-sidebar custom-thin-scroll"
+           style="top: 112px; bottom: 16px; width: 220px; gap: 6px; overflow-y: auto;">
         @include('partials._sidebar_nav')
     </aside>
 
@@ -85,7 +88,7 @@
 
             {{-- Alerts --}}
             @if(session('status'))
-                <div class="flex items-start text-[14px] text-[#15803d] {{ $fa }}"
+                <div class="flex items-start text-[14px] text-[#15803d] max-w-3xl {{ $fa }}"
                      style="margin-bottom: 16px; padding: 14px 16px; border-radius: 18px; background-color: #ecfdf5; border: 1px solid rgba(21,128,61,0.25); box-shadow: 0px 10px 30px 0px rgba(21,128,61,0.06); gap: 10px;">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" style="margin-top: 1px;">
                         <circle cx="12" cy="12" r="10"></circle>
@@ -96,7 +99,7 @@
             @endif
 
             @if($errors->any())
-                <div class="flex items-start text-[14px] text-[#7a2018] {{ $fa }}"
+                <div class="flex items-start text-[14px] text-[#7a2018] max-w-3xl {{ $fa }}"
                      style="margin-bottom: 16px; padding: 14px 16px; border-radius: 18px; background-color: #fef3f2; border: 1px solid rgba(122,32,24,0.25); box-shadow: 0px 10px 30px 0px rgba(122,32,24,0.06); gap: 10px;">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" style="margin-top: 1px;">
                         <circle cx="12" cy="12" r="10"></circle>

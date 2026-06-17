@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Admin;
 
-use App\Enums\PlaceReviewStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Place;
 use App\Services\Place\PlaceReviewService;

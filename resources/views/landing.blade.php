@@ -125,14 +125,12 @@
         <div
             class="relative w-full overflow-hidden shadow-card min-h-[calc(100vh-12rem)] bg-[#0e3a44] hero-box"
         >
-            @if($heroImage)
-                <img
-                    src="{{ $heroImage }}"
-                    alt=""
-                    class="absolute inset-0 w-full h-full object-cover"
-                    draggable="false"
-                >
-            @endif
+            <img
+                src="/assets/landing/hero.jpeg"
+                alt=""
+                class="absolute inset-0 w-full h-full object-cover"
+                draggable="false"
+            >
 
             {{-- text directly on the photo, with shadow for legibility --}}
             <div class="absolute inset-0 flex flex-col items-center justify-center text-center px-6" style="corner-shape: squircle">

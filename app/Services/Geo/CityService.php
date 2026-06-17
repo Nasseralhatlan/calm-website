@@ -6,6 +6,7 @@ namespace App\Services\Geo;
 
 use App\Models\City;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Collection;
 
 final class CityService
 {
@@ -16,6 +17,21 @@ final class CityService
             ->withCount('areas')
             ->orderBy('name_en')
             ->paginate($perPage);
+    }
+
+    /**
+     * Active cities for the mobile API home screen, each with its areas so the
+     * app can render the city → area picker in a single call.
+     *
+     * @return Collection<int, City>
+     */
+    public function activeForApi(): Collection
+    {
+        return City::query()
+            ->active()
+            ->with(['areas' => fn ($q) => $q->orderBy('name_en')])
+            ->orderBy('name_en')
+            ->get();
     }
 
     /**

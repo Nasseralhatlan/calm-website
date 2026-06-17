@@ -48,27 +48,11 @@ class AppServiceProvider extends ServiceProvider
 
     private function registerRateLimiters(): void
     {
-        // OTP request: 1/min and 5/hour per identifier (regardless of IP),
-        // and a backstop of 20/hour per IP.
-        RateLimiter::for('otp-request', function (Request $request): array {
-            $identifier = (string) $request->input('identifier', '');
-
-            return [
-                Limit::perMinute(1)->by('otp-req:id:'.$identifier),
-                Limit::perHour(5)->by('otp-req:id-h:'.$identifier),
-                Limit::perHour(20)->by('otp-req:ip:'.$request->ip()),
-            ];
-        });
-
-        // OTP verify: 5/min per identifier, 30/hour per IP.
-        RateLimiter::for('otp-verify', function (Request $request): array {
-            $identifier = (string) $request->input('identifier', '');
-
-            return [
-                Limit::perMinute(5)->by('otp-vfy:id:'.$identifier),
-                Limit::perHour(30)->by('otp-vfy:ip:'.$request->ip()),
-            ];
-        });
+        // OTP request + verify limiters used to live here. They were dropped
+        // because OtpAuthService enforces the same protections at the
+        // business-logic layer (per-identifier cooldown on send + per-OTP
+        // attempt cap on verify). The HTTP-layer throttles were redundant
+        // and complicated test setup.
 
         // Public, unauthenticated endpoints: 30/min per IP.
         RateLimiter::for('public', fn (Request $request) => Limit::perMinute(30)->by($request->ip()));

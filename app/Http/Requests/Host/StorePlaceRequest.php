@@ -21,6 +21,13 @@ class StorePlaceRequest extends FormRequest
     {
         $rules = [
             'draft_id' => ['nullable', 'uuid'],
+            // Admin-only: attach the new listing to this host's phone instead
+            // of the admin themselves. Ignored entirely for non-admin posters.
+            // Optional even for admins — when blank, the place attaches to the
+            // admin's own account (PlacesController::resolveHost falls back).
+            'host_phone' => $this->user()?->isAdmin()
+                ? ['nullable', 'string', 'regex:/^5\d{8}$/']
+                : ['nullable'],
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:10000'],
             'place_type_id' => ['required', 'uuid', 'exists:place_types,id'],
@@ -28,6 +35,7 @@ class StorePlaceRequest extends FormRequest
             'price' => ['required', 'integer', 'min:0'],
             'check_in_time' => ['required', 'string', 'max:8'],
             'check_out_time' => ['required', 'string', 'max:8'],
+            'max_guests' => ['required', 'integer', 'between:1,50'],
             'rules' => ['nullable', 'string', 'max:10000'],
 
             'attributes' => ['nullable', 'array'],
@@ -40,7 +48,9 @@ class StorePlaceRequest extends FormRequest
             'attribute_image_paths.*.*' => ['string', 'max:500'],
             'extra_image_paths' => ['nullable', 'array'],
             'extra_image_paths.*' => ['string', 'max:500'],
-            'cover_image' => ['nullable', 'string', 'max:255'],
+            // Ordered photo markers shown outside (place page); first = cover. Max 10.
+            'featured' => ['nullable', 'array', 'max:10'],
+            'featured.*' => ['string', 'max:255'],
         ];
 
         foreach (Place::PRICE_COLUMNS as $column) {
@@ -59,7 +69,7 @@ class StorePlaceRequest extends FormRequest
     public function placeData(): array
     {
         return collect($this->validated())
-            ->except(['draft_id', 'attributes', 'attribute_image_paths', 'extra_image_paths', 'cover_image'])
+            ->except(['draft_id', 'host_phone', 'attributes', 'attribute_image_paths', 'extra_image_paths', 'featured'])
             ->toArray();
     }
 
@@ -86,8 +96,8 @@ class StorePlaceRequest extends FormRequest
 
         return [
             'attribute_paths' => $validated['attribute_image_paths'] ?? [],
-            'extra_paths'     => $validated['extra_image_paths']     ?? [],
-            'cover_key'       => $validated['cover_image']           ?? null,
+            'extra_paths' => $validated['extra_image_paths'] ?? [],
+            'featured' => $validated['featured'] ?? [],
         ];
     }
 }

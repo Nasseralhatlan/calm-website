@@ -6,6 +6,7 @@ namespace App\Services\Place;
 
 use App\Models\PlaceType;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Collection;
 
 final class PlaceTypeService
 {
@@ -15,6 +16,17 @@ final class PlaceTypeService
             ->withCount('places')
             ->orderBy('name_en')
             ->paginate($perPage);
+    }
+
+    /**
+     * Active place types for the mobile API home screen — the type picker
+     * grid above the listings.
+     *
+     * @return Collection<int, PlaceType>
+     */
+    public function activeForApi(): Collection
+    {
+        return PlaceType::query()->active()->orderBy('name_en')->get();
     }
 
     /**

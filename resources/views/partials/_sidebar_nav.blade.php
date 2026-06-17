@@ -28,6 +28,7 @@
             'items' => [
                 ['route' => 'admin.dashboard',              'label_ar' => 'الرئيسية',          'label_en' => 'Dashboard',        'icon' => 'grid'],
                 ['route' => 'admin.places.index',           'label_ar' => 'الأماكن',           'label_en' => 'Places',           'icon' => 'house'],
+                ['route' => 'admin.place-lists.index',      'label_ar' => 'القوائم',           'label_en' => 'Lists',            'icon' => 'list'],
                 ['route' => 'admin.place-types.index',      'label_ar' => 'أنواع الأماكن',     'label_en' => 'Place types',      'icon' => 'layers'],
                 ['route' => 'admin.attribute-groups.index', 'label_ar' => 'مجموعات الخصائص',   'label_en' => 'Attribute groups', 'icon' => 'folder'],
                 ['route' => 'admin.attributes.index',       'label_ar' => 'الخصائص',           'label_en' => 'Attributes',       'icon' => 'tag'],
@@ -114,6 +115,12 @@
                     @case('layers')
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="{{ $active ? 2.2 : 1.8 }}" stroke-linecap="round" stroke-linejoin="round">
                             <polygon points="12 2 22 8 12 14 2 8 12 2"></polygon><polyline points="2 14 12 20 22 14"></polyline>
+                        </svg>
+                        @break
+                    @case('list')
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="{{ $active ? 2.2 : 1.8 }}" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="8" y1="6"  x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line>
+                            <line x1="3" y1="6"  x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line>
                         </svg>
                         @break
                     @case('folder')

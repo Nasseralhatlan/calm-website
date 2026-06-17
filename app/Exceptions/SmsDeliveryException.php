@@ -11,6 +11,4 @@ use RuntimeException;
  * The OtpService catches none of these — they propagate up so the rate limiter
  * and global error handlers can deal with them appropriately.
  */
-final class SmsDeliveryException extends RuntimeException
-{
-}
+final class SmsDeliveryException extends RuntimeException {}

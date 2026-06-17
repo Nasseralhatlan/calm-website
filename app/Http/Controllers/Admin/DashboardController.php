@@ -8,6 +8,7 @@ use App\Enums\PlaceReviewStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Place;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\View\View;
 
@@ -38,7 +39,7 @@ class DashboardController extends Controller
      *
      * @return array<int, int>
      */
-    private function dailyCounts(\Illuminate\Database\Eloquent\Builder $base, string $column, int $days = 14): array
+    private function dailyCounts(Builder $base, string $column, int $days = 14): array
     {
         $start = Carbon::now()->subDays($days - 1)->startOfDay();
 

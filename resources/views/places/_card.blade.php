@@ -301,10 +301,10 @@
                     <div>
                         <div class="relative">
                             <img src="{{ $imgUrl($p) }}" class="block w-full aspect-square object-cover" style="border-radius: 14px;" alt="" loading="lazy">
-                            @if($p->is_cover)
+                            @if($p->featured_order !== null)
                                 <span class="absolute top-1 inline-flex items-center gap-1 text-[10px] font-bold bg-[#F88379] text-white {{ $fa }}"
                                       style="padding: 2px 8px; border-radius: 999px; {{ $isRtl ? 'right: 4px;' : 'left: 4px;' }}">
-                                    ★ {{ $isRtl ? 'الغلاف' : 'COVER' }}
+                                    {{ $p->featured_order === 0 ? '★ ' . ($isRtl ? 'الغلاف' : 'COVER') : '#' . ($p->featured_order + 1) }}
                                 </span>
                             @endif
                         </div>
