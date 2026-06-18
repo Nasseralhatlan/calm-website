@@ -1383,7 +1383,7 @@ function registerWizard() {
                 } catch (e) {
                     console.warn('[upload] HEIC convert failed, trying original', e);
                 }
-            } else if (file.size < 350 * 1024) {
+            } else if (file.size < 250 * 1024) {
                 return file; // already small, non-HEIC — no meaningful gain
             }
 
@@ -1391,7 +1391,8 @@ function registerWizard() {
             try {
                 const out = await window.imageCompression(work, {
                     maxWidthOrHeight: 2560,   // resize-first → visually lossless on real screens
-                    initialQuality: 0.9,      // high-quality WebP, near-indistinguishable
+                    initialQuality: 0.82,     // visually-lossless floor for photos, ~25-35% smaller than 0.90
+                    maxSizeMB: 1.5,           // safety ceiling for unusually heavy images (rarely engages)
                     fileType: 'image/webp',
                     useWebWorker: true,       // off the main thread → UI stays responsive
                 });
