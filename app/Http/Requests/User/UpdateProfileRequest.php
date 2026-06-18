@@ -27,6 +27,9 @@ class UpdateProfileRequest extends FormRequest
 
         return [
             'name' => ['sometimes', 'nullable', 'string', 'max:120'],
+            // Profile picture. Upload requires a multipart POST (PHP doesn't
+            // parse multipart bodies on PATCH/PUT) — see the `POST /user` route.
+            'avatar' => ['sometimes', 'file', 'image', 'mimes:jpeg,jpg,png,webp', 'max:5120'],
             'gender' => ['sometimes', 'nullable', Rule::in(['male', 'female'])],
             'age' => ['sometimes', 'nullable', 'integer', 'between:13,120'],
             // Frontend posts YYYY-MM-DD. Lower bound matches age:13.

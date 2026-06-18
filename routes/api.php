@@ -67,7 +67,10 @@ Route::middleware(['auth:api', 'throttle:authenticated'])->group(function (): vo
     Route::post('/auth/refresh', [AuthController::class, 'refresh']);
 
     Route::get('/user', [UserController::class, 'me']);
+    // JSON field updates (name, gender, …). For a profile-picture upload use
+    // the POST alias below — PHP only parses multipart bodies on POST.
     Route::patch('/user', [UserController::class, 'update']);
+    Route::post('/user', [UserController::class, 'update']);
 
     // Heart-icon toggles. POST = like, DELETE = unlike; both idempotent.
     Route::post('/places/{place}/like', [PlaceLikesController::class, 'store']);

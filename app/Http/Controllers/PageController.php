@@ -7,8 +7,9 @@ namespace App\Http\Controllers;
 use Illuminate\View\View;
 
 /**
- * Static public content pages (legal + about), Arabic-only for now. Each just
- * renders its Blade view via the shared `layouts.legal` chrome.
+ * Static public content pages (legal + about), available in Arabic and English
+ * — each view renders both and picks the language from the current locale (the
+ * `locale` cookie). Rendered via the shared `layouts.legal` chrome.
  */
 class PageController extends Controller
 {

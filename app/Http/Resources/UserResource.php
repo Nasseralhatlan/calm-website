@@ -21,6 +21,8 @@ class UserResource extends JsonResource
         return [
             'id' => $this->id,
             'name' => $this->name,
+            // Public profile-picture URL to display (null when none set).
+            'avatar_url' => $this->avatar_url,
             'gender' => $this->gender,
             'age' => $this->age,
             'birth_date' => $this->birth_date?->toDateString(),

@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Storage;
 use PHPOpenSourceSaver\JWTAuth\Contracts\JWTSubject;
 
 class User extends Authenticatable implements JWTSubject
@@ -22,6 +23,7 @@ class User extends Authenticatable implements JWTSubject
 
     protected $fillable = [
         'name',
+        'avatar',
         'gender',
         'age',
         'birth_date',
@@ -47,6 +49,23 @@ class User extends Authenticatable implements JWTSubject
             'age' => 'integer',
             'birth_date' => 'date',
         ];
+    }
+
+    /**
+     * Public URL for the profile picture. Stored value is an S3 object key
+     * (or already a full URL, passed through). Null when no avatar is set.
+     */
+    public function getAvatarUrlAttribute(): ?string
+    {
+        if ($this->avatar === null || $this->avatar === '') {
+            return null;
+        }
+
+        if (str_starts_with($this->avatar, 'http')) {
+            return $this->avatar;
+        }
+
+        return Storage::disk('s3')->url($this->avatar);
     }
 
     public function country(): BelongsTo

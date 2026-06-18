@@ -8,6 +8,9 @@ use App\Enums\OtpType;
 use App\Enums\UserRole;
 use App\Models\User;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 /**
  * Single source of truth for user lookup, creation, and profile updates.
@@ -60,9 +63,34 @@ final class UserService
     {
         unset($attrs['role'], $attrs['phone_verified_at'], $attrs['email_verified_at']);
 
+        // A profile-picture upload arrives as an UploadedFile — store it to S3
+        // and replace the attribute with the object key before filling. The
+        // previous avatar (if any) is removed so we don't orphan objects.
+        if (isset($attrs['avatar']) && $attrs['avatar'] instanceof UploadedFile) {
+            $old = $user->avatar;
+            $attrs['avatar'] = $this->storeAvatar($attrs['avatar']);
+
+            if ($old !== null && $old !== '' && ! str_starts_with($old, 'http')) {
+                Storage::disk('s3')->delete($old);
+            }
+        }
+
         $user->fill($attrs)->save();
 
         return $user->refresh();
+    }
+
+    /**
+     * Persist a profile picture to the public S3 disk and return its key.
+     */
+    private function storeAvatar(UploadedFile $file): string
+    {
+        $ext = Str::lower($file->getClientOriginalExtension() ?: 'jpg');
+        $key = 'avatars/'.Str::lower(Str::random(24)).'.'.$ext;
+
+        Storage::disk('s3')->put($key, $file->getContent(), 'public');
+
+        return $key;
     }
 
     /**
