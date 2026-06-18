@@ -1360,11 +1360,56 @@ function registerWizard() {
             });
         },
         /**
-         * Step 1: POST {filename, mime} to /host-register/presign → ticket with put_url.
+         * Shrink a photo in the browser BEFORE the presigned upload so we store
+         * one smaller WebP per photo (visually lossless): resize-first to a
+         * 2560px max edge + WebP @ 0.90. iPhone HEIC/HEIF is converted to JPEG
+         * first via heic2any (lazy-loaded — it bundles libheif WASM). Anything
+         * that can't be processed falls back to the original so uploads never
+         * break. Small non-HEIC files (< 350 KB) pass through untouched.
+         */
+        async _compress(file) {
+            const isHeic = /image\/heic|image\/heif/.test(file.type) || /\.(heic|heif)$/i.test(file.name);
+            if (!file.type.startsWith('image/') && !isHeic) return file;
+            // Keep animation/vector intact — re-encoding would wreck them.
+            if (file.type === 'image/gif' || file.type === 'image/svg+xml') return file;
+
+            let work = file;
+            if (isHeic) {
+                try {
+                    const heic2any = await window.loadHeic2any();
+                    const out = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.92 });
+                    const blob = Array.isArray(out) ? out[0] : out;
+                    work = new File([blob], file.name.replace(/\.(heic|heif)$/i, '.jpg'), { type: 'image/jpeg' });
+                } catch (e) {
+                    console.warn('[upload] HEIC convert failed, trying original', e);
+                }
+            } else if (file.size < 350 * 1024) {
+                return file; // already small, non-HEIC — no meaningful gain
+            }
+
+            if (!window.imageCompression) return work;
+            try {
+                const out = await window.imageCompression(work, {
+                    maxWidthOrHeight: 2560,   // resize-first → visually lossless on real screens
+                    initialQuality: 0.9,      // high-quality WebP, near-indistinguishable
+                    fileType: 'image/webp',
+                    useWebWorker: true,       // off the main thread → UI stays responsive
+                });
+                const webp = new File([out], work.name.replace(/\.[^.]+$/, '') + '.webp', { type: 'image/webp' });
+                return webp.size < work.size ? webp : work; // never end up bigger
+            } catch (e) {
+                console.warn('[upload] compression failed, using', work === file ? 'original' : 'converted', e);
+                return work; // a converted HEIC is at least a displayable JPEG
+            }
+        },
+        /**
+         * Step 1: compress the photo (above), then POST {filename, mime} to
+         * /host-register/presign → ticket with put_url.
          * Step 2: PUT the raw bytes straight to S3 (DO Spaces) — PHP doesn't see them.
          * Returns { path, url } on success.
          */
         async _uploadOne(file) {
+            file = await this._compress(file);
             const presignRes = await fetch('{{ route('host.places.presign') }}', {
                 method: 'POST',
                 credentials: 'same-origin',
