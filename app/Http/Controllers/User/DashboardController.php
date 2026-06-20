@@ -23,7 +23,7 @@ class DashboardController extends Controller
     public function bookings(Request $request): View
     {
         return view('user.bookings', [
-            'bookings' => $this->bookings->forHost($request->user()),
+            'bookings' => $this->bookings->forHostPaginated($request->user()),
         ]);
     }
 
@@ -51,7 +51,9 @@ class DashboardController extends Controller
 
     public function financials(Request $request): View
     {
-        return view('user.financials', ['user' => $request->user()]);
+        return view('user.financials', [
+            'user' => $request->user(),
+        ]);
     }
 
     public function favorites(Request $request): View

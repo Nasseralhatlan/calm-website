@@ -125,17 +125,19 @@ it('writes one in-app row and fires SMS + push to every device', function (): vo
         ->and($push->calls[0]['title'])->toBe('عنوان');
 });
 
-it('delivers English to en-locale users', function (): void {
+it('always delivers Arabic on SMS + push regardless of user locale', function (): void {
     config(['push.enabled' => true]);
     $sms = fakeSms();
     $push = fakePush();
+    // Even an en-locale user receives Arabic on the outbound channels for now.
     $user = User::factory()->create(['phone' => '513000002', 'locale' => 'en']);
     DeviceToken::query()->create(['user_id' => $user->id, 'token' => 'ExponentPushToken[c]']);
 
     $this->service->notify($user, samplePayload());
 
-    expect($sms->calls[0]['message'])->toContain('Title')
-        ->and($push->calls[0]['title'])->toBe('Title');
+    expect($sms->calls[0]['message'])->toContain('عنوان')
+        ->and($sms->calls[0]['message'])->not->toContain('Title')
+        ->and($push->calls[0]['title'])->toBe('عنوان');
 });
 
 it('still delivers in-app + SMS when the user has no device token (push skipped)', function (): void {
@@ -224,6 +226,8 @@ it('notifies the host when their place is submitted for review', function (): vo
     $row = UserNotification::query()->where('user_id', $host->id)->where('type', 'place_submitted')->sole();
     expect($row->title_en)->toBe('Your place was submitted for review')
         ->and($row->data['place_id'])->toBe($place->id)
+        ->and($row->body_ar)->toContain('تطبيق كالم')   // names the Calm app for new hosts
+        ->and($row->body_en)->toContain('Calm app')
         ->and($sms->calls)->toHaveCount(1)
         ->and($sms->calls[0]['phone'])->toBe('513000030');
 });
@@ -248,6 +252,7 @@ it('notifies the host when they get a booking', function (): void {
     expect($row->type)->toBe('host_new_booking')
         ->and($row->data['booking_id'])->toBe($booking->id)
         ->and($row->data['place_id'])->toBe($place->id)
+        ->and($row->body_ar)->toContain($booking->reference)   // booking reference in the message
         ->and($sms->calls)->toHaveCount(1)
         ->and($sms->calls[0]['phone'])->toBe('513000031');
 });
@@ -265,12 +270,38 @@ it('notifies the guest when their booking is confirmed', function (): void {
         'max_guests' => 2, 'status' => PlaceStatus::Active->value, 'review_status' => PlaceReviewStatus::Approved->value,
     ]);
     $booking = newBooking($place, $guest);
+    $booking->update(['check_in_time' => '15:00', 'check_out_time' => '12:00']);
 
     $this->service->bookingConfirmed($booking);
 
     $row = UserNotification::query()->where('user_id', $guest->id)->sole();
     expect($row->type)->toBe('booking_confirmed')
         ->and($row->data['booking_id'])->toBe($booking->id)
+        ->and($row->body_ar)->toContain($booking->reference)        // booking reference
+        ->and($row->body_ar)->toContain($booking->start_date->translatedFormat('j')) // stay date present
+        ->and($row->body_ar)->toContain('PM')                       // AM/PM time
         ->and($sms->calls)->toHaveCount(1)
         ->and($sms->calls[0]['phone'])->toBe('513000034');
+});
+
+it('puts the booking reference in cancellation messages (guest + host)', function (): void {
+    fakeSms();
+    fakePush();
+    $host = User::factory()->create(['phone' => '513000041']);
+    $guest = User::factory()->create(['phone' => '513000042']);
+    $place = Place::query()->create([
+        'host_user_id' => $host->id,
+        'place_type_id' => PlaceType::query()->first()->id,
+        'city_area_id' => CityArea::query()->first()->id,
+        'title' => 'Cliff House', 'price' => 500, 'check_in_time' => '15:00', 'check_out_time' => '12:00',
+        'max_guests' => 2, 'status' => PlaceStatus::Active->value, 'review_status' => PlaceReviewStatus::Approved->value,
+    ]);
+    $booking = newBooking($place, $guest);
+
+    $this->service->bookingCanceledByHost($booking);
+
+    $guestRow = UserNotification::query()->where('user_id', $guest->id)->where('type', 'booking_canceled_by_host')->sole();
+    $hostRow = UserNotification::query()->where('user_id', $host->id)->where('type', 'booking_canceled_by_host')->sole();
+    expect($guestRow->body_ar)->toContain($booking->reference)
+        ->and($hostRow->body_ar)->toContain($booking->reference);
 });

@@ -19,6 +19,22 @@ class UpdateProfileRequest extends FormRequest
     }
 
     /**
+     * Normalise the payout IBAN before validation: strip spaces and upper-case
+     * so "sa03 8000 …" and "SA0380000000…" both pass and store consistently.
+     */
+    protected function prepareForValidation(): void
+    {
+        if ($this->has('bank_account')) {
+            $iban = $this->input('bank_account');
+            $this->merge([
+                'bank_account' => is_string($iban) && $iban !== ''
+                    ? strtoupper(preg_replace('/\s+/', '', $iban))
+                    : null,
+            ]);
+        }
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function rules(): array
@@ -35,6 +51,20 @@ class UpdateProfileRequest extends FormRequest
             // Frontend posts YYYY-MM-DD. Lower bound matches age:13.
             'birth_date' => ['sometimes', 'nullable', 'date', 'date_format:Y-m-d', 'before:today', 'after:1900-01-01'],
             'email' => ['sometimes', 'nullable', 'email:rfc', 'max:254', Rule::unique('users', 'email')->ignore($userId)],
+            // Payout bank — free-text bank name (informational).
+            'bank' => ['sometimes', 'nullable', 'string', 'max:120'],
+            // Saudi IBAN: "SA" + 2 check digits + 18-digit BBAN = 24 chars.
+            'bank_account' => ['sometimes', 'nullable', 'string', 'regex:/^SA\d{22}$/'],
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'bank_account.regex' => __('Enter a valid Saudi IBAN (SA followed by 22 digits).'),
         ];
     }
 }

@@ -102,6 +102,30 @@ it('shows a host the bookings on their places on /bookings', function (): void {
         ->assertSee('Sara Guest');
 });
 
+it('paginates the host /bookings page', function (): void {
+    config(['pagination.per_page' => 1]);
+    $host = User::factory()->create(['phone' => '517000020']);
+    $guest = User::factory()->create(['phone' => '517000021']);
+    $place = dashboardPlace($host);
+    makeBooking($place, $guest);
+    $this->travel(1)->minutes();
+    $newer = makeBooking($place, $guest);
+
+    // Page 1: only the newest booking + a pager to page 2 (proves it's paginated,
+    // not the full collection).
+    $this->actingAs($host, 'api')
+        ->get('/bookings')
+        ->assertOk()
+        ->assertSee($newer->reference)
+        ->assertSee('bookings?page=2');        // pager link rendered
+
+    // Page 2: the older booking shows.
+    $this->actingAs($host, 'api')
+        ->get('/bookings?page=2')
+        ->assertOk()
+        ->assertSee('Dashboard Test Chalet');
+});
+
 it('does not show a host bookings on places they do not own on /bookings', function (): void {
     $host = User::factory()->create(['phone' => '517000009']);
     $otherHost = User::factory()->create(['phone' => '517000010']);

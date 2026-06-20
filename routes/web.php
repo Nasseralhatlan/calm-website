@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Http\Controllers\Admin\AttributeGroupsController;
 use App\Http\Controllers\Admin\AttributesController;
+use App\Http\Controllers\Admin\BookingsController;
 use App\Http\Controllers\Admin\CitiesController;
 use App\Http\Controllers\Admin\CityAreasController;
 use App\Http\Controllers\Admin\CountriesController;
@@ -135,6 +136,11 @@ Route::middleware(['auth:api', 'admin'])
         // Guest review moderation (under_review / published / blocked).
         Route::get('/reviews', [ReviewsController::class, 'index'])->name('reviews.index');
         Route::post('/reviews/{review}/status', [ReviewsController::class, 'updateStatus'])->name('reviews.status');
+
+        // All bookings — search (guest/host phone, place/booking id), view, cancel.
+        Route::get('/bookings', [BookingsController::class, 'index'])->name('bookings.index');
+        Route::get('/bookings/{booking}', [BookingsController::class, 'show'])->name('bookings.show');
+        Route::post('/bookings/{booking}/cancel', [BookingsController::class, 'cancel'])->name('bookings.cancel');
 
         // Curated landing-page lists ("Featured chalets", "Editor's picks", etc.)
         // Adding places to a list happens from the place's edit page; this
