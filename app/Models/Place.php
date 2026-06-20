@@ -56,6 +56,7 @@ class Place extends Model
         'checkout_next_day',
         'max_guests',
         'rules',
+        'location_url',
         'status',
         'review_status',
         'rejection_reason',

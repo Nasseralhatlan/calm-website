@@ -30,6 +30,7 @@ function createPayload(array $overrides = []): array
         'check_in_time' => '15:00',
         'check_out_time' => '12:00',
         'max_guests' => 4,
+        'location_url' => 'https://maps.google.com/?q=24.7,46.6',
         'extra_image_paths' => imgPaths(5),
     ], $overrides);
 }

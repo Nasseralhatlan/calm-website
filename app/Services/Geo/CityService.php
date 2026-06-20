@@ -21,7 +21,10 @@ final class CityService
 
     /**
      * Active cities for the mobile API home screen, each with its areas so the
-     * app can render the city → area picker in a single call.
+     * app can render the city → area picker in a single call. Only cities that
+     * actually have at least one visible (active + approved) place are returned,
+     * and each city's areas are likewise trimmed to those with a visible place —
+     * so the picker never offers a city/area you can't book in.
      *
      * @return Collection<int, City>
      */
@@ -29,7 +32,10 @@ final class CityService
     {
         return City::query()
             ->active()
-            ->with(['areas' => fn ($q) => $q->orderBy('name_en')])
+            ->whereHas('areas.places', fn ($q) => $q->visible())
+            ->with(['areas' => fn ($q) => $q
+                ->whereHas('places', fn ($p) => $p->visible())
+                ->orderBy('name_en')])
             ->orderBy('name_en')
             ->get();
     }

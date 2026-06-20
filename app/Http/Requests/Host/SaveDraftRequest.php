@@ -41,6 +41,9 @@ class SaveDraftRequest extends FormRequest
             'checkout_next_day' => ['sometimes', 'boolean'],
             'max_guests' => ['nullable', 'integer', 'between:1,50'],
             'rules' => ['nullable', 'string', 'max:10000'],
+            // Map link (Google Maps, etc.) — optional while drafting. Not
+            // url-validated here so a partial paste doesn't block auto-save.
+            'location_url' => ['nullable', 'string', 'max:2048'],
             'last_step' => ['nullable', 'integer', 'min:1', 'max:20'],
 
             // Attributes — host's selected facilities. Sent as an array of objects

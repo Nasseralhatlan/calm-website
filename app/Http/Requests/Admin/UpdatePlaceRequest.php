@@ -45,6 +45,9 @@ class UpdatePlaceRequest extends FormRequest
             'checkout_next_day' => ['sometimes', 'boolean'],
             'max_guests' => ['required', 'integer', 'between:1,50'],
             'rules' => ['nullable', 'string', 'max:10000'],
+            // A map link the host pastes (Google Maps, etc.); only revealed to
+            // the guest once their booking is confirmed.
+            'location_url' => ['required', 'string', 'url', 'max:2048'],
             'status' => ['required', Rule::enum(PlaceStatus::class)],
             'review_status' => ['required', Rule::enum(PlaceReviewStatus::class)],
             // Admin can edit / clear the rejection feedback directly.

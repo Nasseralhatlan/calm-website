@@ -39,6 +39,9 @@ class StorePlaceRequest extends FormRequest
             'checkout_next_day' => ['sometimes', 'boolean'],
             'max_guests' => ['required', 'integer', 'between:1,50'],
             'rules' => ['nullable', 'string', 'max:10000'],
+            // A map link the host pastes (Google Maps, etc.); required on submit,
+            // only revealed to the guest once their booking is confirmed.
+            'location_url' => ['required', 'string', 'url', 'max:2048'],
 
             'attributes' => ['nullable', 'array'],
             'attributes.*.attribute_id' => ['required', 'uuid', 'exists:attributes,id'],
