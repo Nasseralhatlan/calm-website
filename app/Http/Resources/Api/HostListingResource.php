@@ -53,8 +53,8 @@ class HostListingResource extends JsonResource
             'likes_count' => (int) ($this->likes_count ?? 0),
             'bookings_count' => (int) ($this->bookings_count ?? 0),
             'rating' => [
-                'avg' => isset($this->reviews_avg_rate) ? round((float) $this->reviews_avg_rate, 2) : null,
-                'count' => (int) ($this->reviews_count ?? 0),
+                'avg' => isset($this->published_reviews_avg_rate) ? round((float) $this->published_reviews_avg_rate, 2) : null,
+                'count' => (int) ($this->published_reviews_count ?? 0),
             ],
             'created_at' => $this->created_at?->toIso8601String(),
         ];

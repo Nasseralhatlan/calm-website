@@ -157,6 +157,28 @@ it('reflects is_liked when authed viewer calls GET /api/places/most-liked', func
         ->assertJsonPath('data.0.likes_count', 1);
 });
 
+it('breaks like-count ties by average rating on GET /api/places/most-liked', function (): void {
+    $host = User::factory()->create(['phone' => '512345680']);
+
+    // Higher-rated place is created FIRST (older created_at); the lower-rated
+    // one a minute later. A correct rating tiebreaker puts the higher-rated
+    // first, while the buggy created_at fallback (when the rating column is the
+    // wrong alias and resolves to null) would put the NEWER one first — so this
+    // distinguishes the two and guards the `published_reviews_avg_rate` alias.
+    $highRated = makeVisiblePlace($host, ['title' => 'Highly rated']);
+    PlaceReview::query()->create(['place_id' => $highRated->id, 'rate' => 5, 'comment' => 'a', 'status' => 'published']);
+
+    $this->travel(1)->minutes();
+    $lowRated = makeVisiblePlace($host, ['title' => 'Lowly rated']);
+    PlaceReview::query()->create(['place_id' => $lowRated->id, 'rate' => 2, 'comment' => 'b', 'status' => 'published']);
+
+    // Both have zero likes, so order is decided purely by average rating.
+    $this->getJson('/api/places/most-liked')
+        ->assertOk()
+        ->assertJsonPath('data.0.id', $highRated->id)
+        ->assertJsonPath('data.1.id', $lowRated->id);
+});
+
 it('includes review aggregates in PlaceResource', function (): void {
     $host = User::factory()->create(['phone' => '512345677']);
     $place = makeVisiblePlace($host);
