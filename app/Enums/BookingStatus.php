@@ -21,6 +21,9 @@ enum BookingStatus: string
     /** A confirmed booking later cancelled by the guest. */
     case CanceledByGuest = 'canceled_by_guest';
 
+    /** A confirmed booking cancelled by an admin (e.g. on the guest's request). */
+    case CanceledByAdmin = 'canceled_by_admin';
+
     /** The stay has finished. */
     case Completed = 'completed';
 
@@ -34,5 +37,37 @@ enum BookingStatus: string
     public static function blocking(): array
     {
         return [self::PendingPayment, self::Confirmed, self::Completed];
+    }
+
+    /** Any of the cancellation outcomes. */
+    public function isCanceled(): bool
+    {
+        return in_array($this, [self::CanceledByHost, self::CanceledByGuest, self::CanceledByAdmin], true);
+    }
+
+    /** Bilingual label for admin/host/guest screens. */
+    public function label(bool $ar): string
+    {
+        return match ($this) {
+            self::PendingPayment => $ar ? 'بانتظار الدفع' : 'Pending payment',
+            self::Confirmed => $ar ? 'مؤكد' : 'Confirmed',
+            self::Expired => $ar ? 'منتهي' : 'Expired',
+            self::CanceledByHost => $ar ? 'ألغاه المضيف' : 'Cancelled by host',
+            self::CanceledByGuest => $ar ? 'ألغاه الضيف' : 'Cancelled by guest',
+            self::CanceledByAdmin => $ar ? 'ألغته الإدارة' : 'Cancelled by admin',
+            self::Completed => $ar ? 'مكتمل' : 'Completed',
+        };
+    }
+
+    /** Badge palette (saturated bg + light dot) matching the admin pills. */
+    public function pill(): string
+    {
+        return match ($this) {
+            self::PendingPayment => '#f59e0b',
+            self::Confirmed => '#10b981',
+            self::Completed => '#3b82f6',
+            self::Expired => '#9ca3af',
+            self::CanceledByHost, self::CanceledByGuest, self::CanceledByAdmin => '#ef4444',
+        };
     }
 }

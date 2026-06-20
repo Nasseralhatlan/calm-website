@@ -7,6 +7,7 @@ namespace App\Http\Controllers\User;
 use App\Http\Controllers\Controller;
 use App\Models\Booking;
 use App\Services\Booking\BookingService;
+use App\Services\Place\SettingService;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -23,7 +24,7 @@ class DashboardController extends Controller
     public function bookings(Request $request): View
     {
         return view('user.bookings', [
-            'bookings' => $this->bookings->forHost($request->user()),
+            'bookings' => $this->bookings->forHostPaginated($request->user()),
         ]);
     }
 
@@ -36,7 +37,7 @@ class DashboardController extends Controller
     }
 
     /** Detail of one booking — viewable by its guest or its host only. */
-    public function showBooking(Request $request, Booking $booking): View
+    public function showBooking(Request $request, Booking $booking, SettingService $settings): View
     {
         $viewer = $request->user();
         $booking = $this->bookings->detailForViewer($booking, $viewer);
@@ -46,12 +47,15 @@ class DashboardController extends Controller
         return view('user.booking-detail', [
             'booking' => $booking,
             'isHost' => $booking->host_user_id === $viewer->id,
+            'support' => $settings->byKeys(['support_phone', 'support_email']),
         ]);
     }
 
     public function financials(Request $request): View
     {
-        return view('user.financials', ['user' => $request->user()]);
+        return view('user.financials', [
+            'user' => $request->user(),
+        ]);
     }
 
     public function favorites(Request $request): View

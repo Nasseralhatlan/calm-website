@@ -168,6 +168,112 @@ final class BookingService
     }
 
     /**
+     * Admin "all bookings" list. Optional free-text search matches the booking
+     * reference (partial), the booking/place UUID (exact), or the guest's/host's
+     * phone (partial, leading-zero tolerant). Optional $status narrows to a
+     * status group ('cancelled' covers host/guest/admin cancellations).
+     *
+     * @return LengthAwarePaginator<int, Booking>
+     */
+    public function paginateForAdmin(?string $q = null, ?string $status = null, ?int $perPage = null): LengthAwarePaginator
+    {
+        $term = $q !== null && trim($q) !== '' ? trim($q) : null;
+
+        return Booking::query()
+            ->with(['place', 'place.coverPhoto', 'guest', 'host'])
+            ->when($term, function ($query, string $term): void {
+                $phone = ltrim($term, '0'); // phones are stored without the leading 0
+                $query->where(function ($w) use ($term, $phone): void {
+                    $w->where('reference', 'like', "%{$term}%")
+                        ->orWhere('id', $term)
+                        ->orWhere('place_id', $term)
+                        ->orWhereHas('guest', fn ($g) => $g->where('phone', 'like', "%{$phone}%"))
+                        ->orWhereHas('host', fn ($h) => $h->where('phone', 'like', "%{$phone}%"));
+                });
+            })
+            ->when($status, fn ($query, string $status) => $query->whereIn('booking_status', self::statusGroup($status)))
+            ->latest()
+            ->paginate($perPage ?? config('pagination.per_page'))
+            ->withQueryString();
+    }
+
+    /**
+     * Booking counts per status filter for the admin chips. Returns keys:
+     * all, pending_payment, confirmed, completed, cancelled, expired.
+     *
+     * @return array<string, int>
+     */
+    public function adminStatusCounts(): array
+    {
+        $byStatus = Booking::query()
+            ->selectRaw('booking_status, COUNT(*) as aggregate')
+            ->groupBy('booking_status')
+            ->pluck('aggregate', 'booking_status');
+
+        return [
+            'all' => (int) $byStatus->sum(),
+            'pending_payment' => (int) $byStatus->get(BookingStatus::PendingPayment->value, 0),
+            'confirmed' => (int) $byStatus->get(BookingStatus::Confirmed->value, 0),
+            'completed' => (int) $byStatus->get(BookingStatus::Completed->value, 0),
+            'cancelled' => (int) collect(self::statusGroup('cancelled'))->sum(fn (string $s) => (int) $byStatus->get($s, 0)),
+            'expired' => (int) $byStatus->get(BookingStatus::Expired->value, 0),
+        ];
+    }
+
+    /**
+     * Map a filter key to the booking_status values it covers.
+     *
+     * @return list<string>
+     */
+    private static function statusGroup(string $key): array
+    {
+        return match ($key) {
+            'cancelled' => [
+                BookingStatus::CanceledByHost->value,
+                BookingStatus::CanceledByGuest->value,
+                BookingStatus::CanceledByAdmin->value,
+            ],
+            default => [$key],
+        };
+    }
+
+    /**
+     * Admin cancels a CONFIRMED booking on behalf of the host or as the platform.
+     * No refund is issued here (handled manually for now); the dates free up
+     * automatically because cancelled bookings no longer count as active holds.
+     * Both parties are notified after commit, with wording matching the canceller.
+     */
+    public function cancelByAdmin(Booking $booking, BookingStatus $as): Booking
+    {
+        abort_unless(
+            in_array($as, [BookingStatus::CanceledByHost, BookingStatus::CanceledByAdmin], true),
+            422,
+        );
+        abort_unless(
+            $booking->booking_status === BookingStatus::Confirmed,
+            422,
+            __('Only confirmed bookings can be cancelled.'),
+        );
+
+        $booking = DB::transaction(function () use ($booking, $as): Booking {
+            $booking->update([
+                'booking_status' => $as->value,
+                'canceled_at' => CarbonImmutable::now(),
+            ]);
+
+            return $booking->refresh();
+        });
+
+        if ($as === BookingStatus::CanceledByHost) {
+            $this->notifications->bookingCanceledByHost($booking);
+        } else {
+            $this->notifications->bookingCanceledByAdmin($booking);
+        }
+
+        return $booking;
+    }
+
+    /**
      * The guest's own bookings for the mobile "My bookings" list — newest first,
      * paginated, each with the place summary (title/cover/city/type) the card
      * needs.
@@ -294,7 +400,7 @@ final class BookingService
 
         return $booking->load([
             'place', 'place.coverPhoto', 'place.type', 'place.cityArea.city',
-            'guest', 'host',
+            'place.publishedReviews.guest', 'guest', 'host',
         ]);
     }
 

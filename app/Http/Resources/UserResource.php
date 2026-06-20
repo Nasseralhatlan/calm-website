@@ -29,6 +29,9 @@ class UserResource extends JsonResource
             'phone' => $this->phone,
             'email' => $this->email,
             'country_id' => $this->country_id,
+            // Payout bank account (null until the user adds one).
+            'bank' => $this->bank,
+            'bank_account' => $this->bank_account,
             'role' => $this->role?->value,
             // True iff the user has at least one place row, regardless of
             // status — drafts, rejected, approved all count. Frontend uses

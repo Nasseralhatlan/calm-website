@@ -32,6 +32,7 @@
                 ['route' => 'admin.place-types.index',      'label_ar' => 'أنواع الأماكن',     'label_en' => 'Place types',      'icon' => 'layers'],
                 ['route' => 'admin.attributes.index',       'label_ar' => 'الخصائص',           'label_en' => 'Attributes',       'icon' => 'tag'],
                 ['route' => 'admin.reviews.index',          'label_ar' => 'التقييمات',         'label_en' => 'Reviews',          'icon' => 'star'],
+                ['route' => 'admin.bookings.index',         'label_ar' => 'الحجوزات',          'label_en' => 'Bookings',         'icon' => 'calendar'],
                 ['route' => 'admin.users.index',            'label_ar' => 'المستخدمون',        'label_en' => 'Users',            'icon' => 'user'],
                 // Notifications — temporarily disabled (route commented out):
                 // ['route' => 'admin.notifications.index',    'label_ar' => 'الإشعارات',         'label_en' => 'Notifications',    'icon' => 'bell'],

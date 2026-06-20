@@ -1,26 +1,10 @@
 @extends('layouts.user')
 
 @php
-    use App\Enums\BookingStatus;
     $locale = app()->getLocale();
     $isRtl = $locale === 'ar';
     $fa = $isRtl ? 'font-arabic' : '';
-
-    $pill = fn (BookingStatus $s): array => match ($s) {
-        BookingStatus::PendingPayment => ['bg' => '#f59e0b', 'dot' => '#fde68a'],
-        BookingStatus::Confirmed => ['bg' => '#10b981', 'dot' => '#a7f3d0'],
-        BookingStatus::Completed => ['bg' => '#3b82f6', 'dot' => '#bfdbfe'],
-        BookingStatus::Expired => ['bg' => '#9ca3af', 'dot' => '#e5e7eb'],
-        default => ['bg' => '#ef4444', 'dot' => '#fecaca'],
-    };
-    $label = fn (BookingStatus $s): string => $isRtl ? match ($s) {
-        BookingStatus::PendingPayment => 'بانتظار الدفع',
-        BookingStatus::Confirmed => 'مؤكد',
-        BookingStatus::Completed => 'مكتمل',
-        BookingStatus::Expired => 'منتهي',
-        BookingStatus::CanceledByHost => 'ملغى (المضيف)',
-        BookingStatus::CanceledByGuest => 'ملغى (الضيف)',
-    } : str_replace('_', ' ', $s->value);
+    $fmtTime = fn (?string $t) => $t ? \Illuminate\Support\Carbon::parse($t)->format('g:i A') : '—';
 @endphp
 
 @section('title', $isRtl ? 'حجوزات أماكني' : 'Bookings')
@@ -34,71 +18,75 @@
             'subtitle' => $isRtl ? 'ستظهر هنا حجوزات الضيوف على أماكنك.' : 'Guest bookings on your places will appear here.',
         ])
     @else
-        <p class="text-[14px] text-[#717171]" style="margin-bottom: 20px;">
-            {{ $bookings->count() }} {{ $isRtl ? 'حجز' : 'bookings' }}
+        <p class="text-[14px] text-[#717171] {{ $fa }}" style="margin-bottom: 18px;">
+            {{ $bookings->total() }} {{ $isRtl ? 'حجز' : 'bookings' }}
         </p>
 
-        <div class="bg-white overflow-hidden" style="border-radius: 28px; box-shadow: 0px 10px 30px 0px rgba(0,0,0,0.05);">
-            <table class="w-full">
-                <thead class="bg-[#fafafa] text-[12px] uppercase text-[#717171] tracking-wider">
-                    <tr>
-                        <th class="text-start" style="padding: 14px 20px;">{{ $isRtl ? 'المكان' : 'Place' }}</th>
-                        <th class="text-start" style="padding: 14px 20px;">{{ $isRtl ? 'الضيف' : 'Guest' }}</th>
-                        <th class="text-start" style="padding: 14px 20px;">{{ $isRtl ? 'التواريخ' : 'Dates' }}</th>
-                        <th class="text-start" style="padding: 14px 20px;">{{ $isRtl ? 'الضيوف' : 'Guests' }}</th>
-                        <th class="text-start" style="padding: 14px 20px;">{{ $isRtl ? 'الإجمالي' : 'Total' }}</th>
-                        <th class="text-start" style="padding: 14px 20px;">{{ $isRtl ? 'الحالة' : 'Status' }}</th>
-                        <th class="text-end" style="padding: 14px 20px;"></th>
-                    </tr>
-                </thead>
-                <tbody class="text-[14px]">
-                    @foreach($bookings as $booking)
-                        @php
-                            $p = $pill($booking->booking_status);
-                            $place = $booking->place;
-                            $guest = $booking->guest;
-                        @endphp
-                        <tr class="border-t border-[#ebebeb] hover:bg-[#fafafa] transition-colors">
-                            <td class="text-start" style="padding: 14px 20px;">
-                                <span class="inline-flex items-center" style="gap: 12px;">
-                                    @if($place?->coverPhoto?->url)
-                                        <img src="{{ $place->coverPhoto->url }}" alt="" style="width: 44px; height: 44px; object-fit: cover; border-radius: 12px;">
-                                    @else
-                                        <span style="font-size: 22px;">{{ $place?->type?->icon ?: '🏠' }}</span>
-                                    @endif
-                                    <span>
-                                        <span class="block font-medium text-[#222]">{{ $place?->title ?: '—' }}</span>
-                                        <span class="block text-[11px] text-[#999] tabular-nums" dir="ltr">{{ $booking->reference }}</span>
-                                    </span>
-                                </span>
-                            </td>
-                            <td class="text-start text-[#717171]" style="padding: 14px 20px;">
-                                {{ $guest?->name ?: ($guest?->phone ? '+966 '.$guest->phone : '—') }}
-                            </td>
-                            <td class="text-start text-[#222]" style="padding: 14px 20px;" dir="ltr">
-                                {{ $booking->start_date?->isoFormat('D MMM') }} → {{ $booking->end_date?->isoFormat('D MMM YYYY') }}
-                            </td>
-                            <td class="text-start text-[#717171]" style="padding: 14px 20px;">{{ $booking->guests }}</td>
-                            <td class="text-start font-semibold tabular-nums" style="padding: 14px 20px;" dir="ltr">
-                                {{ number_format($booking->total / 100, 2) }} {{ $isRtl ? 'ر.س' : 'SAR' }}
-                            </td>
-                            <td class="text-start" style="padding: 14px 20px;">
-                                <span class="inline-flex items-center text-[11px] font-bold uppercase tracking-wider text-white {{ $fa }}"
-                                      style="padding: 4px 12px 4px 9px; border-radius: 999px; gap: 6px; background-color: {{ $p['bg'] }};">
-                                    <span style="width: 6px; height: 6px; border-radius: 999px; background-color: {{ $p['dot'] }};"></span>
-                                    {{ $label($booking->booking_status) }}
-                                </span>
-                            </td>
-                            <td class="text-end" style="padding: 14px 20px;">
-                                <a href="{{ route('user.bookings.show', $booking) }}"
-                                   class="inline-flex items-center gap-1 text-[13px] font-bold text-[#F88379] hover:text-[#f56b60] {{ $fa }}">
-                                    {{ $isRtl ? 'التفاصيل' : 'Details' }} {{ $isRtl ? '←' : '→' }}
-                                </a>
-                            </td>
-                        </tr>
-                    @endforeach
-                </tbody>
-            </table>
+        <div class="flex flex-col" style="gap: 14px;">
+            @foreach($bookings as $booking)
+                @php
+                    $st = $booking->booking_status;
+                    $checkoutDate = $booking->checkoutAt();
+                @endphp
+                <a href="{{ route('user.bookings.show', $booking) }}"
+                   class="block bg-white hover:shadow-lg transition-all"
+                   style="padding: 18px 20px; border-radius: 20px; box-shadow: 0px 6px 18px 0px rgba(0,0,0,0.05);">
+
+                    {{-- Header: thumbnail · place + reference · status · total --}}
+                    <div class="flex items-center" style="gap: 14px;">
+                        <span class="shrink-0 overflow-hidden bg-[#f3f4f6] flex items-center justify-center" style="width: 64px; height: 64px; border-radius: 16px;">
+                            @if($booking->place?->coverPhoto?->url)
+                                <img src="{{ $booking->place->coverPhoto->url }}" alt="" style="width: 100%; height: 100%; object-fit: cover;">
+                            @else
+                                <span style="font-size: 26px;">{{ $booking->place?->type?->icon ?: '🏠' }}</span>
+                            @endif
+                        </span>
+
+                        <span class="flex-1 min-w-0">
+                            <span class="block font-bold text-[#222] text-[16px] truncate {{ $fa }}">{{ $booking->place?->title ?? '—' }}</span>
+                            <span class="inline-flex items-center font-bold tabular-nums" style="margin-top: 6px; background-color: #fff4f3; color: #F88379; padding: 3px 10px; border-radius: 8px; font-size: 12px; letter-spacing: 0.5px;" dir="ltr">{{ $booking->reference }}</span>
+                        </span>
+
+                        <span class="shrink-0 flex flex-col items-end" style="gap: 6px;">
+                            <span class="inline-flex items-center text-white font-semibold {{ $fa }}"
+                                  style="gap: 6px; padding: 5px 12px; border-radius: 999px; font-size: 11px; background-color: {{ $st->pill() }};">
+                                {{ $st->label($isRtl) }}
+                            </span>
+                            <span class="font-bold text-[#222] text-[15px] tabular-nums" dir="ltr">SR {{ number_format($booking->total / 100, 2) }}</span>
+                        </span>
+                    </div>
+
+                    {{-- Details: guest · guests · check-in · check-out --}}
+                    <div class="grid grid-cols-2 lg:grid-cols-4" style="gap: 16px; margin-top: 16px; padding-top: 16px; border-top: 1px solid #f0f0f0;">
+                        <div class="min-w-0">
+                            <span class="block text-[10px] font-semibold uppercase tracking-wider text-[#bbb] {{ $fa }}" style="margin-bottom: 3px;">{{ $isRtl ? 'الضيف' : 'Guest' }}</span>
+                            <span class="block text-[14px] font-medium text-[#222] truncate {{ $fa }}">{{ $booking->guest?->name ?: '—' }}</span>
+                            <span class="block text-[13px] text-[#717171]">@if($booking->guest?->phone)<span dir="ltr">+966 {{ $booking->guest->phone }}</span>@else—@endif</span>
+                        </div>
+                        <div class="min-w-0">
+                            <span class="block text-[10px] font-semibold uppercase tracking-wider text-[#bbb] {{ $fa }}" style="margin-bottom: 3px;">{{ $isRtl ? 'عدد الضيوف' : 'Guests' }}</span>
+                            <span class="block text-[14px] font-medium text-[#222] {{ $fa }}">{{ $booking->guests }}</span>
+                        </div>
+                        <div class="min-w-0">
+                            <span class="block text-[10px] font-semibold uppercase tracking-wider text-[#bbb] {{ $fa }}" style="margin-bottom: 3px;">{{ $isRtl ? 'الدخول' : 'Check-in' }}</span>
+                            <span class="block text-[14px] font-medium text-[#222] {{ $fa }}">{{ $booking->start_date?->isoFormat('ddd D MMM') ?: '—' }}</span>
+                            <span class="block text-[13px] text-[#717171] tabular-nums"><span dir="ltr">{{ $fmtTime($booking->check_in_time) }}</span></span>
+                        </div>
+                        <div class="min-w-0">
+                            <span class="block text-[10px] font-semibold uppercase tracking-wider text-[#bbb] {{ $fa }}" style="margin-bottom: 3px;">{{ $isRtl ? 'الخروج' : 'Check-out' }}</span>
+                            <span class="block text-[14px] font-medium text-[#222] {{ $fa }}">
+                                {{ optional($checkoutDate)->isoFormat('ddd D MMM') ?: '—' }}
+                                @if($booking->checkout_next_day)<span class="text-[11px] font-semibold text-[#F88379]">{{ $isRtl ? '· التالي' : '· next day' }}</span>@endif
+                            </span>
+                            <span class="block text-[13px] text-[#717171] tabular-nums"><span dir="ltr">{{ $fmtTime($booking->check_out_time) }}</span></span>
+                        </div>
+                    </div>
+                </a>
+            @endforeach
         </div>
+
+        @if($bookings->hasPages())
+            <div style="margin-top: 24px;">{{ $bookings->links() }}</div>
+        @endif
     @endif
 @endsection

@@ -6,7 +6,9 @@ namespace App\Providers;
 
 use App\Contracts\SmsDeliveryContract;
 use App\Integrations\Sms\MockSmsDelivery;
+use App\Integrations\Sms\RoutingSmsDelivery;
 use App\Integrations\Sms\SmsSaudiDelivery;
+use App\Support\MockPhoneRegistry;
 use Illuminate\Support\ServiceProvider;
 use RuntimeException;
 
@@ -15,13 +17,22 @@ class OtpServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(SmsDeliveryContract::class, function (): SmsDeliveryContract {
-            return match (config('sms.driver')) {
+            $primary = match (config('sms.driver')) {
                 'sms_saudi' => $this->makeSmsSaudi(),
                 'mock', null => new MockSmsDelivery,
                 default => throw new RuntimeException(
                     'Unknown SMS driver: '.((string) config('sms.driver')),
                 ),
             };
+
+            // Route whitelisted phones to the mock driver. No-op when the list
+            // is empty or the primary is already the mock.
+            $registry = new MockPhoneRegistry;
+            if ($registry->isEmpty() || $primary instanceof MockSmsDelivery) {
+                return $primary;
+            }
+
+            return new RoutingSmsDelivery($primary, new MockSmsDelivery, $registry);
         });
     }
 
