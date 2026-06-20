@@ -573,7 +573,7 @@ final class PlaceService
 
         return $query
             ->orderByDesc('likes_count')
-            ->orderByDesc('reviews_avg_rate')
+            ->orderByDesc('published_reviews_avg_rate')
             ->orderByDesc('created_at')
             ->limit($limit)
             ->get();
@@ -628,7 +628,7 @@ final class PlaceService
             'price_desc' => $query->orderByDesc('price'),
             default => $query
                 ->orderByDesc('likes_count')
-                ->orderByDesc('reviews_avg_rate')
+                ->orderByDesc('published_reviews_avg_rate')
                 ->orderByDesc('created_at'),
         };
 
