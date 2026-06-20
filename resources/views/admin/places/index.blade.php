@@ -96,57 +96,70 @@
         @if($search) — {{ $isRtl ? 'تصفية:' : 'filtered by:' }} <code class="text-[12px]" dir="ltr">{{ $search }}</code> @endif
     </p>
 
-    <div class="bg-white overflow-hidden"
-         style="border-radius: 28px; box-shadow: 0px 10px 30px 0px rgba(0,0,0,0.05);">
-        <table class="w-full">
-            <thead class="bg-[#fafafa] text-[12px] uppercase text-[#717171] tracking-wider">
-                <tr>
-                    <th class="text-start" style="padding: 14px 20px;">{{ $isRtl ? 'العنوان' : 'Title' }}</th>
-                    <th class="text-start" style="padding: 14px 20px;">{{ $isRtl ? 'المضيف' : 'Host' }}</th>
-                    <th class="text-start" style="padding: 14px 20px;">{{ $isRtl ? 'النوع' : 'Type' }}</th>
-                    <th class="text-start" style="padding: 14px 20px;">{{ $isRtl ? 'المدينة' : 'City' }}</th>
-                    <th class="text-start" style="padding: 14px 20px;">{{ $isRtl ? 'الحالة' : 'Status' }}</th>
-                    <th class="text-start" style="padding: 14px 20px;">{{ $isRtl ? 'حالة المراجعة' : 'Review' }}</th>
-                    <th class="text-end" style="padding: 14px 20px;">{{ $isRtl ? 'إجراءات' : 'Actions' }}</th>
-                </tr>
-            </thead>
-            <tbody class="text-[14px]">
-                @forelse($places as $place)
-                    @php $sp = $statusPill($place->status); $rp = $reviewPill($place->review_status); @endphp
-                    <tr class="border-t border-[#ebebeb]">
-                        <td style="padding: 14px 20px;" class="font-medium">{{ $place->title ?: ($isRtl ? '— بدون عنوان —' : '— Untitled —') }}</td>
-                        <td style="padding: 14px 20px;" class="text-[#717171]" dir="ltr">{{ $place->host?->phone ? '+966 '.$place->host->phone : ($place->host?->email ?? '—') }}</td>
-                        <td style="padding: 14px 20px;" class="text-[#717171]">{{ $isRtl ? $place->type?->name_ar : $place->type?->name_en }}</td>
-                        <td style="padding: 14px 20px;" class="text-[#717171]">{{ $isRtl ? $place->cityArea?->city?->name_ar : $place->cityArea?->city?->name_en }}</td>
-                        <td style="padding: 14px 20px;">
-                            <span class="inline-flex items-center text-[11px] font-bold uppercase tracking-wider text-white"
-                                  style="padding: 4px 12px 4px 9px; border-radius: 999px; gap: 6px; background-color: {{ $sp['bg'] }};">
-                                <span style="width: 6px; height: 6px; border-radius: 999px; background-color: {{ $sp['dot'] }};"></span>
-                                {{ $place->status->value }}
-                            </span>
-                        </td>
-                        <td style="padding: 14px 20px;">
-                            <span class="inline-flex items-center text-[11px] font-bold uppercase tracking-wider text-white whitespace-nowrap"
-                                  style="padding: 4px 12px 4px 9px; border-radius: 999px; gap: 6px; background-color: {{ $rp['bg'] }};">
-                                <span style="width: 6px; height: 6px; border-radius: 999px; background-color: {{ $rp['dot'] }}; flex-shrink: 0;"></span>
-                                {{ str_replace('_', ' ', $place->review_status->value) }}
-                            </span>
-                        </td>
-                        <td style="padding: 14px 20px;" class="text-end whitespace-nowrap">
-                            <a href="{{ route('places.show', $place) }}" class="text-[#717171] font-semibold hover:underline">{{ $isRtl ? 'عرض' : 'View' }}</a>
-                            <a href="{{ route('admin.places.edit', $place) }}" class="text-[#222] font-semibold hover:underline" style="margin-inline-start: 14px;">{{ $isRtl ? 'تعديل' : 'Edit' }}</a>
-                            <form method="POST" action="{{ route('admin.places.destroy', $place) }}" class="inline" style="margin-inline-start: 14px;" onsubmit="return confirm('{{ $isRtl ? 'حذف هذا المكان؟ يمكن استعادته لاحقاً.' : 'Delete this place? It can be restored later.' }}');">
-                                @csrf @method('DELETE')
-                                <button type="submit" class="text-[#dc2626] font-semibold hover:underline">{{ $isRtl ? 'حذف' : 'Delete' }}</button>
-                            </form>
-                        </td>
-                    </tr>
-                @empty
-                    <tr><td colspan="7" style="padding: 32px 20px;" class="text-center text-[#717171]">{{ $isRtl ? 'لا توجد أماكن بعد.' : 'No places yet.' }}</td></tr>
-                @endforelse
-            </tbody>
-        </table>
-    </div>
+    @if($places->isEmpty())
+        <div class="bg-white text-center text-[#717171]" style="padding: 48px 20px; border-radius: 28px; box-shadow: 0px 10px 30px 0px rgba(0,0,0,0.05);">
+            {{ $isRtl ? 'لا توجد أماكن بعد.' : 'No places yet.' }}
+        </div>
+    @else
+        @php $start = $isRtl ? 'text-right' : 'text-left'; @endphp
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" style="gap: 28px 20px;">
+            @foreach($places as $place)
+                @php
+                    $sp = $statusPill($place->status);
+                    $rp = $reviewPill($place->review_status);
+                    $cover = $place->coverPhoto?->url;
+                @endphp
+                <div class="flex flex-col">
+                    {{-- Clickable cover + details → edit page (app-style card) --}}
+                    <a href="{{ route('admin.places.edit', $place) }}" class="block group">
+                        <div class="relative overflow-hidden" style="aspect-ratio: 1 / 1; border-radius: 24px; background-color: #f4f4f4;">
+                            @if($cover)
+                                <img src="{{ $cover }}" alt="" class="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-500" loading="lazy">
+                            @else
+                                <div class="w-full h-full flex items-center justify-center" style="font-size: 52px; opacity: 0.45;">{{ $place->type?->icon ?: '🏠' }}</div>
+                            @endif
+                            <div class="absolute inset-x-0 top-0 flex items-start justify-between" style="padding: 12px; gap: 8px;">
+                                <span class="inline-flex items-center text-[10px] font-bold uppercase tracking-wider text-white"
+                                      style="padding: 4px 10px 4px 8px; border-radius: 999px; gap: 5px; background-color: {{ $sp['bg'] }}; box-shadow: 0 2px 8px rgba(0,0,0,0.25);">
+                                    <span style="width: 5px; height: 5px; border-radius: 999px; background-color: {{ $sp['dot'] }};"></span>
+                                    {{ $place->status->value }}
+                                </span>
+                                <span class="inline-flex items-center text-[10px] font-bold uppercase tracking-wider text-white whitespace-nowrap"
+                                      style="padding: 4px 10px 4px 8px; border-radius: 999px; gap: 5px; background-color: {{ $rp['bg'] }}; box-shadow: 0 2px 8px rgba(0,0,0,0.25);">
+                                    <span style="width: 5px; height: 5px; border-radius: 999px; background-color: {{ $rp['dot'] }};"></span>
+                                    {{ str_replace('_', ' ', $place->review_status->value) }}
+                                </span>
+                            </div>
+                        </div>
 
-    @if($places->hasPages())<div style="margin-top: 20px;">{{ $places->links() }}</div>@endif
+                        <div style="padding-top: 12px;">
+                            <h3 class="font-bold text-[#222] truncate {{ $start }} {{ $isRtl ? 'font-arabic' : '' }}" style="font-size: 16px;">
+                                {{ $place->title ?: ($isRtl ? '— بدون عنوان —' : '— Untitled —') }}
+                            </h3>
+                            <p class="text-[14px] text-[#717171] truncate {{ $start }}" style="margin-top: 3px;">
+                                {{ $isRtl ? $place->type?->name_ar : $place->type?->name_en }}
+                                @if($place->cityArea?->city) · {{ $isRtl ? $place->cityArea->city->name_ar : $place->cityArea->city->name_en }} @endif
+                            </p>
+                            <p class="text-[15px] font-bold text-[#222] tabular-nums {{ $start }}" dir="ltr" style="margin-top: 4px;">SR {{ number_format($place->price) }}</p>
+                            <p class="text-[12px] text-[#999] truncate {{ $start }}" dir="ltr" style="margin-top: 2px;">
+                                {{ $place->host?->phone ? '+966 '.$place->host->phone : ($place->host?->email ?? '—') }}
+                            </p>
+                        </div>
+                    </a>
+
+                    {{-- Actions kept under the card --}}
+                    <div class="flex items-center" style="margin-top: 12px; gap: 16px;">
+                        <a href="{{ route('places.show', $place) }}" class="text-[13px] text-[#717171] font-semibold hover:text-[#222]">{{ $isRtl ? 'عرض' : 'View' }}</a>
+                        <a href="{{ route('admin.places.edit', $place) }}" class="text-[13px] text-[#222] font-semibold hover:underline">{{ $isRtl ? 'تعديل' : 'Edit' }}</a>
+                        <form method="POST" action="{{ route('admin.places.destroy', $place) }}" class="inline" style="margin-inline-start: auto;" onsubmit="return confirm('{{ $isRtl ? 'حذف هذا المكان؟ يمكن استعادته لاحقاً.' : 'Delete this place? It can be restored later.' }}');">
+                            @csrf @method('DELETE')
+                            <button type="submit" class="text-[13px] text-[#dc2626] font-semibold hover:underline">{{ $isRtl ? 'حذف' : 'Delete' }}</button>
+                        </form>
+                    </div>
+                </div>
+            @endforeach
+        </div>
+    @endif
+
+    @if($places->hasPages())<div style="margin-top: 24px;">{{ $places->links() }}</div>@endif
 @endsection

@@ -83,6 +83,7 @@ it('excludes a liked place that is no longer visible', function (): void {
 });
 
 it('paginates the favorites feed', function (): void {
+    config(['pagination.per_page' => 1]); // page size is server-controlled now, not ?per_page=
     $host = User::factory()->create(['phone' => '518000007']);
     $viewer = User::factory()->create(['phone' => '518000008']);
     $a = favPlace($host);
@@ -93,7 +94,7 @@ it('paginates the favorites feed', function (): void {
     $this->actingAs($viewer, 'api')->postJson("/api/places/{$b->id}/like")->assertOk();
 
     $this->actingAs($viewer, 'api')
-        ->getJson('/api/favorites?per_page=1')
+        ->getJson('/api/favorites')
         ->assertOk()
         ->assertJsonCount(1, 'data.items')
         ->assertJsonPath('data.items.0.id', $b->id)
@@ -103,7 +104,7 @@ it('paginates the favorites feed', function (): void {
         ->assertJsonPath('data.pagination.has_more', true);
 
     $this->actingAs($viewer, 'api')
-        ->getJson('/api/favorites?per_page=1&page=2')
+        ->getJson('/api/favorites?page=2')
         ->assertOk()
         ->assertJsonPath('data.items.0.id', $a->id)
         ->assertJsonPath('data.pagination.page', 2)

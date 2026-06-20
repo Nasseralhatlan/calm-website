@@ -233,13 +233,14 @@ it('reflects is_liked for an authenticated viewer', function (): void {
 });
 
 it('paginates results', function (): void {
+    config(['pagination.per_page' => 2]); // page size is server-controlled now, not ?per_page=
     $city = searchCity();
     $area = searchArea($city);
     searchPlace($area);
     searchPlace($area);
     searchPlace($area);
 
-    $this->getJson("/api/places/search?city_id={$city->id}&per_page=2")
+    $this->getJson("/api/places/search?city_id={$city->id}")
         ->assertOk()
         ->assertJsonCount(2, 'data.items')
         ->assertJsonPath('data.pagination.per_page', 2)

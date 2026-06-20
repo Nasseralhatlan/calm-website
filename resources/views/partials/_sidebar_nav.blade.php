@@ -30,9 +30,11 @@
                 ['route' => 'admin.places.index',           'label_ar' => 'الأماكن',           'label_en' => 'Places',           'icon' => 'house'],
                 ['route' => 'admin.place-lists.index',      'label_ar' => 'القوائم',           'label_en' => 'Lists',            'icon' => 'list'],
                 ['route' => 'admin.place-types.index',      'label_ar' => 'أنواع الأماكن',     'label_en' => 'Place types',      'icon' => 'layers'],
-                ['route' => 'admin.attribute-groups.index', 'label_ar' => 'مجموعات الخصائص',   'label_en' => 'Attribute groups', 'icon' => 'folder'],
                 ['route' => 'admin.attributes.index',       'label_ar' => 'الخصائص',           'label_en' => 'Attributes',       'icon' => 'tag'],
+                ['route' => 'admin.reviews.index',          'label_ar' => 'التقييمات',         'label_en' => 'Reviews',          'icon' => 'star'],
                 ['route' => 'admin.users.index',            'label_ar' => 'المستخدمون',        'label_en' => 'Users',            'icon' => 'user'],
+                // Notifications — temporarily disabled (route commented out):
+                // ['route' => 'admin.notifications.index',    'label_ar' => 'الإشعارات',         'label_en' => 'Notifications',    'icon' => 'bell'],
                 ['route' => 'admin.countries.index',        'label_ar' => 'الدول',             'label_en' => 'Countries',        'icon' => 'globe'],
                 ['route' => 'admin.cities.index',           'label_ar' => 'المدن',             'label_en' => 'Cities',           'icon' => 'building'],
                 ['route' => 'admin.city-areas.index',       'label_ar' => 'الأحياء',           'label_en' => 'City areas',       'icon' => 'map'],
@@ -69,7 +71,7 @@
         'title_en' => 'Account',
         'items' => [
             ['route' => 'profile',       'label_ar' => 'الملف الشخصي', 'label_en' => 'Profile', 'icon' => 'user'],
-            ['route' => 'user.support',  'label_ar' => 'الدعم',         'label_en' => 'Support', 'icon' => 'help'],
+            ['route' => 'pages.support', 'label_ar' => 'الدعم',         'label_en' => 'Support', 'icon' => 'help'],
         ],
     ];
 @endphp
@@ -133,6 +135,11 @@
                             <path d="M20.59 13.41 13.42 20.58a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line>
                         </svg>
                         @break
+                    @case('star')
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="{{ $active ? 2.2 : 1.8 }}" stroke-linecap="round" stroke-linejoin="round">
+                            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                        </svg>
+                        @break
                     @case('globe')
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="{{ $active ? 2.2 : 1.8 }}" stroke-linecap="round" stroke-linejoin="round">
                             <circle cx="12" cy="12" r="9"></circle><path d="M3 12h18"></path>
@@ -188,6 +195,11 @@
                     @case('help')
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="{{ $active ? 2.2 : 1.8 }}" stroke-linecap="round" stroke-linejoin="round">
                             <circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line>
+                        </svg>
+                        @break
+                    @case('bell')
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="{{ $active ? 2.2 : 1.8 }}" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
                         </svg>
                         @break
                 @endswitch

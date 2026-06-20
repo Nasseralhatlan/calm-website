@@ -101,16 +101,11 @@ class PlacesController extends Controller
                 ->with(['areas' => fn ($q) => $q->orderBy('name_en')])
                 ->orderBy('name_en')
                 ->get(['id', 'name_ar', 'name_en', 'avatar']),
-            // Attributes are sorted by how often hosts have actually picked
-            // them (the place_attributes count) so the most-used facilities
-            // surface at the top of each group's chip row. Cold-start fallback
-            // is alphabetical when nothing has been chosen yet.
+            // Attributes follow the admin-controlled order (sort_order, then a
+            // name tiebreaker) so the wizard matches the place page exactly.
             'attributeGroups' => AttributeGroup::query()
-                ->with(['attributes' => fn ($q) => $q
-                    ->withCount('placeValues')
-                    ->orderByDesc('place_values_count')
-                    ->orderBy('name_en')])
-                ->orderBy('name_en')
+                ->with(['attributes' => fn ($q) => $q->ordered()])
+                ->ordered()
                 ->get(),
             // Commission rate (%) so the pricing step can show the host Calm's
             // cut and their take-home. Falls back to 15%.

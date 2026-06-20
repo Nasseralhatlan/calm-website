@@ -28,8 +28,7 @@ class BookingsController extends Controller
         /** @var User $user */
         $user = $request->user();
 
-        $perPage = min(max($request->integer('per_page', 20), 1), 50);
-        $paginator = $this->service->forGuestPaginated($user, $perPage);
+        $paginator = $this->service->forGuestPaginated($user);
 
         return ApiResponse::success(
             data: [
@@ -43,6 +42,24 @@ class BookingsController extends Controller
                 ],
             ],
             message: 'Bookings fetched.',
+        );
+    }
+
+    /**
+     * The guest's still-payable holds — pending_payment bookings whose hold
+     * hasn't lapsed. Drives a "finish your payment" card on the home screen;
+     * each item carries `payment.url` and `expires_at`.
+     */
+    public function pending(Request $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        $bookings = $this->service->pendingPaymentsForGuest($user);
+
+        return ApiResponse::success(
+            data: ['items' => BookingResource::collection($bookings)->resolve($request)],
+            message: 'Pending payments fetched.',
         );
     }
 

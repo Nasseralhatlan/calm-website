@@ -69,6 +69,7 @@
                                     <span>
                                         <span class="block font-medium text-[#222]">{{ $place?->title ?: '—' }}</span>
                                         <span class="block text-[12px] text-[#717171]">{{ $isRtl ? $city?->name_ar : $city?->name_en }}</span>
+                                        <span class="block text-[11px] text-[#999] tabular-nums" dir="ltr">{{ $booking->reference }}</span>
                                     </span>
                                 </span>
                             </td>

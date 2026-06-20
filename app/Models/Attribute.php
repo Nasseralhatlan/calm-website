@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Enums\AttributePhotoRule;
 use App\Enums\AttributeType;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -24,6 +25,8 @@ class Attribute extends Model
         'question_en',
         'photo_rule',
         'type',
+        'is_highlighted',
+        'sort_order',
         'options',
     ];
 
@@ -32,8 +35,16 @@ class Attribute extends Model
         return [
             'type' => AttributeType::class,
             'photo_rule' => AttributePhotoRule::class,
+            'is_highlighted' => 'boolean',
+            'sort_order' => 'integer',
             'options' => 'array',
         ];
+    }
+
+    /** Admin-controlled display order, then a stable alphabetical tiebreaker. */
+    public function scopeOrdered(Builder $query): Builder
+    {
+        return $query->orderBy('sort_order')->orderBy('name_en');
     }
 
     public function group(): BelongsTo

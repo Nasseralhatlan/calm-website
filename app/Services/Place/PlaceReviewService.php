@@ -7,6 +7,7 @@ namespace App\Services\Place;
 use App\Enums\PlaceReviewStatus;
 use App\Enums\PlaceStatus;
 use App\Models\Place;
+use App\Services\Notification\NotificationService;
 
 /**
  * The admin review workflow lives here so the controller stays at one
@@ -16,9 +17,12 @@ use App\Models\Place;
  */
 final class PlaceReviewService
 {
+    public function __construct(private readonly NotificationService $notifications) {}
+
     /**
      * Approve the submission. Flips review_status to Approved and turns the
-     * listing on (status = Active) so guests can start booking.
+     * listing on (status = Active) so guests can start booking. The host is
+     * notified (SMS + push + in-app).
      */
     public function approve(Place $place): ?Place
     {
@@ -28,6 +32,8 @@ final class PlaceReviewService
             'rejection_reason' => null,
             'reviewed_at' => now(),
         ]);
+
+        $this->notifications->placeApproved($place);
 
         return $this->nextAfter($place);
     }
@@ -50,6 +56,8 @@ final class PlaceReviewService
             'reviewed_at' => now(),
             'last_step' => 1,
         ]);
+
+        $this->notifications->placeRejected($place, $reason);
 
         return $this->nextAfter($place);
     }

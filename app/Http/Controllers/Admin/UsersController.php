@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\UpdateUserRequest;
+use App\Models\Country;
 use App\Models\User;
 use App\Services\User\UserService;
 use Illuminate\Http\RedirectResponse;
@@ -22,7 +23,10 @@ class UsersController extends Controller
 
     public function edit(User $user): View
     {
-        return view('admin.users.edit', compact('user'));
+        return view('admin.users.edit', [
+            'user' => $user,
+            'countries' => Country::query()->orderBy('name_en')->get(['id', 'name_ar', 'name_en']),
+        ]);
     }
 
     public function update(UpdateUserRequest $request, User $user): RedirectResponse

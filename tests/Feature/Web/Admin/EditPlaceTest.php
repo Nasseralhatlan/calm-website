@@ -83,7 +83,10 @@ it('saves an admin edit without forcing re-review, syncing amenities/photos/list
             'title' => 'Edited by admin',
             'lists' => [$list->id],
             'attributes' => [['attribute_id' => $amenity->id, 'value' => '1', 'description' => 'Heated']],
-            'extra_image_paths' => ['places/uploads/a.jpg'],
+            'extra_image_paths' => [
+                'places/uploads/a.jpg', 'places/uploads/b.jpg', 'places/uploads/c.jpg',
+                'places/uploads/d.jpg', 'places/uploads/e.jpg',
+            ],
             'featured' => ['extra_images.0'],
         ]))
         ->assertRedirect(route('admin.places.index'));
@@ -94,7 +97,7 @@ it('saves an admin edit without forcing re-review, syncing amenities/photos/list
         ->and($place->status)->toBe(PlaceStatus::Active)
         ->and($place->review_status)->toBe(PlaceReviewStatus::Approved)
         ->and($place->attributeValues)->toHaveCount(1)
-        ->and($place->photos)->toHaveCount(1)
+        ->and($place->photos)->toHaveCount(5)
         ->and($place->lists->pluck('id')->all())->toBe([$list->id]);
 });
 

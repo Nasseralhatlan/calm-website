@@ -9,12 +9,12 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 
 final class AttributeGroupService
 {
-    public function paginate(int $perPage = 25): LengthAwarePaginator
+    public function paginate(?int $perPage = null): LengthAwarePaginator
     {
         return AttributeGroup::query()
             ->withCount('attributes')
-            ->orderBy('name_en')
-            ->paginate($perPage);
+            ->ordered()
+            ->paginate($perPage ?? config('pagination.per_page'));
     }
 
     /**

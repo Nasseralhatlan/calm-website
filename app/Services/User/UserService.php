@@ -105,7 +105,12 @@ final class UserService
     {
         unset($attrs['phone_verified_at'], $attrs['email_verified_at']);
 
-        $user->fill($attrs)->save();
+        $user->fill($attrs);
+
+        // Keep the legacy `age` column in sync with the editable birth_date.
+        $user->age = $user->birth_date?->age;
+
+        $user->save();
 
         return $user->refresh();
     }
@@ -116,12 +121,12 @@ final class UserService
      *
      * @return LengthAwarePaginator<int, User>
      */
-    public function paginate(int $perPage = 25): LengthAwarePaginator
+    public function paginate(?int $perPage = null): LengthAwarePaginator
     {
         return User::query()
             ->withCount('places')
             ->latest('created_at')
-            ->paginate($perPage);
+            ->paginate($perPage ?? config('pagination.per_page'));
     }
 
     private function columnFor(OtpType $type): string

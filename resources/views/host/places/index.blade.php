@@ -51,112 +51,103 @@
         ])
     @else
         <p class="text-[14px] text-[#717171]" style="margin-bottom: 20px;">
-            {{ $places->count() }} {{ $isRtl ? 'مكان' : 'places' }}
+            {{ $places->total() }} {{ $isRtl ? 'مكان' : 'places' }}
         </p>
 
-        <div class="bg-white overflow-hidden"
-             style="border-radius: 28px; box-shadow: 0px 10px 30px 0px rgba(0,0,0,0.05);">
-            <table class="w-full">
-                <thead class="bg-[#fafafa] text-[12px] uppercase text-[#717171] tracking-wider">
-                    <tr>
-                        <th class="text-start" style="padding: 14px 20px;">{{ $isRtl ? 'المكان' : 'Place' }}</th>
-                        <th class="text-start" style="padding: 14px 20px;">{{ $isRtl ? 'المدينة' : 'City' }}</th>
-                        <th class="text-start" style="padding: 14px 20px;">{{ $isRtl ? 'السعر' : 'Price' }}</th>
-                        <th class="text-start" style="padding: 14px 20px;">{{ $isRtl ? 'الحالة' : 'Status' }}</th>
-                        <th class="text-start" style="padding: 14px 20px;">{{ $isRtl ? 'المراجعة' : 'Review' }}</th>
-                        <th class="text-end" style="padding: 14px 20px;">{{ $isRtl ? 'إجراء' : 'Action' }}</th>
-                    </tr>
-                </thead>
-                <tbody class="text-[14px]">
-                    @foreach($places as $place)
-                        @php
-                            $rp = $reviewPill($place->review_status);
-                            $sp = $statusPill($place->status);
-                            $isDraft = $place->review_status === PlaceReviewStatus::Draft;
-                            $city = $place->cityArea?->city;
-                        @endphp
-                        <tr class="border-t border-[#ebebeb] {{ $isDraft ? 'bg-[#fffbeb]/40 hover:bg-[#fffbeb]' : 'hover:bg-[#fafafa]' }} transition-colors">
-                            <td class="text-start" style="padding: 14px 20px;">
-                                <span class="inline-flex items-center" style="gap: 12px;">
-                                    <span style="font-size: 22px; line-height: 1;">{{ $place->type?->icon ?: '🏠' }}</span>
-                                    <span class="font-medium text-[#222]">{{ $place->title ?: ($isRtl ? '— بدون عنوان —' : '— Untitled —') }}</span>
-                                </span>
-                            </td>
-                            <td class="text-start text-[#717171]" style="padding: 14px 20px;">
-                                <span class="inline-flex items-center" style="gap: 8px;">
-                                    <span>{{ $city?->avatar ?: '📍' }}</span>
-                                    <span>{{ $isRtl ? $city?->name_ar : $city?->name_en }}</span>
-                                </span>
-                            </td>
-                            <td class="text-start font-semibold tabular-nums" style="padding: 14px 20px;" dir="ltr">{{ number_format($place->price) }} SAR</td>
-                            <td class="text-start" style="padding: 14px 20px;">
-                                <span class="inline-flex items-center text-[11px] font-bold uppercase tracking-wider text-white {{ $fa }}"
-                                      style="padding: 4px 12px 4px 9px; border-radius: 999px; gap: 6px; background-color: {{ $sp['bg'] }};">
-                                    <span style="width: 6px; height: 6px; border-radius: 999px; background-color: {{ $sp['dot'] }};"></span>
+        @php $start = $isRtl ? 'text-right' : 'text-left'; @endphp
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" style="gap: 28px 20px;">
+            @foreach($places as $place)
+                @php
+                    $rp = $reviewPill($place->review_status);
+                    $sp = $statusPill($place->status);
+                    $isDraft = $place->review_status === PlaceReviewStatus::Draft;
+                    $isRejected = $place->review_status === PlaceReviewStatus::Rejected;
+                    $city = $place->cityArea?->city;
+                    $cover = $place->coverPhoto?->url;
+                    // The card opens the same destination as its primary action:
+                    // drafts resume in the wizard, everything else opens the editor.
+                    $cardUrl = $isDraft
+                        ? route('host.places.create', ['draft' => $place->id])
+                        : route('host.places.edit', $place);
+                @endphp
+                <div class="flex flex-col">
+                    {{-- Clickable cover + details → edit/continue (app-style card) --}}
+                    <a href="{{ $cardUrl }}" class="block group">
+                        <div class="relative overflow-hidden" style="aspect-ratio: 1 / 1; border-radius: 24px; background-color: #f4f4f4;">
+                            @if($cover)
+                                <img src="{{ $cover }}" alt="" class="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-500" loading="lazy">
+                            @else
+                                <div class="w-full h-full flex items-center justify-center" style="font-size: 52px; opacity: 0.45;">{{ $place->type?->icon ?: '🏠' }}</div>
+                            @endif
+                            <div class="absolute inset-x-0 top-0 flex items-start justify-between" style="padding: 12px; gap: 8px;">
+                                <span class="inline-flex items-center text-[10px] font-bold uppercase tracking-wider text-white {{ $fa }}"
+                                      style="padding: 4px 10px 4px 8px; border-radius: 999px; gap: 5px; background-color: {{ $sp['bg'] }}; box-shadow: 0 2px 8px rgba(0,0,0,0.25);">
+                                    <span style="width: 5px; height: 5px; border-radius: 999px; background-color: {{ $sp['dot'] }};"></span>
                                     {{ $statusLabel($place->status) }}
                                 </span>
-                            </td>
-                            <td class="text-start" style="padding: 14px 20px;">
-                                <span class="inline-flex items-center text-[11px] font-bold uppercase tracking-wider text-white {{ $fa }}"
-                                      style="padding: 4px 12px 4px 9px; border-radius: 999px; gap: 6px; background-color: {{ $rp['bg'] }};">
-                                    <span style="width: 6px; height: 6px; border-radius: 999px; background-color: {{ $rp['dot'] }};"></span>
+                                <span class="inline-flex items-center text-[10px] font-bold uppercase tracking-wider text-white {{ $fa }}"
+                                      style="padding: 4px 10px 4px 8px; border-radius: 999px; gap: 5px; background-color: {{ $rp['bg'] }}; box-shadow: 0 2px 8px rgba(0,0,0,0.25);">
+                                    <span style="width: 5px; height: 5px; border-radius: 999px; background-color: {{ $rp['dot'] }};"></span>
                                     {{ $reviewLabel($place->review_status) }}
                                 </span>
-                            </td>
-                            <td class="text-end" style="padding: 14px 20px;">
-                                @php $isRejected = $place->review_status === PlaceReviewStatus::Rejected; @endphp
-                                <span class="inline-flex items-center justify-end flex-wrap" style="gap: 6px 14px;">
-                                    {{-- View as a guest (owner sees a status banner on top). --}}
-                                    <a href="{{ route('places.show', $place) }}"
-                                       class="inline-flex items-center gap-1 text-[13px] font-semibold text-[#717171] hover:text-[#222] {{ $fa }}">
-                                        {{ $isRtl ? '👁 عرض' : '👁 View' }}
-                                    </a>
-                                    {{-- Edit: drafts continue building in the wizard; everything
-                                         else opens the pre-filled editor (saving resubmits). --}}
-                                    @if($isDraft)
-                                        <a href="{{ route('host.places.create', ['draft' => $place->id]) }}"
-                                           class="inline-flex items-center gap-1 text-[13px] font-bold text-[#F88379] hover:text-[#f56b60] {{ $fa }}">
-                                            {{ $isRtl ? '↩ متابعة' : 'Continue ↪' }}
-                                        </a>
-                                    @else
-                                        <a href="{{ route('host.places.edit', $place) }}"
-                                           class="inline-flex items-center gap-1 text-[13px] font-bold {{ $isRejected ? 'text-[#ef4444] hover:text-[#dc2626]' : 'text-[#222] hover:text-[#000]' }} {{ $fa }}"
-                                           @if($isRejected) title="{{ $place->rejection_reason }}" @endif>
-                                            {{ $isRtl ? '✎ تعديل' : '✎ Edit' }}
-                                        </a>
-                                    @endif
-                                    @if($place->review_status === PlaceReviewStatus::Approved)
-                                        <a href="{{ route('host.places.availability', $place) }}"
-                                           class="inline-flex items-center gap-1 text-[13px] font-bold text-[#F88379] hover:text-[#f56b60] {{ $fa }}">
-                                            {{ $isRtl ? '📅 التواريخ' : '📅 Dates' }}
-                                        </a>
-                                    @endif
-                                    {{-- Delete archives the place (soft delete, reversible). --}}
-                                    <form method="POST" action="{{ route('host.places.destroy', $place) }}" class="inline m-0"
-                                          onsubmit="return confirm('{{ $isRtl ? 'حذف هذا المكان؟ يمكن استعادته لاحقاً.' : 'Delete this place? It can be restored later.' }}');">
-                                        @csrf @method('DELETE')
-                                        <button type="submit" class="inline-flex items-center gap-1 text-[13px] font-bold text-[#dc2626] hover:text-[#b91c1c] {{ $fa }}">
-                                            {{ $isRtl ? '🗑 حذف' : '🗑 Delete' }}
-                                        </button>
-                                    </form>
-                                </span>
-                            </td>
-                        </tr>
-                        @if($isRejected && $place->rejection_reason)
-                            {{-- Inline reviewer feedback on the rejected row so the host
-                                 sees what to fix without leaving the listing. --}}
-                            <tr class="bg-[#fef2f2]/60">
-                                <td colspan="6" style="padding: 12px 20px 16px 20px;">
-                                    <div class="text-[12px] {{ $fa }}">
-                                        <span class="font-bold text-[#7a2018]">{{ $isRtl ? 'ملاحظات المراجع:' : 'Reviewer feedback:' }}</span>
-                                        <span class="text-[#7a2018]">{{ $place->rejection_reason }}</span>
-                                    </div>
-                                </td>
-                            </tr>
+                            </div>
+                        </div>
+
+                        <div style="padding-top: 12px;">
+                            <h3 class="font-bold text-[#222] truncate {{ $start }} {{ $fa }}" style="font-size: 16px;">
+                                <span style="margin-inline-end: 6px;">{{ $place->type?->icon ?: '🏠' }}</span>{{ $place->title ?: ($isRtl ? '— بدون عنوان —' : '— Untitled —') }}
+                            </h3>
+                            <p class="inline-flex items-center text-[14px] text-[#717171] truncate {{ $start }} {{ $fa }}" style="gap: 6px; margin-top: 3px;">
+                                <span>{{ $city?->avatar ?: '📍' }}</span>
+                                <span class="truncate">{{ $isRtl ? ($place->type?->name_ar.' · '.$city?->name_ar) : ($place->type?->name_en.' · '.$city?->name_en) }}</span>
+                            </p>
+                            <p class="text-[15px] font-bold text-[#222] tabular-nums {{ $start }}" dir="ltr" style="margin-top: 4px;">SR {{ number_format($place->price) }}</p>
+                        </div>
+                    </a>
+
+                    @if($isRejected && $place->rejection_reason)
+                        <div class="text-[12px] {{ $fa }}" style="margin-top: 10px; padding: 10px 12px; background-color: #fef2f2; border-radius: 12px;">
+                            <span class="font-bold text-[#7a2018]">{{ $isRtl ? 'ملاحظات المراجع:' : 'Reviewer feedback:' }}</span>
+                            <span class="text-[#7a2018]">{{ $place->rejection_reason }}</span>
+                        </div>
+                    @endif
+
+                    {{-- Actions kept under the card --}}
+                    <div class="flex items-center flex-wrap" style="margin-top: 12px; gap: 8px 16px;">
+                        <a href="{{ route('places.show', $place) }}"
+                           class="inline-flex items-center gap-1 text-[13px] font-semibold text-[#717171] hover:text-[#222] {{ $fa }}">
+                            {{ $isRtl ? '👁 عرض' : '👁 View' }}
+                        </a>
+                        @if($isDraft)
+                            <a href="{{ route('host.places.create', ['draft' => $place->id]) }}"
+                               class="inline-flex items-center gap-1 text-[13px] font-bold text-[#F88379] hover:text-[#f56b60] {{ $fa }}">
+                                {{ $isRtl ? '↩ متابعة' : 'Continue ↪' }}
+                            </a>
+                        @else
+                            <a href="{{ route('host.places.edit', $place) }}"
+                               class="inline-flex items-center gap-1 text-[13px] font-bold {{ $isRejected ? 'text-[#ef4444] hover:text-[#dc2626]' : 'text-[#222] hover:text-[#000]' }} {{ $fa }}"
+                               @if($isRejected) title="{{ $place->rejection_reason }}" @endif>
+                                {{ $isRtl ? '✎ تعديل' : '✎ Edit' }}
+                            </a>
                         @endif
-                    @endforeach
-                </tbody>
-            </table>
+                        @if($place->review_status === PlaceReviewStatus::Approved)
+                            <a href="{{ route('host.places.availability', $place) }}"
+                               class="inline-flex items-center gap-1 text-[13px] font-bold text-[#F88379] hover:text-[#f56b60] {{ $fa }}">
+                                {{ $isRtl ? '📅 التواريخ' : '📅 Dates' }}
+                            </a>
+                        @endif
+                        <form method="POST" action="{{ route('host.places.destroy', $place) }}" class="inline m-0" style="margin-inline-start: auto;"
+                              onsubmit="return confirm('{{ $isRtl ? 'حذف هذا المكان؟ يمكن استعادته لاحقاً.' : 'Delete this place? It can be restored later.' }}');">
+                            @csrf @method('DELETE')
+                            <button type="submit" class="inline-flex items-center gap-1 text-[13px] font-bold text-[#dc2626] hover:text-[#b91c1c] {{ $fa }}">
+                                {{ $isRtl ? '🗑 حذف' : '🗑 Delete' }}
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            @endforeach
         </div>
+
+        @if($places->hasPages())<div style="margin-top: 24px;">{{ $places->links() }}</div>@endif
     @endif
 @endsection

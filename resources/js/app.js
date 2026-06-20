@@ -1,8 +1,16 @@
 import imageCompression from 'browser-image-compression';
 import Alpine from 'alpinejs';
+import sort from '@alpinejs/sort';
+import Sortable from 'sortablejs';
 
 window.Alpine = Alpine;
+// x-sort: reactive drag-and-drop reordering that plays nicely with x-for
+// (used on the merged admin attributes page).
+Alpine.plugin(sort);
 Alpine.start();
+
+// Raw SortableJS still exposed for any non-Alpine page that needs it.
+window.Sortable = Sortable;
 
 // ── Client-side image compression for the host photo wizard ──────────────────
 // The wizard runs as an inline <script> (not through this bundle), so it reads

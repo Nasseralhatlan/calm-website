@@ -88,6 +88,31 @@
         </div>
     </div>
 
+    <div class="grid grid-cols-1 sm:grid-cols-2" style="gap: 16px; margin-top: 16px;">
+        <div>
+            <label class="block text-[13px] font-semibold text-[#222]" style="margin-bottom: 6px;">{{ $isRtl ? 'الترتيب' : 'Sort' }}</label>
+            <input type="number" name="sort_order" value="{{ old('sort_order', $attribute->sort_order ?? 0) }}" min="0" max="9999"
+                   class="w-full bg-[#fafafa] border border-[#ebebeb] focus:border-[#222] text-[15px] tabular-nums focus:outline-none"
+                   style="padding: 11px 14px; border-radius: 12px;" dir="ltr">
+            <p class="text-[12px] text-[#717171]" style="margin-top: 6px;">{{ $isRtl ? 'الأصغر يظهر أولاً في نموذج الإضافة وصفحة المكان.' : 'Lower shows first in the add form and place page.' }}</p>
+        </div>
+        <div x-data="{ highlighted: {{ old('is_highlighted', $attribute->is_highlighted) ? 'true' : 'false' }} }">
+            <label class="block text-[13px] font-semibold text-[#222]" style="margin-bottom: 6px;">{{ $isRtl ? 'مميّزة' : 'Highlight' }}</label>
+            <input type="hidden" name="is_highlighted" :value="highlighted ? 1 : 0">
+            <button type="button" @click="highlighted = !highlighted" role="switch" :aria-checked="highlighted"
+                    class="flex items-center w-full bg-[#fafafa] border border-[#ebebeb] hover:border-[#222] transition-colors cursor-pointer text-start"
+                    style="padding: 11px 14px; border-radius: 12px; gap: 12px;">
+                {{-- iOS-style toggle, RTL-safe via logical inset --}}
+                <span class="relative shrink-0 transition-colors" style="width: 46px; height: 28px; border-radius: 999px;"
+                      :style="highlighted ? 'background-color:#F88379' : 'background-color:#dddddd'">
+                    <span class="absolute bg-white transition-all" style="width: 22px; height: 22px; top: 3px; border-radius: 999px; box-shadow: 0 1px 3px rgba(0,0,0,0.2);"
+                          :style="highlighted ? 'inset-inline-start: 21px' : 'inset-inline-start: 3px'"></span>
+                </span>
+                <span class="text-[14px] text-[#222]">{{ $isRtl ? 'إبراز هذه الخاصية في قسم منفصل' : 'Feature this in a separate Highlights section' }}</span>
+            </button>
+        </div>
+    </div>
+
     {{-- Options textarea — only shown for select / multi_select --}}
     <div x-show="['select','multi_select'].includes(type)" x-cloak style="margin-top: 16px;">
         <label class="block text-[13px] font-semibold text-[#222]" style="margin-bottom: 6px;">{{ $isRtl ? 'الخيارات (سطر لكل خيار)' : 'Options (one per line)' }}</label>

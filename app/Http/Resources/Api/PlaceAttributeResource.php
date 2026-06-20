@@ -34,6 +34,8 @@ class PlaceAttributeResource extends JsonResource
                 'name_ar' => $attribute->name_ar,
                 'icon' => $attribute->icon,
                 'type' => $attribute->type?->value,
+                'is_highlighted' => (bool) $attribute->is_highlighted,
+                'sort_order' => (int) $attribute->sort_order,
                 'group' => $attribute->group ? [
                     'id' => $attribute->group->id,
                     'name_en' => $attribute->group->name_en,

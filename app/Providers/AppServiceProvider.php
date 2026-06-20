@@ -4,18 +4,34 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Contracts\PushDeliveryContract;
+use App\Integrations\Push\ExpoPushDelivery;
+use App\Integrations\Push\MockPushDelivery;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 use PHPOpenSourceSaver\JWTAuth\Http\Parser\Cookies as JwtCookieParser;
+use RuntimeException;
 
 class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        //
+        // Push transport — same driver-binding shape as the SMS contract
+        // (see OtpServiceProvider). `mock` logs; `expo` hits Expo's push API.
+        $this->app->bind(PushDeliveryContract::class, function (): PushDeliveryContract {
+            return match (config('push.driver')) {
+                'expo' => new ExpoPushDelivery(
+                    accessToken: config('push.expo.access_token'),
+                    timeout: (int) config('push.expo.timeout', 10),
+                ),
+                'mock', null => new MockPushDelivery,
+                default => throw new RuntimeException('Unknown push driver: '.((string) config('push.driver'))),
+            };
+        });
     }
 
     public function boot(): void
@@ -26,6 +42,9 @@ class AppServiceProvider extends ServiceProvider
 
         $this->registerRateLimiters();
         $this->registerJwtCookieParser();
+
+        // Render every paginator with the app's squircle/brand styling.
+        Paginator::defaultView('pagination::calm');
     }
 
     /**

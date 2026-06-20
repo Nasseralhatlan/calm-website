@@ -40,7 +40,7 @@ class PlaceDetailResource extends JsonResource
             'photo_groups' => $this->whenLoaded('photos', fn () => $this->buildPhotoGroups()),
 
             'attributes' => PlaceAttributeResource::collection($this->whenLoaded('attributeValues')),
-            'reviews_recent' => PlaceReviewResource::collection($this->whenLoaded('reviews')),
+            'reviews_recent' => PlaceReviewResource::collection($this->whenLoaded('publishedReviews')),
             'host' => $this->whenLoaded('host', fn () => [
                 'id' => $this->host?->id,
                 // Lightweight public profile only — phone/email/etc. stay

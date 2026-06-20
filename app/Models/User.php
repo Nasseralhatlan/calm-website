@@ -24,6 +24,7 @@ class User extends Authenticatable implements JWTSubject
     protected $fillable = [
         'name',
         'avatar',
+        'locale',
         'gender',
         'age',
         'birth_date',
@@ -76,6 +77,18 @@ class User extends Authenticatable implements JWTSubject
     public function otps(): HasMany
     {
         return $this->hasMany(Otp::class);
+    }
+
+    /** Expo push tokens across this user's devices. */
+    public function deviceTokens(): HasMany
+    {
+        return $this->hasMany(DeviceToken::class);
+    }
+
+    /** In-app notification feed (newest first). */
+    public function userNotifications(): HasMany
+    {
+        return $this->hasMany(UserNotification::class)->latest();
     }
 
     /**

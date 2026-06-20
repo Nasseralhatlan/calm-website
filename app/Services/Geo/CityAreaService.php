@@ -9,12 +9,12 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 
 final class CityAreaService
 {
-    public function paginate(int $perPage = 25): LengthAwarePaginator
+    public function paginate(?int $perPage = null): LengthAwarePaginator
     {
         return CityArea::query()
             ->with('city.country')
             ->orderBy('name_en')
-            ->paginate($perPage);
+            ->paginate($perPage ?? config('pagination.per_page'));
     }
 
     /**

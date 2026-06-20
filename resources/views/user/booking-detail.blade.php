@@ -54,7 +54,11 @@
             <span style="width: 7px; height: 7px; border-radius: 999px; background-color: {{ $p['dot'] }};"></span>
             {{ $label($booking->booking_status) }}
         </span>
-        <span class="text-[12px] text-[#999]" dir="ltr">#{{ \Illuminate\Support\Str::upper(substr($booking->id, 0, 8)) }}</span>
+        <span class="inline-flex items-center text-[12px] font-semibold text-[#222] bg-[#f7f7f7]"
+              style="padding: 5px 12px; border-radius: 999px; gap: 6px;">
+            <span class="text-[#999] {{ $fa }}">{{ $isRtl ? 'رقم الحجز' : 'Booking ref' }}</span>
+            <span dir="ltr" class="tabular-nums">{{ $booking->reference }}</span>
+        </span>
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-2" style="gap: 18px; align-items: start; max-width: 920px;">

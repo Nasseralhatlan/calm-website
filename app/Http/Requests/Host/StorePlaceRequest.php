@@ -6,6 +6,7 @@ namespace App\Http\Requests\Host;
 
 use App\Models\Place;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Validator;
 
 class StorePlaceRequest extends FormRequest
 {
@@ -35,6 +36,7 @@ class StorePlaceRequest extends FormRequest
             'price' => ['required', 'integer', 'min:0'],
             'check_in_time' => ['required', 'string', 'max:8'],
             'check_out_time' => ['required', 'string', 'max:8'],
+            'checkout_next_day' => ['sometimes', 'boolean'],
             'max_guests' => ['required', 'integer', 'between:1,50'],
             'rules' => ['nullable', 'string', 'max:10000'],
 
@@ -44,9 +46,11 @@ class StorePlaceRequest extends FormRequest
             'attributes.*.description' => ['nullable', 'string', 'max:1000'],
 
             'attribute_image_paths' => ['nullable', 'array'],
-            'attribute_image_paths.*' => ['array'],
+            // Each section (per amenity) holds at most 10 images.
+            'attribute_image_paths.*' => ['array', 'max:10'],
             'attribute_image_paths.*.*' => ['string', 'max:500'],
-            'extra_image_paths' => ['nullable', 'array'],
+            // The "other" section also caps at 10.
+            'extra_image_paths' => ['nullable', 'array', 'max:10'],
             'extra_image_paths.*' => ['string', 'max:500'],
             // Ordered photo markers shown outside (place page); first = cover. Max 10.
             'featured' => ['nullable', 'array', 'max:10'],
@@ -58,6 +62,29 @@ class StorePlaceRequest extends FormRequest
         }
 
         return $rules;
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator): void {
+            $total = collect($this->input('attribute_image_paths', []))->flatten()->filter()->count()
+                + collect($this->input('extra_image_paths', []))->filter()->count();
+
+            if ($total < 5) {
+                $validator->errors()->add('images', __('A place must have at least :min images.', ['min' => 5]));
+            }
+        });
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'attribute_image_paths.*.max' => __('Each section can have at most :max images.', ['max' => 10]),
+            'extra_image_paths.max' => __('Each section can have at most :max images.', ['max' => 10]),
+        ];
     }
 
     /**

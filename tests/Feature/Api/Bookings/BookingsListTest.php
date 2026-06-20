@@ -54,34 +54,72 @@ function listBooking(Place $place, User $guest, array $attrs = []): Booking
     ], $attrs));
 }
 
-it('lists the guest\'s bookings, newest first, with place details + price + status', function (): void {
+it('lists the guest\'s bookings with place details + price + status', function (): void {
     $guest = User::factory()->create(['phone' => '519000001']);
     $host = User::factory()->create(['phone' => '519000002']);
-    $placeA = listPlace($host, ['title' => 'Older Stay']);
-    $placeB = listPlace($host, ['title' => 'Newer Stay']);
+    $place = listPlace($host, ['title' => 'Beach Stay']);
 
-    $older = listBooking($placeA, $guest, ['booking_status' => BookingStatus::Expired->value]);
-    $this->travel(1)->minutes();
-    $newer = listBooking($placeB, $guest);
+    listBooking($place, $guest);
 
     $this->actingAs($guest, 'api')
         ->getJson('/api/bookings')
         ->assertOk()
-        ->assertJsonPath('data.pagination.total', 2)
-        ->assertJsonCount(2, 'data.items')
-        // Newest first.
-        ->assertJsonPath('data.items.0.id', $newer->id)
-        ->assertJsonPath('data.items.1.id', $older->id)
+        ->assertJsonPath('data.pagination.total', 1)
+        ->assertJsonCount(1, 'data.items')
         // Status, dates, price, and place details on each item.
         ->assertJsonPath('data.items.0.status', 'confirmed')
         ->assertJsonPath('data.items.0.start_date', now()->addDays(3)->toDateString())
         ->assertJsonPath('data.items.0.pricing.total', 2300)
-        ->assertJsonPath('data.items.0.place.title', 'Newer Stay')
+        ->assertJsonPath('data.items.0.place.title', 'Beach Stay')
         ->assertJsonStructure(['data' => ['items' => [[
             'id', 'status', 'start_date', 'end_date', 'guests',
             'pricing' => ['total', 'total_minor'],
             'place' => ['id', 'title', 'cover_photo_url', 'type', 'city'],
         ]]]]);
+});
+
+it('orders the list for UX: pending → confirmed(soonest) → completed(recent) → cancelled', function (): void {
+    config(['pagination.per_page' => 20]);
+    $guest = User::factory()->create(['phone' => '519000030']);
+    $host = User::factory()->create(['phone' => '519000031']);
+    $place = listPlace($host);
+
+    // Created in deliberately scrambled order so created_at can't explain the result.
+    $confirmedFar = listBooking($place, $guest, ['start_date' => now()->addDays(20)->toDateString(), 'end_date' => now()->addDays(21)->toDateString()]);
+    $completedOld = listBooking($place, $guest, ['booking_status' => BookingStatus::Completed->value, 'start_date' => now()->subDays(30)->toDateString(), 'end_date' => now()->subDays(29)->toDateString()]);
+    $pendingSoon = listBooking($place, $guest, ['booking_status' => BookingStatus::PendingPayment->value, 'start_date' => now()->addDays(2)->toDateString(), 'end_date' => now()->addDays(3)->toDateString(), 'expires_at' => now()->addMinutes(10)]);
+    $cancelledOld = listBooking($place, $guest, ['booking_status' => BookingStatus::CanceledByGuest->value, 'canceled_at' => now()->subDays(9)]);
+    $confirmedSoon = listBooking($place, $guest, ['start_date' => now()->addDays(4)->toDateString(), 'end_date' => now()->addDays(5)->toDateString()]);
+    $completedRecent = listBooking($place, $guest, ['booking_status' => BookingStatus::Completed->value, 'start_date' => now()->subDays(3)->toDateString(), 'end_date' => now()->subDays(2)->toDateString()]);
+    $cancelledRecent = listBooking($place, $guest, ['booking_status' => BookingStatus::CanceledByHost->value, 'canceled_at' => now()->subDay()]);
+
+    $this->actingAs($guest, 'api')
+        ->getJson('/api/bookings')
+        ->assertOk()
+        ->assertJsonPath('data.pagination.total', 7)
+        ->assertJsonPath('data.items.0.id', $pendingSoon->id)       // 1. pending hold (must act)
+        ->assertJsonPath('data.items.1.id', $confirmedSoon->id)     // 2. confirmed, nearest start_date
+        ->assertJsonPath('data.items.2.id', $confirmedFar->id)      //    confirmed, later start_date
+        ->assertJsonPath('data.items.3.id', $completedRecent->id)   // 3. completed, most recent end_date
+        ->assertJsonPath('data.items.4.id', $completedOld->id)      //    completed, older
+        ->assertJsonPath('data.items.5.id', $cancelledRecent->id)   // 4. cancelled, most recent canceled_at
+        ->assertJsonPath('data.items.6.id', $cancelledOld->id);     //    cancelled, older
+});
+
+it('excludes expired bookings from the guest list', function (): void {
+    $guest = User::factory()->create(['phone' => '519000020']);
+    $host = User::factory()->create(['phone' => '519000021']);
+    $place = listPlace($host);
+
+    $kept = listBooking($place, $guest, ['booking_status' => BookingStatus::Confirmed->value]);
+    listBooking($place, $guest, ['booking_status' => BookingStatus::Expired->value]); // hidden
+
+    $this->actingAs($guest, 'api')
+        ->getJson('/api/bookings')
+        ->assertOk()
+        ->assertJsonPath('data.pagination.total', 1)
+        ->assertJsonCount(1, 'data.items')
+        ->assertJsonPath('data.items.0.id', $kept->id);
 });
 
 it('only returns the authenticated guest\'s bookings', function (): void {
@@ -100,6 +138,7 @@ it('only returns the authenticated guest\'s bookings', function (): void {
 });
 
 it('paginates the bookings list', function (): void {
+    config(['pagination.per_page' => 1]); // page size is server-controlled now, not ?per_page=
     $guest = User::factory()->create(['phone' => '519000006']);
     $host = User::factory()->create(['phone' => '519000007']);
     $place = listPlace($host);
@@ -109,7 +148,7 @@ it('paginates the bookings list', function (): void {
     $latest = listBooking($place, $guest);
 
     $this->actingAs($guest, 'api')
-        ->getJson('/api/bookings?per_page=1')
+        ->getJson('/api/bookings')
         ->assertOk()
         ->assertJsonCount(1, 'data.items')
         ->assertJsonPath('data.items.0.id', $latest->id)

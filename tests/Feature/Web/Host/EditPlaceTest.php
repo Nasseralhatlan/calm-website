@@ -207,12 +207,15 @@ it('syncs photos and the cover on edit', function (): void {
 
     $this->actingAs($host, 'api')
         ->put("/my-places/{$place->id}", editPayload([
-            'extra_image_paths' => ['places/uploads/a.jpg', 'places/uploads/b.jpg'],
+            'extra_image_paths' => [
+                'places/uploads/a.jpg', 'places/uploads/b.jpg', 'places/uploads/c.jpg',
+                'places/uploads/d.jpg', 'places/uploads/e.jpg',
+            ],
             'featured' => ['extra_images.0'],
         ]))
         ->assertRedirect();
 
     $place->load(['photos', 'coverPhoto']);
-    expect($place->photos)->toHaveCount(2);
+    expect($place->photos)->toHaveCount(5);
     expect($place->coverPhoto?->path)->toBe('places/uploads/a.jpg');
 });

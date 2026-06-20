@@ -10,12 +10,12 @@ use Illuminate\Database\Eloquent\Collection;
 
 final class PlaceTypeService
 {
-    public function paginate(int $perPage = 25): LengthAwarePaginator
+    public function paginate(?int $perPage = null): LengthAwarePaginator
     {
         return PlaceType::query()
             ->withCount('places')
             ->orderBy('name_en')
-            ->paginate($perPage);
+            ->paginate($perPage ?? config('pagination.per_page'));
     }
 
     /**

@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Enums\PlaceReviewStatus;
 use App\Enums\PlaceStatus;
+use App\Enums\ReviewStatus;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
@@ -52,6 +53,7 @@ class Place extends Model
         'price_saturday',
         'check_in_time',
         'check_out_time',
+        'checkout_next_day',
         'max_guests',
         'rules',
         'status',
@@ -75,6 +77,7 @@ class Place extends Model
             'price_friday' => 'integer',
             'price_saturday' => 'integer',
             'max_guests' => 'integer',
+            'checkout_next_day' => 'boolean',
             'reviewed_at' => 'datetime',
         ];
     }
@@ -133,6 +136,12 @@ class Place extends Model
     public function reviews(): HasMany
     {
         return $this->hasMany(PlaceReview::class);
+    }
+
+    /** Only published reviews — what's shown publicly + counted in the rating. */
+    public function publishedReviews(): HasMany
+    {
+        return $this->hasMany(PlaceReview::class)->where('status', ReviewStatus::Published->value);
     }
 
     /**

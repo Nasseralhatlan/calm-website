@@ -40,6 +40,9 @@ class PlaceResource extends JsonResource
             ],
             'check_in_time' => $this->check_in_time,
             'check_out_time' => $this->check_out_time,
+            // True = checkout is the morning AFTER the booking ends (overnight);
+            // false = same day as the last booked day. Check-in is always day 1.
+            'checkout_next_day' => (bool) $this->checkout_next_day,
             'max_guests' => $this->max_guests !== null ? (int) $this->max_guests : null,
             'rules' => $this->rules,
             // Cover = the first "shown outside" photo (falls back to the first
@@ -103,9 +106,10 @@ class PlaceResource extends JsonResource
             // Cast defensively so the response is always typed even if the
             // caller forgot to load them (then they read as 0 / null).
             'likes_count' => (int) ($this->likes_count ?? 0),
+            // Rating counts PUBLISHED reviews only (see PlaceService aggregates).
             'rating' => [
-                'avg' => isset($this->reviews_avg_rate) ? round((float) $this->reviews_avg_rate, 2) : null,
-                'count' => (int) ($this->reviews_count ?? 0),
+                'avg' => isset($this->published_reviews_avg_rate) ? round((float) $this->published_reviews_avg_rate, 2) : null,
+                'count' => (int) ($this->published_reviews_count ?? 0),
             ],
             // True iff the authed user has liked this place. Requires the
             // `likedByMe` exists-load (see PlaceService::eagerHomeFields()).
