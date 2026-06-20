@@ -15,6 +15,35 @@ class Booking extends Model
 {
     use HasUuids;
 
+    /** Characters used in the support reference — no ambiguous 0/O/1/I/L. */
+    private const REFERENCE_ALPHABET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
+
+    protected static function booted(): void
+    {
+        // Assign a unique, support-friendly reference (e.g. CB-7K9P2Q) to every
+        // booking on create — covers the API, seeders, tests, and the backfill.
+        static::creating(function (self $booking): void {
+            if (empty($booking->reference)) {
+                $booking->reference = self::generateUniqueReference();
+            }
+        });
+    }
+
+    /** A short, human-readable reference unique across bookings. */
+    public static function generateUniqueReference(): string
+    {
+        $max = strlen(self::REFERENCE_ALPHABET) - 1;
+
+        do {
+            $code = 'CB-';
+            for ($i = 0; $i < 6; $i++) {
+                $code .= self::REFERENCE_ALPHABET[random_int(0, $max)];
+            }
+        } while (self::query()->where('reference', $code)->exists());
+
+        return $code;
+    }
+
     protected $fillable = [
         'place_id',
         'guest_user_id',
@@ -24,6 +53,7 @@ class Booking extends Model
         'end_date',
         'check_in_time',
         'check_out_time',
+        'checkout_next_day',
         'rules',
         'guests',
         'booking_price',
@@ -60,6 +90,7 @@ class Booking extends Model
             'vat_rate' => 'float',
             'vat_amount' => 'integer',
             'total' => 'integer',
+            'checkout_next_day' => 'boolean',
             'booking_status' => BookingStatus::class,
             'payment_status_check_attempts' => 'integer',
             'payment_response' => 'array',
@@ -71,7 +102,12 @@ class Booking extends Model
 
     public function place(): BelongsTo
     {
-        return $this->belongsTo(Place::class);
+        // withTrashed: a booking must always resolve its place even after the
+        // place is archived (soft-deleted) — otherwise the guest's "My bookings",
+        // host bookings, and the booking detail/resource lose the place block.
+        // Archiving a place stops NEW bookings (the route binding 404s a trashed
+        // place); existing bookings stay valid and readable.
+        return $this->belongsTo(Place::class)->withTrashed();
     }
 
     public function guest(): BelongsTo
@@ -82,6 +118,32 @@ class Booking extends Model
     public function host(): BelongsTo
     {
         return $this->belongsTo(User::class, 'host_user_id');
+    }
+
+    /**
+     * The guest's real checkout instant. end_date is the last *occupied* day;
+     * checkout falls on end_date + 1 (the morning after) when checkout_next_day
+     * is set — the overnight case — or on end_date itself for a same-day stay.
+     * The day is an explicit place setting, not inferred from the times.
+     */
+    public function checkoutAt(): ?CarbonImmutable
+    {
+        if ($this->end_date === null) {
+            return null;
+        }
+
+        $day = CarbonImmutable::parse($this->end_date->toDateString());
+        if ($this->checkout_next_day) {
+            $day = $day->addDay();
+        }
+
+        if ($this->check_out_time === null) {
+            return $day->startOfDay();
+        }
+
+        [$hour, $minute] = array_pad(explode(':', $this->check_out_time), 2, '0');
+
+        return $day->setTime((int) $hour, (int) $minute);
     }
 
     /** True while this booking is still holding its dates against the calendar. */
@@ -112,5 +174,44 @@ class Booking extends Model
                         });
                 });
         });
+    }
+
+    /**
+     * Order the guest's "My bookings" list for the best experience: actionable
+     * holds and upcoming stays first, then recent history, cancellations last.
+     *
+     *   1. pending_payment — awaiting payment, by nearest start_date (must act)
+     *   2. confirmed       — upcoming, by nearest start_date
+     *   3. completed       — past, most recently finished first (end_date desc)
+     *   4. canceled_*      — last, most recently cancelled first (canceled_at desc)
+     *
+     * Each secondary key is wrapped in a CASE that is non-null only for its own
+     * status bucket, so the bucket the primary CASE already separated is the only
+     * one it sorts — making the multi-key order portable across SQLite and MySQL.
+     */
+    public function scopeOrderForGuestList(Builder $query): Builder
+    {
+        return $query
+            ->orderByRaw(
+                'CASE booking_status WHEN ? THEN 1 WHEN ? THEN 2 WHEN ? THEN 3 ELSE 4 END',
+                [
+                    BookingStatus::PendingPayment->value,
+                    BookingStatus::Confirmed->value,
+                    BookingStatus::Completed->value,
+                ],
+            )
+            ->orderByRaw(
+                'CASE WHEN booking_status IN (?, ?) THEN start_date END ASC',
+                [BookingStatus::PendingPayment->value, BookingStatus::Confirmed->value],
+            )
+            ->orderByRaw(
+                'CASE WHEN booking_status = ? THEN end_date END DESC',
+                [BookingStatus::Completed->value],
+            )
+            ->orderByRaw(
+                'CASE WHEN booking_status IN (?, ?) THEN canceled_at END DESC',
+                [BookingStatus::CanceledByHost->value, BookingStatus::CanceledByGuest->value],
+            )
+            ->orderByDesc('id'); // stable tiebreaker for equal sort keys
     }
 }

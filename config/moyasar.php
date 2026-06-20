@@ -21,4 +21,9 @@ return [
 
     // How long a hosted invoice (and the date hold) stays open before expiring.
     'hold_minutes' => (int) env('MOYASAR_HOLD_MINUTES', 10),
+
+    // The hosted invoice expires this many minutes BEFORE the date hold, so
+    // Moyasar stops accepting payment before our expiry sweep can release the
+    // dates — closes the "paid after we expired" race.
+    'invoice_buffer_minutes' => (int) env('MOYASAR_INVOICE_BUFFER_MINUTES', 1),
 ];

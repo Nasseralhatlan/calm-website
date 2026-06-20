@@ -9,9 +9,9 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 
 final class SettingService
 {
-    public function paginate(int $perPage = 25): LengthAwarePaginator
+    public function paginate(?int $perPage = null): LengthAwarePaginator
     {
-        return Setting::query()->orderBy('key')->paginate($perPage);
+        return Setting::query()->orderBy('key')->paginate($perPage ?? config('pagination.per_page'));
     }
 
     /**

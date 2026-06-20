@@ -9,7 +9,9 @@ use App\Integrations\Payment\MoyasarGateway;
 use App\Integrations\Payment\MoyasarInvoice;
 use App\Models\Booking;
 use App\Models\Place;
+use App\Models\PlaceReview;
 use App\Models\User;
+use App\Services\Notification\NotificationService;
 use App\Services\Place\PlaceAvailabilityService;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -23,7 +25,22 @@ final class BookingService
     public function __construct(
         private readonly PlaceAvailabilityService $availability,
         private readonly MoyasarGateway $gateway,
+        private readonly NotificationService $notifications,
     ) {}
+
+    /**
+     * Notify the guest when a booking reaches a terminal state — fired AFTER the
+     * settling transaction commits, exactly once per real transition.
+     */
+    private function fireBookingNotification(Booking $booking, ?BookingStatus $transitionedTo): void
+    {
+        if ($transitionedTo === BookingStatus::Confirmed) {
+            $this->notifications->bookingConfirmed($booking);   // guest
+            $this->notifications->hostNewBooking($booking);     // host gets a booking
+        }
+        // No guest SMS on Expired: an expired hold is an abandoned/unpaid booking,
+        // not a real cancellation. bookingCancelled() stays for a future cancel flow.
+    }
 
     /**
      * "Click book": re-run the availability + pricing quote as the server-side
@@ -36,7 +53,11 @@ final class BookingService
      */
     public function create(User $user, Place $place, string $checkIn, string $checkOut, int $guests): Booking
     {
-        $booking = DB::transaction(function () use ($user, $place, $checkIn, $checkOut, $guests): Booking {
+        // Single base instant for both the date-hold and the invoice expiry so
+        // they can't drift apart.
+        $holdExpiresAt = CarbonImmutable::now()->addMinutes((int) config('moyasar.hold_minutes', 10));
+
+        $booking = DB::transaction(function () use ($user, $place, $checkIn, $checkOut, $guests, $holdExpiresAt): Booking {
             // Serialise concurrent bookings for this place.
             $locked = Place::query()->whereKey($place->id)->lockForUpdate()->first();
             if ($locked === null) {
@@ -65,6 +86,7 @@ final class BookingService
                 'end_date' => $quote['check_out'],
                 'check_in_time' => $locked->check_in_time,
                 'check_out_time' => $locked->check_out_time,
+                'checkout_next_day' => $locked->checkout_next_day,
                 'rules' => $locked->rules,
                 'guests' => $guests,
                 'booking_price' => (int) $locked->price * 100,  // base nightly snapshot, halalas
@@ -76,9 +98,19 @@ final class BookingService
                 'vat_amount' => $pricing['vat_amount_minor'],
                 'total' => $pricing['total_minor'],
                 'payout_status' => 'not_paid',
-                'expires_at' => CarbonImmutable::now()->addMinutes((int) config('moyasar.hold_minutes', 10)),
+                'expires_at' => $holdExpiresAt,
             ]);
         });
+
+        // Close the invoice a buffer BEFORE the date-hold, so Moyasar refuses
+        // payment before the expiry sweep can release the dates (no "paid after
+        // we expired" race). Floor to a minute out so a misconfigured buffer
+        // never sends a past/at-now expiry.
+        $invoiceExpiresAt = $holdExpiresAt->subMinutes((int) config('moyasar.invoice_buffer_minutes', 1));
+        $earliest = CarbonImmutable::now()->addMinute();
+        if ($invoiceExpiresAt->lessThan($earliest)) {
+            $invoiceExpiresAt = $earliest;
+        }
 
         try {
             $invoice = $this->gateway->createInvoice(
@@ -86,6 +118,7 @@ final class BookingService
                 description: 'Booking — '.$place->title,
                 callbackUrl: route('payments.moyasar.webhook'),
                 metadata: ['booking_id' => $booking->id],
+                expiredAt: $invoiceExpiresAt,
             );
         } catch (RuntimeException $e) {
             // Free the dates immediately — a hold is worthless without a payment.
@@ -113,6 +146,7 @@ final class BookingService
     {
         return Booking::query()
             ->where('guest_user_id', $user->id)
+            ->where('booking_status', '!=', BookingStatus::Expired->value)
             ->with(['place', 'place.coverPhoto', 'place.cityArea.city'])
             ->latest()
             ->get();
@@ -140,14 +174,49 @@ final class BookingService
      *
      * @return LengthAwarePaginator<int, Booking>
      */
-    public function forGuestPaginated(User $user, int $perPage = 20): LengthAwarePaginator
+    public function forGuestPaginated(User $user, ?int $perPage = null): LengthAwarePaginator
+    {
+        $paginator = Booking::query()
+            ->where('guest_user_id', $user->id)
+            // Hide expired holds — a lapsed unpaid booking is noise to the guest.
+            ->where('booking_status', '!=', BookingStatus::Expired->value)
+            ->with(['place', 'place.coverPhoto', 'place.cityArea.city', 'place.type'])
+            ->orderForGuestList()
+            ->paginate($perPage ?? config('pagination.per_page'))
+            ->withQueryString();
+
+        // Attach the guest's place-scoped review to each booking (one query for
+        // the whole page) so the card can show it + the "leave a review" CTA.
+        $reviews = PlaceReview::query()
+            ->where('guest_user_id', $user->id)
+            ->whereIn('place_id', collect($paginator->items())->pluck('place_id')->unique()->all())
+            ->get()
+            ->keyBy('place_id');
+
+        foreach ($paginator->items() as $booking) {
+            $booking->setRelation('review', $reviews->get($booking->place_id));
+        }
+
+        return $paginator;
+    }
+
+    /**
+     * The guest's still-payable holds: pending_payment bookings whose hold
+     * hasn't lapsed yet. Soonest-to-expire first so the home screen can nudge
+     * the user to finish paying before the dates are released. Each carries
+     * `payment.url` so the client can reopen the Moyasar page.
+     *
+     * @return Collection<int, Booking>
+     */
+    public function pendingPaymentsForGuest(User $user): Collection
     {
         return Booking::query()
             ->where('guest_user_id', $user->id)
+            ->where('booking_status', BookingStatus::PendingPayment->value)
+            ->where('expires_at', '>', CarbonImmutable::now())
             ->with(['place', 'place.coverPhoto', 'place.cityArea.city', 'place.type'])
-            ->latest()
-            ->paginate($perPage)
-            ->withQueryString();
+            ->orderBy('expires_at')
+            ->get();
     }
 
     /**
@@ -157,13 +226,13 @@ final class BookingService
      *
      * @return LengthAwarePaginator<int, Booking>
      */
-    public function forHostPaginated(User $host, int $perPage = 20): LengthAwarePaginator
+    public function forHostPaginated(User $host, ?int $perPage = null): LengthAwarePaginator
     {
         return Booking::query()
             ->where('host_user_id', $host->id)
             ->with(['place', 'place.coverPhoto', 'place.cityArea.city', 'place.type', 'guest'])
             ->latest()
-            ->paginate($perPage)
+            ->paginate($perPage ?? config('pagination.per_page'))
             ->withQueryString();
     }
 
@@ -353,12 +422,70 @@ final class BookingService
     }
 
     /**
+     * Mark confirmed bookings whose checkout moment has passed as completed. A
+     * booking stays "confirmed" through the stay and flips to "completed" once
+     * the guest's checkout has elapsed — see Booking::checkoutAt() for the rule.
+     * Scheduled hourly (see routes/console.php); a pure DB sweep with no
+     * external calls. Stateless: all state lives in the DB.
+     *
+     * @return int Number of bookings completed.
+     */
+    public function completeEndedStays(int $limit = 200): int
+    {
+        // Cheap, indexed pre-filter on end_date; the exact checkout-time gate is
+        // applied per row below (a booking ending today may still be mid-stay).
+        $candidates = Booking::query()
+            ->where('booking_status', BookingStatus::Confirmed->value)
+            ->whereDate('end_date', '<=', CarbonImmutable::now()->toDateString())
+            ->limit($limit)
+            ->get();
+
+        $now = CarbonImmutable::now();
+        $completed = 0;
+
+        foreach ($candidates as $booking) {
+            $checkout = $booking->checkoutAt();
+            if ($checkout === null || $checkout->greaterThan($now)) {
+                continue; // checkout time hasn't arrived yet
+            }
+
+            if ($this->markCompleted($booking)) {
+                $completed++;
+            }
+        }
+
+        return $completed;
+    }
+
+    /**
+     * Flip a single booking to completed under a row lock, re-reading status so
+     * a concurrent sweep can't double-transition. Returns whether it flipped.
+     */
+    private function markCompleted(Booking $booking): bool
+    {
+        return DB::transaction(function () use ($booking): bool {
+            $fresh = Booking::query()->whereKey($booking->id)->lockForUpdate()->first();
+
+            if ($fresh === null || $fresh->booking_status !== BookingStatus::Confirmed) {
+                return false;
+            }
+
+            $fresh->booking_status = BookingStatus::Completed;
+            $fresh->save();
+
+            return true;
+        });
+    }
+
+    /**
      * Apply a fetched invoice to the booking under a row lock, re-reading status
      * so a concurrent webhook/poll/sweep can't double-settle the same booking.
      */
     private function applyInvoice(Booking $booking, MoyasarInvoice $invoice): Booking
     {
-        return DB::transaction(function () use ($booking, $invoice): Booking {
+        $transitionedTo = null;
+
+        $result = DB::transaction(function () use ($booking, $invoice, &$transitionedTo): Booking {
             $fresh = Booking::query()->whereKey($booking->id)->lockForUpdate()->first();
 
             if ($fresh === null || $fresh->booking_status !== BookingStatus::PendingPayment) {
@@ -376,36 +503,50 @@ final class BookingService
                         'booking' => $fresh->id, 'expected' => $fresh->total, 'paid' => $invoice->amount,
                     ]);
                     $fresh->booking_status = BookingStatus::Expired;
+                    $transitionedTo = BookingStatus::Expired;
                 } else {
                     $fresh->booking_status = BookingStatus::Confirmed;
                     $fresh->payment_method = $invoice->paymentMethod();
                     $fresh->confirmed_at = CarbonImmutable::now();
                     $fresh->expires_at = null;
+                    $transitionedTo = BookingStatus::Confirmed;
                 }
             } elseif ($invoice->isCancelled() || $invoice->isFailed() || ($fresh->expires_at !== null && $fresh->expires_at->isPast())) {
                 // Cancelled, failed, or the hold lapsed while still "initiated" —
                 // let the dates go.
                 $fresh->booking_status = BookingStatus::Expired;
+                $transitionedTo = BookingStatus::Expired;
             }
 
             $fresh->save();
 
             return $fresh;
         });
+
+        $this->fireBookingNotification($result, $transitionedTo);
+
+        return $result;
     }
 
     /** Expire a stale pending hold (no usable invoice) under a row lock. */
     private function forceExpire(Booking $booking): Booking
     {
-        return DB::transaction(function () use ($booking): Booking {
+        $transitionedTo = null;
+
+        $result = DB::transaction(function () use ($booking, &$transitionedTo): Booking {
             $fresh = Booking::query()->whereKey($booking->id)->lockForUpdate()->first();
 
             if ($fresh !== null && $fresh->booking_status === BookingStatus::PendingPayment) {
                 $fresh->booking_status = BookingStatus::Expired;
                 $fresh->save();
+                $transitionedTo = BookingStatus::Expired;
             }
 
             return $fresh ?? $booking;
         });
+
+        $this->fireBookingNotification($result, $transitionedTo);
+
+        return $result;
     }
 }

@@ -10,6 +10,15 @@
     $fa = $isRtl ? 'font-arabic' : '';
     $dirAttr = $isRtl ? 'rtl' : 'ltr';
 
+    // Sensible default house rules pre-filled for a NEW place — the host can
+    // edit, add to, or clear it. (Only seeds new places; existing/draft rules
+    // override it on resume/edit.)
+    $defaultRules = $isRtl
+        ? "• المحافظة على المكان: يرجى الحفاظ على نظافة المكان والمرافق، وتسليمه بحالة جيدة كما تم استلامه.\n• الهدوء والخصوصية: يرجى احترام الجيران والمناطق المحيطة، وتجنب الإزعاج أو رفع الصوت خصوصًا في الأوقات المتأخرة.\n• الحفلات والتجمعات: لا يسمح بإقامة الحفلات أو التجمعات داخل المكان.\n• التدخين: يمنع التدخين داخل المكان.\n• الأثاث والممتلكات: يرجى عدم نقل أو إتلاف الأثاث والمرافق، ويتحمل الضيف مسؤولية أي تلفيات ناتجة عن سوء الاستخدام.\n• أوقات الدخول والخروج: يجب الالتزام بمواعيد تسجيل الدخول والخروج الموضحة في الحجز."
+        : "• Care for the property: Please keep the place and its facilities clean, and hand it over in good condition as you received it.\n• Quiet & privacy: Please respect the neighbors and surroundings, and avoid noise or loud sounds, especially late at night.\n• Parties & gatherings: Parties or gatherings inside the property are not allowed.\n• Smoking: Smoking inside the property is not allowed.\n• Furniture & property: Please do not move or damage the furniture or facilities; the guest is responsible for any damage caused by misuse.\n• Check-in & check-out: Please adhere to the check-in and check-out times shown in the booking.";
+
+    $photoLimitMsg = $isRtl ? 'الحد الأقصى ١٠ صور لكل قسم.' : 'Each section can have at most 10 images.';
+
     // Reshape for Alpine — only the keys the wizard needs
     $jsonPlaceTypes = $placeTypes->map(fn ($t) => [
         'id' => $t->id,
@@ -27,17 +36,30 @@
         ])->values(),
     ])->values();
 
+    $attributeJson = fn ($a) => [
+        'id' => $a->id,
+        'icon' => $a->icon,
+        'label' => $isRtl ? $a->name_ar : $a->name_en,
+        'type' => $a->type->value,           // 'boolean' or 'number'
+        'photoRule' => $a->photo_rule->value, // 'none' | 'optional' | 'required'
+        'isHighlighted' => (bool) $a->is_highlighted,
+    ];
+
     $jsonAttributeGroups = $attributeGroups->map(fn ($g) => [
         'id' => $g->id,
         'label' => $isRtl ? $g->name_ar : $g->name_en,
-        'attributes' => $g->attributes->map(fn ($a) => [
-            'id' => $a->id,
-            'icon' => $a->icon,
-            'label' => $isRtl ? $a->name_ar : $a->name_en,
-            'type' => $a->type->value,           // 'boolean' or 'number'
-            'photoRule' => $a->photo_rule->value, // 'none' | 'optional' | 'required'
-        ])->values(),
+        'attributes' => $g->attributes->map($attributeJson)->values(),
     ])->values();
+
+    // Highlighted amenities across all groups, in the admin sort order — shown
+    // in a dedicated section at the top of the amenities step (they ALSO stay
+    // in their group below).
+    $jsonHighlightedAttributes = $attributeGroups
+        ->flatMap(fn ($g) => $g->attributes)
+        ->filter(fn ($a) => $a->is_highlighted)
+        ->sortBy([['sort_order', 'asc'], ['name_en', 'asc']])
+        ->map($attributeJson)
+        ->values();
 
     $dayLabels = $isRtl
         ? ['sunday' => 'الأحد', 'monday' => 'الإثنين', 'tuesday' => 'الثلاثاء', 'wednesday' => 'الأربعاء', 'thursday' => 'الخميس', 'friday' => 'الجمعة', 'saturday' => 'السبت']
@@ -63,6 +85,7 @@
         ],
         'check_in_time' => $draft->check_in_time,
         'check_out_time' => $draft->check_out_time,
+        'checkout_next_day' => (bool) $draft->checkout_next_day,
         'max_guests' => $draft->max_guests,
         'rules' => $draft->rules,
         'review_status' => $draft->review_status?->value,
@@ -143,6 +166,7 @@
                 'placeTypes'      => $jsonPlaceTypes,
                 'cities'          => $jsonCities,
                 'attributeGroups' => $jsonAttributeGroups,
+                'highlightedAttributes' => $jsonHighlightedAttributes,
                 'draftEndpoint'   => route('host.places.draft'),
                 'draft'           => $jsonDraft,
                 'rates'           => $pricingRates,
@@ -404,6 +428,31 @@
                     <p class="mt-2 text-[#717171] text-base {{ $fa }}">{{ $isRtl ? 'اختر ما يتوفر، وفصّل الكمية ووصف كل واحد في الخطوة التالية.' : "Pick what's available — you'll set counts and descriptions on the next step." }}</p>
 
                     <div class="mt-10 space-y-8">
+                        {{-- Highlights: the most important amenities, surfaced first. They
+                             still appear in their group below (selection stays in sync,
+                             since both chips key off the same attribute id). --}}
+                        <template x-if="highlightedAttributes.length">
+                            <div>
+                                <h3 class="text-base font-semibold text-[#222] mb-4 flex items-center gap-2 {{ $fa }}">
+                                    <span>⭐</span><span>{{ $isRtl ? 'أبرز الخصائص' : 'Highlights' }}</span>
+                                </h3>
+                                <div class="flex flex-wrap gap-2">
+                                    <template x-for="a in highlightedAttributes" :key="'hl-' + a.id">
+                                        <button type="button"
+                                                @click="toggleAttribute(a.id)"
+                                                style="border-radius: 999px;"
+                                                class="cursor-pointer inline-flex items-center gap-2 px-4 py-2.5 border-2 text-sm font-semibold transition-all"
+                                                :class="hasAttribute(a.id)
+                                                    ? 'border-[#222] bg-[#222] text-white shadow-card'
+                                                    : 'border-[#dddddd] bg-white text-[#222] hover:border-[#222]'">
+                                            <span x-text="a.icon" class="text-base leading-none"></span>
+                                            <span x-text="a.label" class="{{ $fa }}"></span>
+                                        </button>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
+
                         <template x-for="group in attributeGroups" :key="group.id">
                             <div>
                                 <h3 class="text-base font-semibold text-[#222] mb-4 {{ $fa }}" x-text="group.label"></h3>
@@ -482,6 +531,16 @@
                 <section x-show="step === 8" x-transition.opacity>
                     <h2 class="text-3xl sm:text-[34px] font-bold tracking-tight text-[#222] {{ $fa }}">{{ $isRtl ? 'صور المكان' : 'Photos of your place' }}</h2>
                     <p class="mt-2 text-[#717171] text-base {{ $fa }}">{{ $isRtl ? 'أضف الصور، اسحبها لإعادة الترتيب أو نقلها بين الأقسام (أو استخدم الأسهم)، ثم اختر الصور التي تظهر في صفحة المكان.' : 'Add photos, drag to reorder or move them between sections (or use the arrows), then choose which appear on the place page.' }}</p>
+
+                    {{-- Image rules: at least 5 overall, max 10 per section --}}
+                    <div class="mt-4 inline-flex items-center text-[13px] font-semibold {{ $fa }}"
+                         :class="totalDoneUploads() >= 5 ? 'text-[#16a34a]' : 'text-[#717171]'"
+                         style="gap: 8px; padding: 8px 14px; border-radius: 999px; background-color: #fafafa;">
+                        <span x-text="totalDoneUploads() >= 5 ? '✓' : '•'"></span>
+                        <span x-text="`${totalDoneUploads()}/5`"></span>
+                        <span>{{ $isRtl ? 'صور على الأقل · 10 كحد أقصى لكل قسم' : 'images minimum · 10 max per section' }}</span>
+                    </div>
+                    <p x-show="photoNotice" x-cloak x-text="photoNotice" class="mt-3 text-[13px] font-semibold text-[#F88379] {{ $fa }}"></p>
 
                     {{-- A. Per-attribute uploads — reorderable sections, reorderable photos within --}}
                     <div class="mt-10 space-y-4">
@@ -739,6 +798,7 @@
                                     @endforeach
                                 </select>
                             </div>
+                            <span class="block mt-2 text-[12px] text-[#717171] {{ $fa }}">{{ $isRtl ? 'الوصول دائماً في أول يوم من الحجز.' : "Check-in is always on the booking's first day." }}</span>
                         </label>
                         <label>
                             <span class="text-sm font-semibold text-[#222] {{ $fa }}">{{ $isRtl ? 'وقت المغادرة' : 'Check-out' }}</span>
@@ -750,15 +810,23 @@
                                     @endforeach
                                 </select>
                             </div>
+                            <label class="flex items-start mt-3 cursor-pointer" style="gap: 10px;">
+                                {{-- Hidden 0 + checkbox 1 so the form always posts a real boolean
+                                     (an unchecked checkbox sends nothing). --}}
+                                <input type="hidden" name="checkout_next_day" value="0">
+                                <input type="checkbox" name="checkout_next_day" value="1" x-model="checkoutNextDay" class="mt-0.5 w-4 h-4 accent-[#F88379] shrink-0">
+                                <span class="text-[12px] text-[#717171] {{ $fa }}">{{ $isRtl ? 'المغادرة في صباح اليوم التالي لنهاية الحجز (إقامة ليلية). ألغِ التحديد إذا كانت المغادرة في نفس يوم نهاية الحجز.' : 'Checkout is the morning after the booking ends (overnight stay). Uncheck if checkout is the same day the booking ends.' }}</span>
+                            </label>
                         </label>
                     </div>
 
                     <label class="block mt-8">
                         <span class="text-sm font-semibold text-[#222] {{ $fa }}">{{ $isRtl ? 'قواعد المكان (اختياري)' : 'House rules (optional)' }}</span>
-                        <div class="mt-3 border border-[#dddddd] focus-within:border-[#222] transition-all bg-white shadow-card r-ios-lg overflow-hidden">
-                            <textarea name="rules" x-model="rules" rows="4" maxlength="5000"
+                        <div class="mt-3 border border-[#dddddd] focus-within:border-[#222] transition-all bg-white shadow-card r-ios-lg">
+                            <textarea name="rules" x-model="rules" rows="8" maxlength="5000"
                                       placeholder="{{ $isRtl ? 'مثلاً: ممنوع التدخين، الحفلات بإذن مسبق...' : 'e.g. No smoking, no parties without prior approval...' }}"
-                                      class="w-full bg-transparent outline-none resize-none text-[15px] text-[#222] py-4 px-5 leading-relaxed {{ $fa }}"></textarea>
+                                      class="w-full bg-transparent outline-none resize-y text-[15px] text-[#222] py-4 px-5 leading-relaxed {{ $fa }}"
+                                      style="min-height: 160px; max-height: 70vh;"></textarea>
                         </div>
                     </label>
                 </section>
@@ -908,6 +976,7 @@ function registerWizard() {
         placeTypes: init.placeTypes,
         cities: init.cities,
         attributeGroups: init.attributeGroups,
+        highlightedAttributes: init.highlightedAttributes || [],
         draftEndpoint: init.draftEndpoint,
 
         // Form state
@@ -936,10 +1005,13 @@ function registerWizard() {
         money(n) { return (Math.round(n * 100) / 100).toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); },
         checkInTime: '15:00',
         checkOutTime: '12:00',
+        checkoutNextDay: true,
         // Default to 1 — UI starts at the minimum so the +/− stepper has
         // something sensible to mutate. Required at final submit.
         maxGuests: 1,
-        rules: '',
+        // Pre-filled default rules for a new place; overridden by saved rules on
+        // draft-resume / edit (see init.draft.rules below).
+        rules: @js($defaultRules),
         // attribute_id → { count, description }
         selectedAttributes: {},
 
@@ -947,6 +1019,9 @@ function registerWizard() {
         // { id, status: 'uploading'|'done'|'failed', preview, path, url, name, error? }
         attributeUploads: {},   // attribute_id → list
         extraUploads: [],       // general photos, no attribute
+        photoSectionMax: 10,    // hard cap of images per section (incl. "other")
+        photoMinTotal: 5,       // a place must have at least this many overall
+        photoNotice: '',        // transient "limit reached" message
         featured: [],           // ordered upload ids "shown outside" (first = cover)
         featuredMax: 10,        // cap on the showcase set
         sectionOrder: [],       // attribute_ids in host-chosen gallery section order
@@ -972,6 +1047,7 @@ function registerWizard() {
                 Object.assign(this.dayPrices, init.draft.day_prices || {});
                 this.checkInTime  = init.draft.check_in_time || '15:00';
                 this.checkOutTime = init.draft.check_out_time || '12:00';
+                this.checkoutNextDay = init.draft.checkout_next_day ?? true;
                 this.maxGuests    = init.draft.max_guests || 1;
                 this.rules        = init.draft.rules || '';
                 this.draftId      = init.draft.id;
@@ -1091,9 +1167,11 @@ function registerWizard() {
                 case 5: return Number(this.price) > 0; // pricing
                 case 6: return Object.keys(this.selectedAttributes).length > 0;        // attribute pick
                 case 7: return this.selectedAttributesList().every((e) => e.count >= 1); // configure
-                case 8: return this.photoNeedingAttributes()
-                    .filter((e) => e.attribute.photoRule === 'required')
-                    .every((e) => this.uploadCountFor(e.id, true) > 0);                // photos
+                case 8: return this.totalDoneUploads() >= this.photoMinTotal           // ≥5 images overall
+                    && this.photoNeedingAttributes()
+                        .filter((e) => e.attribute.photoRule === 'required')
+                        .every((e) => this.uploadCountFor(e.id, true) > 0);            // photos
+
                 case 9: return this.checkInTime.trim().length > 0 && this.checkOutTime.trim().length > 0;
                 default: return true;
             }
@@ -1360,11 +1438,57 @@ function registerWizard() {
             });
         },
         /**
-         * Step 1: POST {filename, mime} to /host-register/presign → ticket with put_url.
+         * Shrink a photo in the browser BEFORE the presigned upload so we store
+         * one smaller WebP per photo (visually lossless): resize-first to a
+         * 2560px max edge + WebP @ 0.90. iPhone HEIC/HEIF is converted to JPEG
+         * first via heic2any (lazy-loaded — it bundles libheif WASM). Anything
+         * that can't be processed falls back to the original so uploads never
+         * break. Small non-HEIC files (< 350 KB) pass through untouched.
+         */
+        async _compress(file) {
+            const isHeic = /image\/heic|image\/heif/.test(file.type) || /\.(heic|heif)$/i.test(file.name);
+            if (!file.type.startsWith('image/') && !isHeic) return file;
+            // Keep animation/vector intact — re-encoding would wreck them.
+            if (file.type === 'image/gif' || file.type === 'image/svg+xml') return file;
+
+            let work = file;
+            if (isHeic) {
+                try {
+                    const heic2any = await window.loadHeic2any();
+                    const out = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.92 });
+                    const blob = Array.isArray(out) ? out[0] : out;
+                    work = new File([blob], file.name.replace(/\.(heic|heif)$/i, '.jpg'), { type: 'image/jpeg' });
+                } catch (e) {
+                    console.warn('[upload] HEIC convert failed, trying original', e);
+                }
+            } else if (file.size < 250 * 1024) {
+                return file; // already small, non-HEIC — no meaningful gain
+            }
+
+            if (!window.imageCompression) return work;
+            try {
+                const out = await window.imageCompression(work, {
+                    maxWidthOrHeight: 2560,   // resize-first → visually lossless on real screens
+                    initialQuality: 0.82,     // visually-lossless floor for photos, ~25-35% smaller than 0.90
+                    maxSizeMB: 1.5,           // safety ceiling for unusually heavy images (rarely engages)
+                    fileType: 'image/webp',
+                    useWebWorker: true,       // off the main thread → UI stays responsive
+                });
+                const webp = new File([out], work.name.replace(/\.[^.]+$/, '') + '.webp', { type: 'image/webp' });
+                return webp.size < work.size ? webp : work; // never end up bigger
+            } catch (e) {
+                console.warn('[upload] compression failed, using', work === file ? 'original' : 'converted', e);
+                return work; // a converted HEIC is at least a displayable JPEG
+            }
+        },
+        /**
+         * Step 1: compress the photo (above), then POST {filename, mime} to
+         * /host-register/presign → ticket with put_url.
          * Step 2: PUT the raw bytes straight to S3 (DO Spaces) — PHP doesn't see them.
          * Returns { path, url } on success.
          */
         async _uploadOne(file) {
+            file = await this._compress(file);
             const presignRes = await fetch('{{ route('host.places.presign') }}', {
                 method: 'POST',
                 credentials: 'same-origin',
@@ -1402,10 +1526,13 @@ function registerWizard() {
             return { path: ticket.path, url: ticket.public_url };
         },
         async onAttributeFiles(event, attributeId) {
-            const files = Array.from(event.target.files || []);
+            let files = Array.from(event.target.files || []);
             event.target.value = '';
             if (!files.length) return;
             if (!this.attributeUploads[attributeId]) this.attributeUploads[attributeId] = [];
+
+            files = this._capSectionFiles(files, this.attributeUploads[attributeId].length);
+            if (!files.length) return;
 
             for (const file of files) {
                 const preview = await this._readPreview(file);
@@ -1423,8 +1550,11 @@ function registerWizard() {
             }
         },
         async onExtraFiles(event) {
-            const files = Array.from(event.target.files || []);
+            let files = Array.from(event.target.files || []);
             event.target.value = '';
+            if (!files.length) return;
+
+            files = this._capSectionFiles(files, this.extraUploads.length);
             if (!files.length) return;
 
             for (const file of files) {
@@ -1441,6 +1571,27 @@ function registerWizard() {
                     if (row) { row.status = 'failed'; row.error = err.message || 'Upload failed'; }
                 });
             }
+        },
+
+        /** Trim a file list to the section's remaining slots (max 10). */
+        _capSectionFiles(files, currentCount) {
+            const allowed = this.photoSectionMax - currentCount;
+            if (allowed <= 0) { this.flashPhotoNotice(); return []; }
+            if (files.length > allowed) { this.flashPhotoNotice(); return files.slice(0, allowed); }
+            return files;
+        },
+        flashPhotoNotice() {
+            this.photoNotice = @js($photoLimitMsg);
+            clearTimeout(this._photoNoticeTimer);
+            this._photoNoticeTimer = setTimeout(() => { this.photoNotice = ''; }, 4000);
+        },
+        /** Count of successfully-uploaded photos across all sections + "other". */
+        totalDoneUploads() {
+            let n = this.extraUploads.filter((u) => u.status === 'done').length;
+            for (const k in this.attributeUploads) {
+                n += (this.attributeUploads[k] || []).filter((u) => u.status === 'done').length;
+            }
+            return n;
         },
 
         // ── Draft auto-save
@@ -1468,6 +1619,7 @@ function registerWizard() {
                 price: Number(this.price) || 0,
                 check_in_time: this.checkInTime || '15:00',
                 check_out_time: this.checkOutTime || '12:00',
+                checkout_next_day: this.checkoutNextDay,
                 max_guests: Number(this.maxGuests) || null,
                 rules: this.rules || null,
                 last_step: this.step,

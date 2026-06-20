@@ -8,10 +8,12 @@ use App\Http\Controllers\Admin\CitiesController;
 use App\Http\Controllers\Admin\CityAreasController;
 use App\Http\Controllers\Admin\CountriesController;
 use App\Http\Controllers\Admin\DashboardController;
+// use App\Http\Controllers\Admin\NotificationsController; // notifications temporarily disabled
 use App\Http\Controllers\Admin\PlaceListsController;
 use App\Http\Controllers\Admin\PlaceReviewController;
 use App\Http\Controllers\Admin\PlacesController;
 use App\Http\Controllers\Admin\PlaceTypesController;
+use App\Http\Controllers\Admin\ReviewsController;
 use App\Http\Controllers\Admin\SettingsController;
 use App\Http\Controllers\Admin\UsersController;
 use App\Http\Controllers\Auth\LoginController;
@@ -43,6 +45,8 @@ Route::get('/terms', [PageController::class, 'terms'])->name('pages.terms');
 Route::get('/privacy', [PageController::class, 'privacy'])->name('pages.privacy');
 Route::get('/cancellation-policy', [PageController::class, 'cancellation'])->name('pages.cancellation');
 Route::get('/community-standards', [PageController::class, 'community'])->name('pages.community');
+// Public support page — contact details rendered from admin settings.
+Route::get('/support', [PageController::class, 'support'])->name('pages.support');
 
 // ─── Auth (web, OTP → JWT cookie) ────────────────────────────────────────────
 Route::middleware('guest')->group(function (): void {
@@ -89,7 +93,6 @@ Route::middleware('auth:api')->group(function (): void {
     Route::get('/bookings/{booking}', [UserDashboardController::class, 'showBooking'])->name('user.bookings.show');
     Route::get('/financials', [UserDashboardController::class, 'financials'])->name('user.financials');
     Route::get('/favorites', [UserDashboardController::class, 'favorites'])->name('user.favorites');
-    Route::get('/support', [UserDashboardController::class, 'support'])->name('user.support');
 });
 
 // ─── Admin (auth + role) ─────────────────────────────────────────────────────
@@ -110,16 +113,28 @@ Route::middleware(['auth:api', 'admin'])
         Route::resource('place-types', PlaceTypesController::class)
             ->except(['show'])
             ->parameters(['place-types' => 'placeType']);
+        // Attribute groups: store/update/destroy only — driven inline (JSON)
+        // from the merged attributes page (no standalone group screen).
         Route::resource('attribute-groups', AttributeGroupsController::class)
-            ->except(['show'])
+            ->only(['store', 'update', 'destroy'])
             ->parameters(['attribute-groups' => 'attributeGroup']);
-        Route::resource('attributes', AttributesController::class)->except(['show']);
+        // Inline actions for the merged page — drag-sort save + the star toggle.
+        // Registered before the resource so the literal paths aren't captured as
+        // an {attribute} route parameter.
+        Route::post('attributes/reorder', [AttributesController::class, 'reorder'])->name('attributes.reorder');
+        Route::post('attributes/{attribute}/highlight', [AttributesController::class, 'toggleHighlight'])->name('attributes.highlight');
+        // The merged page replaces the old index + create/edit form pages.
+        Route::resource('attributes', AttributesController::class)->except(['show', 'create', 'edit']);
 
         // Place review workflow — three actions per place + skip.
         Route::get('/places/{place}/review', [PlaceReviewController::class, 'show'])->name('places.review');
         Route::post('/places/{place}/review/approve', [PlaceReviewController::class, 'approve'])->name('places.review.approve');
         Route::post('/places/{place}/review/reject', [PlaceReviewController::class, 'reject'])->name('places.review.reject');
         Route::post('/places/{place}/review/skip', [PlaceReviewController::class, 'skip'])->name('places.review.skip');
+
+        // Guest review moderation (under_review / published / blocked).
+        Route::get('/reviews', [ReviewsController::class, 'index'])->name('reviews.index');
+        Route::post('/reviews/{review}/status', [ReviewsController::class, 'updateStatus'])->name('reviews.status');
 
         // Curated landing-page lists ("Featured chalets", "Editor's picks", etc.)
         // Adding places to a list happens from the place's edit page; this
@@ -137,4 +152,8 @@ Route::middleware(['auth:api', 'admin'])
         // Users — list + edit. Self-registration handles creation; deletion is
         // intentionally not exposed here.
         Route::resource('users', UsersController::class)->only(['index', 'edit', 'update']);
+
+        // Notifications — TEMPORARILY DISABLED (code kept; uncomment to re-enable).
+        // Route::get('/notifications', [NotificationsController::class, 'index'])->name('notifications.index');
+        // Route::post('/notifications', [NotificationsController::class, 'store'])->name('notifications.store');
     });

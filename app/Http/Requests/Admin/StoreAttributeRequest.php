@@ -31,6 +31,9 @@ class StoreAttributeRequest extends FormRequest
                     ->all(),
             ]);
         }
+
+        // An unchecked checkbox is absent from the payload — normalize to false.
+        $this->merge(['is_highlighted' => $this->boolean('is_highlighted')]);
     }
 
     /**
@@ -47,6 +50,8 @@ class StoreAttributeRequest extends FormRequest
             'question_en' => ['nullable', 'string', 'max:500'],
             'photo_rule' => ['sometimes', Rule::enum(AttributePhotoRule::class)],
             'type' => ['required', Rule::enum(AttributeType::class)],
+            'is_highlighted' => ['sometimes', 'boolean'],
+            'sort_order' => ['nullable', 'integer', 'min:0', 'max:9999'],
             'options' => ['nullable', 'array'],
             'options.*' => ['string', 'max:128'],
         ];

@@ -1,5 +1,6 @@
 <?php
 
+use App\Jobs\CompleteEndedBookings;
 use App\Jobs\ExpireStaleBookings;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
@@ -14,4 +15,10 @@ Artisan::command('inspire', function () {
 // single server — stateless, all state is in the DB.
 Schedule::job(new ExpireStaleBookings)
     ->everyMinute()
+    ->withoutOverlapping();
+
+// Flip confirmed bookings to completed once the guest's checkout has passed.
+// Not time-critical, so hourly is plenty — stateless, all state is in the DB.
+Schedule::job(new CompleteEndedBookings)
+    ->hourly()
     ->withoutOverlapping();

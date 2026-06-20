@@ -118,6 +118,7 @@ Auth: public
     "user": {
       "id": "019eb8...",
       "name": null,
+      "avatar_url": null,
       "gender": null,
       "age": null,
       "phone": "512345678",
@@ -139,7 +140,8 @@ Auth: public
 | `token_type`  | Always `"bearer"`. |
 | `expires_in`  | TTL in **seconds**. |
 | `expires_at`  | Absolute ISO 8601 UTC timestamp the token stops working. Prefer this over `expires_in` to avoid clock-skew math — schedule the refresh against `expires_at - 20%` of the window. |
-| `user`        | Full user profile. `name`/`gender`/`age`/`email` are nullable until the user fills them via `PATCH /api/user`. |
+| `user`        | Full user profile — the **same object** returned by `GET /api/user` and `PATCH`/`POST /api/user` (see §5). `name`/`avatar_url`/`gender`/`age`/`email` are nullable until the user fills them. |
+| `user.avatar_url` | Public URL of the profile picture to **display** in an `<img>`, or `null` when none is set. |
 | `user.role`   | `"user"` for normal users, `"admin"` for staff. The mobile app only cares about `"user"`. |
 | `user.is_host` | `true` once the user has any place in the system — **including drafts and rejected places**. Flip the "Become a host" CTA to "My listings" based on this. |
 
@@ -213,6 +215,128 @@ Replace the old token in secure storage with the new one. The old token is inval
 | Status | When |
 | ------ | ---- |
 | 401    | Token already expired / blacklisted — fall back to the OTP flow |
+
+---
+
+## 5. Get & update profile
+
+### Get the current user
+
+```
+GET /api/user
+Auth: required
+```
+
+Returns the full user profile (the same `user` object shown in §2), wrapped in `data`:
+
+```json
+{
+  "data": {
+    "id": "019eb8...",
+    "name": "Nasser",
+    "avatar_url": "https://calm-object-storage.fra1.digitaloceanspaces.com/avatars/k1towwlu7c0d.webp",
+    "gender": "male",
+    "age": 30,
+    "birth_date": "1996-05-01",
+    "phone": "512345678",
+    "email": "me@example.com",
+    "country_id": "019eb8...",
+    "role": "user",
+    "is_host": false,
+    "phone_verified_at": "2026-06-12T18:30:00+00:00",
+    "email_verified_at": null,
+    "created_at": "2026-06-12T18:30:00+00:00"
+  }
+}
+```
+
+### Update name / details (JSON)
+
+```
+PATCH /api/user
+Auth: required
+Content-Type: application/json
+```
+
+Send **only the fields you want to change** — all optional:
+
+```json
+{ "name": "Nasser", "gender": "male", "age": 30, "birth_date": "1996-05-01", "email": "me@example.com" }
+```
+
+### Update profile **with a picture** (multipart)
+
+```
+POST /api/user
+Auth: required
+Content-Type: multipart/form-data
+```
+
+⚠️ A profile-picture upload **must use POST**, not PATCH — PHP only parses multipart bodies on POST. You can update `name` (and the other fields) in the same request:
+
+```
+name=Nasser
+avatar=<image file>     // jpeg / jpg / png / webp, ≤ 5 MB
+```
+
+**Response** (identical for `PATCH` and `POST`):
+
+```json
+{
+  "status": 200,
+  "message": "Profile updated.",
+  "data": {
+    "id": "019eb8...",
+    "name": "Nasser",
+    "avatar_url": "https://calm-object-storage.fra1.digitaloceanspaces.com/avatars/k1towwlu7c0d.webp",
+    "gender": "male",
+    "age": 30,
+    "birth_date": "1996-05-01",
+    "phone": "512345678",
+    "email": "me@example.com",
+    "country_id": "019eb8...",
+    "role": "user",
+    "is_host": false,
+    "phone_verified_at": "2026-06-12T18:30:00+00:00",
+    "email_verified_at": null,
+    "created_at": "2026-06-12T18:30:00+00:00"
+  }
+}
+```
+
+**Behavior**
+- Every field is optional — send only what changed.
+- The response returns **`avatar_url`** (the public picture URL to display); it's `null` until a picture is set. The uploaded file field is named `avatar`.
+- Uploading a new `avatar` **replaces and deletes** the previous one — no orphaned files.
+- `phone` changes via the OTP flow, not here. `role` and the `*_verified_at` timestamps are ignored if sent.
+
+**Validation**
+
+| Field        | Rule |
+| ------------ | ---- |
+| `name`       | string, ≤ 120 |
+| `avatar`     | image (`jpeg`/`jpg`/`png`/`webp`), ≤ 5 MB. **POST only.** |
+| `gender`     | `male` or `female` |
+| `age`        | integer, 13–120 |
+| `birth_date` | `YYYY-MM-DD`, before today (after 1900) |
+| `email`      | valid email, ≤ 254, unique across users |
+
+**Errors**
+
+| Status | When |
+| ------ | ---- |
+| 401    | Missing / expired token |
+| 422    | Validation — failed fields under `data.errors.<field>` (e.g. non-image `avatar`, duplicate `email`) |
+
+curl:
+
+```bash
+# Update name + avatar in one multipart call
+curl -X POST https://api.calmapp.co/api/user \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "name=Nasser" \
+  -F "avatar=@/path/to/photo.jpg"
+```
 
 ---
 

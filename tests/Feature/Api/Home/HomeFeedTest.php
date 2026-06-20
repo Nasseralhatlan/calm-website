@@ -160,8 +160,8 @@ it('reflects is_liked when authed viewer calls GET /api/places/most-liked', func
 it('includes review aggregates in PlaceResource', function (): void {
     $host = User::factory()->create(['phone' => '512345677']);
     $place = makeVisiblePlace($host);
-    PlaceReview::query()->create(['place_id' => $place->id, 'rate' => 5, 'comment' => 'great']);
-    PlaceReview::query()->create(['place_id' => $place->id, 'rate' => 3, 'comment' => 'ok']);
+    PlaceReview::query()->create(['place_id' => $place->id, 'rate' => 5, 'comment' => 'great', 'status' => 'published']);
+    PlaceReview::query()->create(['place_id' => $place->id, 'rate' => 3, 'comment' => 'ok', 'status' => 'published']);
 
     $response = $this->getJson('/api/places/most-liked')->assertOk();
     expect($response->json('data.0.rating.count'))->toBe(2);

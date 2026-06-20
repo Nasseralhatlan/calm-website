@@ -66,7 +66,10 @@
                                     @else
                                         <span style="font-size: 22px;">{{ $place?->type?->icon ?: '🏠' }}</span>
                                     @endif
-                                    <span class="font-medium text-[#222]">{{ $place?->title ?: '—' }}</span>
+                                    <span>
+                                        <span class="block font-medium text-[#222]">{{ $place?->title ?: '—' }}</span>
+                                        <span class="block text-[11px] text-[#999] tabular-nums" dir="ltr">{{ $booking->reference }}</span>
+                                    </span>
                                 </span>
                             </td>
                             <td class="text-start text-[#717171]" style="padding: 14px 20px;">

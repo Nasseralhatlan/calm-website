@@ -140,6 +140,36 @@ it('returns attributes grouped with their definition + group', function (): void
         ->assertJsonPath('data.attributes.0.attribute.group.name_en', 'Indoor');
 });
 
+it('orders attributes by the admin sort_order and exposes is_highlighted', function (): void {
+    $place = detailPlace();
+    $group = AttributeGroup::query()->create(['name_en' => 'Indoor', 'name_ar' => 'داخلي']);
+
+    // Created Pool-first, but sort_order should make Pool come second.
+    $pool = Attribute::query()->create([
+        'group_id' => $group->id, 'name_en' => 'Pool', 'name_ar' => 'مسبح',
+        'icon' => '🏊', 'type' => 'boolean', 'photo_rule' => 'none',
+        'is_highlighted' => true, 'sort_order' => 2,
+    ]);
+    $wifi = Attribute::query()->create([
+        'group_id' => $group->id, 'name_en' => 'WiFi', 'name_ar' => 'واي فاي',
+        'icon' => '📶', 'type' => 'boolean', 'photo_rule' => 'none',
+        'is_highlighted' => false, 'sort_order' => 1,
+    ]);
+    foreach ([$pool, $wifi] as $a) {
+        PlaceAttribute::query()->create(['place_id' => $place->id, 'attribute_id' => $a->id, 'value' => '1']);
+    }
+
+    $this->getJson('/api/places/'.$place->id)
+        ->assertOk()
+        // sort_order 1 (WiFi) before 2 (Pool), regardless of insert order.
+        ->assertJsonPath('data.attributes.0.attribute.name_en', 'WiFi')
+        ->assertJsonPath('data.attributes.0.attribute.is_highlighted', false)
+        ->assertJsonPath('data.attributes.0.attribute.sort_order', 1)
+        ->assertJsonPath('data.attributes.1.attribute.name_en', 'Pool')
+        ->assertJsonPath('data.attributes.1.attribute.is_highlighted', true)
+        ->assertJsonPath('data.attributes.1.attribute.sort_order', 2);
+});
+
 it('returns the 10 most recent reviews on the detail screen', function (): void {
     $place = detailPlace();
 
@@ -148,6 +178,7 @@ it('returns the 10 most recent reviews on the detail screen', function (): void 
             'place_id' => $place->id,
             'rate' => 5,
             'comment' => "review #$i",
+            'status' => 'published',
         ]);
     }
 

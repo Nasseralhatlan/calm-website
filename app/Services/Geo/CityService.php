@@ -10,13 +10,13 @@ use Illuminate\Database\Eloquent\Collection;
 
 final class CityService
 {
-    public function paginate(int $perPage = 25): LengthAwarePaginator
+    public function paginate(?int $perPage = null): LengthAwarePaginator
     {
         return City::query()
             ->with('country')
             ->withCount('areas')
             ->orderBy('name_en')
-            ->paginate($perPage);
+            ->paginate($perPage ?? config('pagination.per_page'));
     }
 
     /**

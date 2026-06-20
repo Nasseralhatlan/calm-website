@@ -55,12 +55,24 @@
     $allImages   = $place->photos->values();
     $extraImages = $place->photos->whereNull('place_attribute_id')->values();
 
+    // Ordered by the admin-controlled attribute sort (sort_order, then name) so
+    // the place page matches the add-place wizard and the app API.
+    $sortByAttribute = fn ($pa) => [$pa->attribute->sort_order ?? 0, $pa->attribute->name_en ?? ''];
+
     $facilities = $place->attributeValues
         ->filter(fn ($pa) => $pa->attribute && $pa->attribute->type === AttributeType::Number)
+        ->sortBy($sortByAttribute)
         ->values();
 
     $amenities = $place->attributeValues
         ->filter(fn ($pa) => $pa->attribute && $pa->attribute->type !== AttributeType::Number)
+        ->sortBy($sortByAttribute)
+        ->values();
+
+    // The most important amenities, shown in a dedicated "Highlights" block
+    // above the preview. They still appear in the grouped list below.
+    $highlightedAmenities = $amenities
+        ->filter(fn ($pa) => $pa->attribute->is_highlighted)
         ->values();
 
     // For each facility, fetch the linked photos via place_attribute_id.
@@ -627,6 +639,23 @@
                     <p class="text-[15px] text-[#717171] mb-6 {{ $start }} {{ $fa }}">
                         {{ $amenities->count() }} {{ $isRtl ? 'ميزة متوفرة' : 'amenities available' }}
                     </p>
+
+                    @if($highlightedAmenities->count() > 0)
+                        <div style="margin-bottom: 28px;">
+                            <h3 class="inline-flex items-center text-[14px] font-bold text-[#222] {{ $start }} {{ $fa }}" style="gap: 8px; margin-bottom: 14px;">
+                                <span>⭐</span><span>{{ $isRtl ? 'أبرز المميزات' : 'Highlights' }}</span>
+                            </h3>
+                            <div class="flex flex-wrap" style="gap: 12px;">
+                                @foreach($highlightedAmenities as $a)
+                                    <div class="inline-flex items-center bg-[#fff8f7] hover:-translate-y-0.5 transition-all duration-200"
+                                         style="gap: 10px; padding: 14px 18px; border-radius: 16px; corner-shape: squircle; border: 1px solid #F88379;">
+                                        <span class="leading-none shrink-0" style="font-size: 22px;">{{ $a->attribute->icon ?: '·' }}</span>
+                                        <span class="text-[15px] font-semibold text-[#222] whitespace-nowrap {{ $fa }}">{{ $isRtl ? $a->attribute->name_ar : $a->attribute->name_en }}</span>
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endif
 
                     <div class="flex flex-wrap" style="gap: 12px; margin-top: 24px;">
                         @foreach($previewAmenities as $a)

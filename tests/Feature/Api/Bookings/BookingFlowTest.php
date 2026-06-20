@@ -12,6 +12,7 @@ use App\Models\Place;
 use App\Models\PlaceType;
 use App\Models\User;
 use App\Services\Booking\BookingService;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Http;
 
 beforeEach(function (): void {
@@ -376,4 +377,51 @@ it('serves the payment-return landing pages', function (): void {
     $this->get('/calm-back-payment')
         ->assertOk()
         ->assertSee('data-payment-return="cancelled"', false);
+});
+
+it('expires the Moyasar invoice a buffer before the date hold', function (): void {
+    config(['moyasar.hold_minutes' => 10, 'moyasar.invoice_buffer_minutes' => 1]);
+    fakeMoyasar();
+    $guest = bookingGuest();
+    $place = bookingPlace();
+    [$in, $out] = twoNightDates();
+
+    $this->actingAs($guest, 'api')
+        ->postJson("/api/places/{$place->id}/bookings", ['check_in' => $in, 'check_out' => $out, 'guests' => 2])
+        ->assertStatus(201);
+
+    $booking = Booking::query()->first();
+
+    // Capture the invoice-creation request and read the expiry we sent Moyasar.
+    $invoiceExpiry = null;
+    Http::assertSent(function ($request) use (&$invoiceExpiry) {
+        if ($request->url() === 'https://api.moyasar.com/v1/invoices' && $request->method() === 'POST') {
+            $invoiceExpiry = CarbonImmutable::parse($request['expired_at']);
+
+            return true;
+        }
+
+        return false;
+    });
+
+    expect($invoiceExpiry)->not->toBeNull()
+        // Invoice closes before the date hold...
+        ->and($invoiceExpiry->lessThan($booking->expires_at))->toBeTrue()
+        // ...by the configured buffer (≈ 1 minute).
+        ->and(abs($booking->expires_at->diffInSeconds($invoiceExpiry)))->toBeGreaterThanOrEqual(55)
+        ->and(abs($booking->expires_at->diffInSeconds($invoiceExpiry)))->toBeLessThanOrEqual(65);
+});
+
+it('snapshots the place checkout_next_day onto the booking', function (): void {
+    fakeMoyasar();
+    $guest = bookingGuest();
+    $place = bookingPlace(['checkout_next_day' => false]);
+    [$in, $out] = twoNightDates();
+
+    $this->actingAs($guest, 'api')
+        ->postJson("/api/places/{$place->id}/bookings", ['check_in' => $in, 'check_out' => $out, 'guests' => 2])
+        ->assertStatus(201)
+        ->assertJsonPath('data.checkout_next_day', false);
+
+    expect(Booking::query()->first()->checkout_next_day)->toBeFalse();
 });

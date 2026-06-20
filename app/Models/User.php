@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Storage;
 use PHPOpenSourceSaver\JWTAuth\Contracts\JWTSubject;
 
 class User extends Authenticatable implements JWTSubject
@@ -22,6 +23,8 @@ class User extends Authenticatable implements JWTSubject
 
     protected $fillable = [
         'name',
+        'avatar',
+        'locale',
         'gender',
         'age',
         'birth_date',
@@ -49,6 +52,23 @@ class User extends Authenticatable implements JWTSubject
         ];
     }
 
+    /**
+     * Public URL for the profile picture. Stored value is an S3 object key
+     * (or already a full URL, passed through). Null when no avatar is set.
+     */
+    public function getAvatarUrlAttribute(): ?string
+    {
+        if ($this->avatar === null || $this->avatar === '') {
+            return null;
+        }
+
+        if (str_starts_with($this->avatar, 'http')) {
+            return $this->avatar;
+        }
+
+        return Storage::disk('s3')->url($this->avatar);
+    }
+
     public function country(): BelongsTo
     {
         return $this->belongsTo(Country::class);
@@ -57,6 +77,18 @@ class User extends Authenticatable implements JWTSubject
     public function otps(): HasMany
     {
         return $this->hasMany(Otp::class);
+    }
+
+    /** Expo push tokens across this user's devices. */
+    public function deviceTokens(): HasMany
+    {
+        return $this->hasMany(DeviceToken::class);
+    }
+
+    /** In-app notification feed (newest first). */
+    public function userNotifications(): HasMany
+    {
+        return $this->hasMany(UserNotification::class)->latest();
     }
 
     /**

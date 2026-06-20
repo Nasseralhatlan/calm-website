@@ -32,10 +32,11 @@ final class MoyasarGateway
      *
      * @param  int  $amountMinor  Amount to charge in halalas.
      * @param  array<string, scalar>  $metadata  Echoed back on status/webhook (carry booking_id here).
+     * @param  CarbonImmutable|null  $expiredAt  When the hosted invoice stops accepting payment.
      *
      * @throws RuntimeException when Moyasar rejects the request.
      */
-    public function createInvoice(int $amountMinor, string $description, string $callbackUrl, array $metadata = []): MoyasarInvoice
+    public function createInvoice(int $amountMinor, string $description, string $callbackUrl, array $metadata = [], ?CarbonImmutable $expiredAt = null): MoyasarInvoice
     {
         $payload = [
             'amount' => $amountMinor,
@@ -44,7 +45,7 @@ final class MoyasarGateway
             'callback_url' => $callbackUrl,
             'success_url' => (string) config('moyasar.success_url'),
             'back_url' => (string) config('moyasar.back_url'),
-            'expired_at' => CarbonImmutable::now()->addMinutes((int) config('moyasar.hold_minutes', 10))->toIso8601String(),
+            'expired_at' => ($expiredAt ?? CarbonImmutable::now()->addMinutes((int) config('moyasar.hold_minutes', 10)))->toIso8601String(),
         ];
 
         foreach ($metadata as $key => $value) {

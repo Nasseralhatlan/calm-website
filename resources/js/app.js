@@ -1,7 +1,24 @@
+import imageCompression from 'browser-image-compression';
 import Alpine from 'alpinejs';
+import sort from '@alpinejs/sort';
+import Sortable from 'sortablejs';
 
 window.Alpine = Alpine;
+// x-sort: reactive drag-and-drop reordering that plays nicely with x-for
+// (used on the merged admin attributes page).
+Alpine.plugin(sort);
 Alpine.start();
+
+// Raw SortableJS still exposed for any non-Alpine page that needs it.
+window.Sortable = Sortable;
+
+// ── Client-side image compression for the host photo wizard ──────────────────
+// The wizard runs as an inline <script> (not through this bundle), so it reads
+// these helpers off `window`. browser-image-compression is small → eager.
+// heic2any bundles libheif WASM (heavy) → code-split + loaded on demand only
+// when an iPhone HEIC/HEIF file is actually picked.
+window.imageCompression = imageCompression;
+window.loadHeic2any = () => import('heic2any').then((m) => m.default);
 
 /**
  * Global submit-loading handler.

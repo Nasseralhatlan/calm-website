@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Resources\Api;
 
+use App\Enums\BookingStatus;
 use App\Models\Booking;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -27,6 +28,7 @@ class BookingResource extends JsonResource
     {
         return [
             'id' => $this->id,
+            'reference' => $this->reference,
             'place_id' => $this->place_id,
             // Compact place summary — present when the place is eager-loaded
             // (the bookings list loads it; the create/payment responses don't).
@@ -62,6 +64,10 @@ class BookingResource extends JsonResource
             'end_date' => $this->end_date?->toDateString(),
             'check_in_time' => $this->check_in_time,
             'check_out_time' => $this->check_out_time,
+            'checkout_next_day' => (bool) $this->checkout_next_day,
+            // Resolved checkout datetime — check-in is start_date @ check_in_time;
+            // checkout is end_date (+1 day when checkout_next_day) @ check_out_time.
+            'checkout_at' => $this->checkoutAt()?->toIso8601String(),
             'guests' => $this->guests,
             'currency' => 'SAR',
             'pricing' => [
@@ -80,6 +86,21 @@ class BookingResource extends JsonResource
             'expires_at' => $this->expires_at?->toIso8601String(),
             'confirmed_at' => $this->confirmed_at?->toIso8601String(),
             'created_at' => $this->created_at?->toIso8601String(),
+
+            // The guest's review for this booking's place (place-scoped, attached
+            // by BookingService::forGuestPaginated). Present only when loaded.
+            'review' => $this->whenLoaded('review', fn () => $this->review ? [
+                'id' => $this->review->id,
+                'rate' => (int) $this->review->rate,
+                'comment' => $this->review->comment,
+                'status' => $this->review->status?->value,
+                'created_at' => $this->review->created_at?->toIso8601String(),
+            ] : null),
+            // True when the stay is completed and the place hasn't been reviewed yet.
+            'can_review' => $this->when(
+                $this->relationLoaded('review'),
+                fn (): bool => $this->booking_status === BookingStatus::Completed && $this->review === null,
+            ),
         ];
     }
 }

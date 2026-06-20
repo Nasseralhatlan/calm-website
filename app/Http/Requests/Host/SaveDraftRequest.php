@@ -38,6 +38,7 @@ class SaveDraftRequest extends FormRequest
             'price' => ['nullable', 'integer', 'min:0'],
             'check_in_time' => ['nullable', 'string', 'max:8'],
             'check_out_time' => ['nullable', 'string', 'max:8'],
+            'checkout_next_day' => ['sometimes', 'boolean'],
             'max_guests' => ['nullable', 'integer', 'between:1,50'],
             'rules' => ['nullable', 'string', 'max:10000'],
             'last_step' => ['nullable', 'integer', 'min:1', 'max:20'],
@@ -52,9 +53,11 @@ class SaveDraftRequest extends FormRequest
 
             // Photos — uploaded paths already on S3 (via presigned PUT).
             'attribute_image_paths' => ['nullable', 'array'],
-            'attribute_image_paths.*' => ['array'],
+            // Cap each section at 10 even for drafts (the min-5 total is only
+            // enforced at final submit, not on partial drafts).
+            'attribute_image_paths.*' => ['array', 'max:10'],
             'attribute_image_paths.*.*' => ['string', 'max:500'],
-            'extra_image_paths' => ['nullable', 'array'],
+            'extra_image_paths' => ['nullable', 'array', 'max:10'],
             'extra_image_paths.*' => ['string', 'max:500'],
             'featured' => ['nullable', 'array', 'max:10'],
             'featured.*' => ['string', 'max:255'],

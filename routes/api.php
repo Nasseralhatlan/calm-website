@@ -6,14 +6,17 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BookingsController;
 use App\Http\Controllers\Api\CitiesController;
 use App\Http\Controllers\Api\CountriesController;
+// use App\Http\Controllers\Api\DeviceTokenController; // notifications temporarily disabled
 use App\Http\Controllers\Api\HostController;
 use App\Http\Controllers\Api\MoyasarWebhookController;
+// use App\Http\Controllers\Api\NotificationController; // notifications temporarily disabled
 use App\Http\Controllers\Api\PlaceAvailabilityController;
 use App\Http\Controllers\Api\PlaceLikesController;
 use App\Http\Controllers\Api\PlaceListsController;
 use App\Http\Controllers\Api\PlaceQuoteController;
 use App\Http\Controllers\Api\PlacesController;
 use App\Http\Controllers\Api\PlaceTypesController;
+use App\Http\Controllers\Api\ReviewsController;
 use App\Http\Controllers\Api\SettingsController;
 use App\Http\Controllers\Api\UserController;
 use Illuminate\Support\Facades\Route;
@@ -67,7 +70,21 @@ Route::middleware(['auth:api', 'throttle:authenticated'])->group(function (): vo
     Route::post('/auth/refresh', [AuthController::class, 'refresh']);
 
     Route::get('/user', [UserController::class, 'me']);
+    // JSON field updates (name, gender, …). For a profile-picture upload use
+    // the POST alias below — PHP only parses multipart bodies on POST.
     Route::patch('/user', [UserController::class, 'update']);
+    Route::post('/user', [UserController::class, 'update']);
+
+    // ── Notifications API — TEMPORARILY DISABLED (code kept; uncomment to re-enable). ──
+    // // Expo push-token registration (call on login + token refresh; remove on logout).
+    // Route::post('/devices', [DeviceTokenController::class, 'register']);
+    // Route::delete('/devices', [DeviceTokenController::class, 'unregister']);
+    //
+    // // In-app notification feed.
+    // Route::get('/notifications', [NotificationController::class, 'index']);
+    // Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount']);
+    // Route::post('/notifications/read-all', [NotificationController::class, 'readAll']);
+    // Route::post('/notifications/{notification}/read', [NotificationController::class, 'read']);
 
     // Heart-icon toggles. POST = like, DELETE = unlike; both idempotent.
     Route::post('/places/{place}/like', [PlaceLikesController::class, 'store']);
@@ -76,19 +93,27 @@ Route::middleware(['auth:api', 'throttle:authenticated'])->group(function (): vo
     // so it never collides with the public /places/{place} catch.
     Route::get('/favorites', [PlacesController::class, 'favorites']);
 
-    // Host app: bookings on the host's places, their own listings, earnings.
+    // Host app: bookings on the host's places, their own listings, earnings, reviews.
     Route::get('/host/bookings', [HostController::class, 'bookings']);
     Route::get('/host/listings', [HostController::class, 'listings']);
     Route::get('/host/earnings', [HostController::class, 'earnings']);
+    Route::get('/host/reviews', [HostController::class, 'reviews']);
 
     // Bookings. POST holds the dates + opens a Moyasar invoice; the status
     // endpoint re-verifies and confirms once paid.
     Route::post('/places/{place}/bookings', [BookingsController::class, 'store']);
     // The guest's own bookings list ("My bookings"), paginated, newest first.
     Route::get('/bookings', [BookingsController::class, 'index']);
+    // Still-payable holds for a "finish your payment" card on the home screen.
+    // Registered before /bookings/{booking}/* so "pending" isn't a {booking}.
+    Route::get('/bookings/pending', [BookingsController::class, 'pending']);
     Route::get('/bookings/{booking}/payment-status', [BookingsController::class, 'paymentStatus']);
     // Called by the app when the guest backs out of the hosted payment page.
     Route::post('/bookings/{booking}/cancel', [BookingsController::class, 'cancel']);
+
+    // Guest reviews: post one for a completed booking's place; delete own.
+    Route::post('/bookings/{booking}/reviews', [ReviewsController::class, 'store']);
+    Route::delete('/reviews/{review}', [ReviewsController::class, 'destroy']);
 });
 
 // ─── Admin-only ──────────────────────────────────────────────────────────────

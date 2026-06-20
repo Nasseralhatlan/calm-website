@@ -17,13 +17,13 @@ use Illuminate\Support\Facades\DB;
  */
 final class PlaceListService
 {
-    public function paginate(int $perPage = 25): LengthAwarePaginator
+    public function paginate(?int $perPage = null): LengthAwarePaginator
     {
         return PlaceList::query()
             ->withCount('places')
             ->orderBy('sort_order')
             ->orderBy('name_en')
-            ->paginate($perPage);
+            ->paginate($perPage ?? config('pagination.per_page'));
     }
 
     /** Fetch a list ready for editing — with its current members + sort order. */

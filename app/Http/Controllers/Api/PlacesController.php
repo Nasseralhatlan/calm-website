@@ -30,8 +30,7 @@ class PlacesController extends Controller
         /** @var User|null $viewer */
         $viewer = $request->user();
 
-        $perPage = min(max($request->integer('per_page', 20), 1), 50);
-        $paginator = $this->service->search($request->filters(), $viewer, $perPage);
+        $paginator = $this->service->search($request->filters(), $viewer);
 
         return ApiResponse::success(
             data: [
@@ -83,8 +82,7 @@ class PlacesController extends Controller
         /** @var User $viewer */
         $viewer = $request->user();
 
-        $perPage = min(max($request->integer('per_page', 20), 1), 50);
-        $paginator = $this->service->likedByUser($viewer, $perPage);
+        $paginator = $this->service->likedByUser($viewer);
 
         return ApiResponse::success(
             data: [

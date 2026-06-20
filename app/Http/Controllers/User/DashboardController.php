@@ -58,9 +58,4 @@ class DashboardController extends Controller
     {
         return view('user.favorites', ['user' => $request->user()]);
     }
-
-    public function support(Request $request): View
-    {
-        return view('user.support', ['user' => $request->user()]);
-    }
 }

@@ -13,16 +13,19 @@ use App\Models\PlaceAttribute;
 use App\Models\PlacePhoto;
 use App\Models\PlaceType;
 use App\Models\User;
+use App\Services\Notification\NotificationService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 
 final class PlaceService
 {
-    public function paginate(int $perPage = 25, ?string $search = null): LengthAwarePaginator
+    public function __construct(private readonly NotificationService $notifications) {}
+
+    public function paginate(?int $perPage = null, ?string $search = null): LengthAwarePaginator
     {
         return Place::query()
-            ->with(['host', 'type', 'cityArea.city'])
+            ->with(['host', 'type', 'cityArea.city', 'coverPhoto'])
             ->withCount(['photos', 'attributeValues'])
             ->when($search, fn ($q, string $term) => $q->where(function ($q) use ($term): void {
                 // Search is exact-match on the place uuid or LIKE on the host
@@ -35,7 +38,7 @@ final class PlaceService
                     ->orWhereHas('host', fn ($h) => $h->where('phone', 'like', '%'.$phone.'%'));
             }))
             ->latest()
-            ->paginate($perPage)
+            ->paginate($perPage ?? config('pagination.per_page'))
             ->withQueryString();
     }
 
@@ -47,7 +50,7 @@ final class PlaceService
      *
      * @return array{places: LengthAwarePaginator<int, Place>, counts: array<string,int>, nextReview: ?Place}
      */
-    public function indexData(?string $search = null, int $perPage = 25): array
+    public function indexData(?string $search = null, ?int $perPage = null): array
     {
         return [
             'places' => $this->paginate($perPage, $search),
@@ -88,17 +91,17 @@ final class PlaceService
     }
 
     /**
-     * Places that belong to a specific host (the host's own list).
-     *
-     * @return Collection<int, Place>
+     * Places that belong to a specific host (the host's own list), paginated so
+     * a host with many listings doesn't load them all on one page.
      */
-    public function forHost(User $host): Collection
+    public function forHost(User $host, ?int $perPage = null): LengthAwarePaginator
     {
         return Place::query()
             ->where('host_user_id', $host->id)
             ->with(['type', 'cityArea.city', 'coverPhoto'])
             ->latest()
-            ->get();
+            ->paginate($perPage ?? config('pagination.per_page'))
+            ->withQueryString();
     }
 
     /**
@@ -119,13 +122,18 @@ final class PlaceService
         array $attributes = [],
         array $photos = [],
     ): Place {
-        return DB::transaction(function () use ($host, $data, $draftId, $attributes, $photos): Place {
+        $place = DB::transaction(function () use ($host, $data, $draftId, $attributes, $photos): Place {
             $place = $this->upsertPlace($host, $data, $draftId, PlaceReviewStatus::PendingReview);
             $this->syncAttributes($place, $attributes);
             $this->syncPhotos($place, $photos);
 
             return $place->refresh();
         });
+
+        // Notify the host their place is now in review (fired after commit).
+        $this->notifications->placeSubmitted($place);
+
+        return $place;
     }
 
     /**
@@ -415,7 +423,7 @@ final class PlaceService
      */
     public function updateDetailsForHost(Place $place, array $data, array $attributes = [], array $photos = []): Place
     {
-        return DB::transaction(function () use ($place, $data, $attributes, $photos): Place {
+        $place = DB::transaction(function () use ($place, $data, $attributes, $photos): Place {
             $place->update([
                 ...$data,
                 'status' => PlaceStatus::Inactive->value,
@@ -436,6 +444,11 @@ final class PlaceService
 
             return $place->refresh();
         });
+
+        // Editing resubmits for review — notify the host (fired after commit).
+        $this->notifications->placeSubmitted($place);
+
+        return $place;
     }
 
     /**
@@ -445,15 +458,15 @@ final class PlaceService
      *
      * @return LengthAwarePaginator<int, Place>
      */
-    public function listingsForHost(User $host, int $perPage = 20): LengthAwarePaginator
+    public function listingsForHost(User $host, ?int $perPage = null): LengthAwarePaginator
     {
         return Place::query()
             ->where('host_user_id', $host->id)
             ->with(['type', 'cityArea.city', 'coverPhoto'])
-            ->withCount(['likes', 'reviews', 'bookings'])
-            ->withAvg('reviews', 'rate')
+            ->withCount(['likes', 'publishedReviews', 'bookings'])
+            ->withAvg('publishedReviews', 'rate')
             ->latest()
-            ->paginate($perPage)
+            ->paginate($perPage ?? config('pagination.per_page'))
             ->withQueryString();
     }
 
@@ -485,8 +498,8 @@ final class PlaceService
     {
         $query->with(['type', 'cityArea.city', 'coverPhoto', 'photos'])
             ->withCount('likes')
-            ->withCount('reviews')
-            ->withAvg('reviews', 'rate');
+            ->withCount('publishedReviews')
+            ->withAvg('publishedReviews', 'rate');
 
         if ($viewer !== null) {
             $query->selectRaw('places.*, EXISTS(SELECT 1 FROM place_likes WHERE place_likes.place_id = places.id AND place_likes.user_id = ?) AS liked_by_me', [$viewer->id]);
@@ -520,12 +533,21 @@ final class PlaceService
             'photos',
             'coverPhoto',
             'attributeValues.attribute.group',
-            'reviews' => fn ($q) => $q->latest()->limit(10),
+            'publishedReviews' => fn ($q) => $q->with('guest')->latest()->limit(10),
         ]);
 
+        // Order the place's amenities by the admin-controlled attribute sort so
+        // the API matches the add-place wizard and the web place page exactly.
+        $place->setRelation(
+            'attributeValues',
+            $place->attributeValues
+                ->sortBy(fn ($pa) => [$pa->attribute?->sort_order ?? 0, $pa->attribute?->name_en ?? ''])
+                ->values(),
+        );
+
         $place->loadCount('likes');
-        $place->loadCount('reviews');
-        $place->loadAvg('reviews', 'rate');
+        $place->loadCount('publishedReviews');
+        $place->loadAvg('publishedReviews', 'rate');
 
         if ($viewer !== null) {
             $place->setAttribute(
@@ -567,7 +589,7 @@ final class PlaceService
      * @param  array<string, mixed>  $f  Validated filters (see SearchPlacesRequest).
      * @return LengthAwarePaginator<int, Place>
      */
-    public function search(array $f, ?User $viewer = null, int $perPage = 20): LengthAwarePaginator
+    public function search(array $f, ?User $viewer = null, ?int $perPage = null): LengthAwarePaginator
     {
         $query = Place::query()->visible();
         $this->eagerHomeFields($query, $viewer);
@@ -610,7 +632,7 @@ final class PlaceService
                 ->orderByDesc('created_at'),
         };
 
-        return $query->paginate($perPage)->withQueryString();
+        return $query->paginate($perPage ?? config('pagination.per_page'))->withQueryString();
     }
 
     /**
@@ -666,7 +688,7 @@ final class PlaceService
         $amenities = Attribute::query()
             ->with('group')
             ->withCount(['placeValues as places_count' => fn ($q) => $q->whereHas('place', $inCity)])
-            ->orderBy('name_en')
+            ->ordered()
             ->get()
             ->filter(fn (Attribute $a) => $a->places_count > 0)
             ->groupBy(fn (Attribute $a) => $a->group_id)
@@ -681,6 +703,7 @@ final class PlaceService
                     'name_en' => $a->name_en,
                     'name_ar' => $a->name_ar,
                     'icon' => $a->icon,
+                    'is_highlighted' => (bool) $a->is_highlighted,
                     'places_count' => (int) $a->places_count,
                 ])->values()->all(),
             ])
@@ -707,14 +730,14 @@ final class PlaceService
      *
      * @return LengthAwarePaginator<int, Place>
      */
-    public function likedByUser(User $viewer, int $perPage = 20): LengthAwarePaginator
+    public function likedByUser(User $viewer, ?int $perPage = null): LengthAwarePaginator
     {
         $query = $viewer->likedPlaces()->visible();
         $this->eagerHomeFields($query);
 
         $paginator = $query
             ->orderByPivot('created_at', 'desc')
-            ->paginate($perPage)
+            ->paginate($perPage ?? config('pagination.per_page'))
             ->withQueryString();
 
         // Every row is liked by definition → flag it for PlaceResource.
