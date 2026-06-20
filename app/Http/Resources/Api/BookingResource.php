@@ -36,10 +36,19 @@ class BookingResource extends JsonResource
                 $place = $this->place;
                 $city = $place?->cityArea?->city;
 
+                // The exact map link is sensitive: only reveal it once the
+                // booking is a real, paid stay (confirmed or completed).
+                $locationUnlocked = in_array(
+                    $this->booking_status,
+                    [BookingStatus::Confirmed, BookingStatus::Completed],
+                    true,
+                );
+
                 return $place ? [
                     'id' => $place->id,
                     'title' => $place->title,
                     'cover_photo_url' => $place->coverPhoto?->url,
+                    'location_url' => $locationUnlocked ? $place->location_url : null,
                     'type' => $place->type ? [
                         'name_en' => $place->type->name_en,
                         'name_ar' => $place->type->name_ar,

@@ -88,6 +88,7 @@
         'checkout_next_day' => (bool) $draft->checkout_next_day,
         'max_guests' => $draft->max_guests,
         'rules' => $draft->rules,
+        'location_url' => $draft->location_url,
         'review_status' => $draft->review_status?->value,
         'rejection_reason' => $draft->rejection_reason,
         'last_step' => (int) ($draft->last_step ?: 1),
@@ -371,6 +372,15 @@
                     </div>
 
                     <input type="hidden" name="city_area_id" :value="cityAreaId || ''">
+
+                    <label class="block mt-10">
+                        <span class="text-sm font-semibold text-[#222] {{ $fa }}">{{ $isRtl ? 'رابط الموقع' : 'Location link' }} <span class="text-[#F88379]">*</span></span>
+                        <div class="mt-3 border border-[#dddddd] focus-within:border-[#222] transition-all bg-white shadow-card r-ios-lg overflow-hidden">
+                            <input name="location_url" x-model="locationUrl" type="url" maxlength="2048" dir="ltr"
+                                   placeholder="https://maps.google.com/..."
+                                   class="w-full bg-transparent outline-none text-[15px] text-[#222] py-4 px-5 {{ $fa }}">
+                        </div>
+                    </label>
                 </section>
 
                 {{-- ── Step 5: pricing ── --}}
@@ -892,7 +902,7 @@
                 <div class="mt-12 flex items-center justify-between gap-4" x-show="!editing">
                     <button type="button" @click="back" x-show="step > 1"
                             class="px-6 py-3 text-[#717171] hover:text-[#222] font-semibold transition-colors {{ $fa }}">
-                        {{ $isRtl ? '← السابق' : '← Back' }}
+                        {{ $isRtl ? 'السابق →' : '← Back' }}
                     </button>
                     <div x-show="step === 1"></div>
 
@@ -924,10 +934,10 @@
                     <div class="flex items-center gap-2">
                         <button type="button" @click="back" :disabled="step === 1"
                                 class="inline-flex items-center font-semibold text-[#222] bg-[#f3f4f6] hover:bg-[#e9eaec] disabled:opacity-30 transition-all {{ $fa }}"
-                                style="padding: 11px 18px; border-radius: 14px;">{{ $isRtl ? '← السابق' : '← Back' }}</button>
+                                style="padding: 11px 18px; border-radius: 14px;">{{ $isRtl ? 'السابق →' : '← Back' }}</button>
                         <button type="button" @click="editNext" :disabled="step >= totalSteps"
                                 class="inline-flex items-center font-semibold text-[#222] bg-[#f3f4f6] hover:bg-[#e9eaec] disabled:opacity-30 transition-all {{ $fa }}"
-                                style="padding: 11px 18px; border-radius: 14px;">{{ $isRtl ? 'التالي →' : 'Next →' }}</button>
+                                style="padding: 11px 18px; border-radius: 14px;">{{ $isRtl ? '← التالي' : 'Next →' }}</button>
                     </div>
                     <div class="flex items-center gap-2">
                         <button type="button" @click="discard()"
@@ -1012,6 +1022,9 @@ function registerWizard() {
         // Pre-filled default rules for a new place; overridden by saved rules on
         // draft-resume / edit (see init.draft.rules below).
         rules: @js($defaultRules),
+        // Map link (Google Maps, etc.) the host pastes; shown to guests only
+        // after their booking is confirmed.
+        locationUrl: '',
         // attribute_id → { count, description }
         selectedAttributes: {},
 
@@ -1050,6 +1063,7 @@ function registerWizard() {
                 this.checkoutNextDay = init.draft.checkout_next_day ?? true;
                 this.maxGuests    = init.draft.max_guests || 1;
                 this.rules        = init.draft.rules || '';
+                this.locationUrl  = init.draft.location_url || '';
                 this.draftId      = init.draft.id;
 
                 // Restore selected attributes — keyed by attribute_id, value = count, plus description.
@@ -1163,7 +1177,7 @@ function registerWizard() {
                 case 1: return !!this.placeTypeId;
                 case 2: return this.title.trim().length > 0;
                 case 3: return !!this.cityId;          // city pick
-                case 4: return !!this.cityAreaId;      // area pick
+                case 4: return !!this.cityAreaId && this.locationUrl.trim().length > 0; // area pick + location link
                 case 5: return Number(this.price) > 0; // pricing
                 case 6: return Object.keys(this.selectedAttributes).length > 0;        // attribute pick
                 case 7: return this.selectedAttributesList().every((e) => e.count >= 1); // configure
@@ -1622,6 +1636,7 @@ function registerWizard() {
                 checkout_next_day: this.checkoutNextDay,
                 max_guests: Number(this.maxGuests) || null,
                 rules: this.rules || null,
+                location_url: this.locationUrl || null,
                 last_step: this.step,
                 price_sunday:    this.dayPrices.sunday    || 0,
                 price_monday:    this.dayPrices.monday    || 0,

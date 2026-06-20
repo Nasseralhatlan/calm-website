@@ -30,6 +30,7 @@ function placeSubmitPayload(array $overrides = []): array
         'check_in_time' => '15:00',
         'check_out_time' => '12:00',
         'max_guests' => 4,
+        'location_url' => 'https://maps.google.com/?q=24.7,46.6',
         // A place must have at least 5 images overall.
         'extra_image_paths' => [
             'places/uploads/1.jpg', 'places/uploads/2.jpg', 'places/uploads/3.jpg',

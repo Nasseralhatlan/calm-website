@@ -4,12 +4,12 @@
     $cell = 'inline-flex items-center justify-center text-sm font-semibold select-none transition-colors';
     $cellStyle = 'min-width: 40px; height: 40px; padding: 0 12px; border-radius: 12px;';
 
-    // Arrows point in the direction of travel. The flex row reverses under RTL
-    // (previous sits on the right toward page 1, next on the left toward the
-    // last page), so the glyphs flip with the locale: previous always points at
-    // page 1, next always points at the higher pages.
-    $prevArrow = $isRtl ? '&rsaquo;' : '&lsaquo;'; // → / ← toward page 1
-    $nextArrow = $isRtl ? '&lsaquo;' : '&rsaquo;'; // ← / → toward the last page
+    // The pager is kept LTR in both locales (page numbers are numeric, so a
+    // left→right run reads naturally either way). This guarantees the arrow's
+    // visual direction matches where it takes you: ‹ always = previous/back,
+    // › always = next/forward — no reversed "points right but goes back" glyphs.
+    $prevArrow = '&lsaquo;'; // ‹ — previous / back
+    $nextArrow = '&rsaquo;'; // › — next / forward
 @endphp
 
 @if ($paginator->hasPages())
@@ -29,8 +29,9 @@
             @endif
         </p>
 
-        {{-- Page links --}}
-        <div class="flex items-center" style="gap: 6px;">
+        {{-- Page links — forced LTR in both locales so prev (‹) sits left and
+             next (›) right, arrows matching their action regardless of page dir. --}}
+        <div class="flex items-center" dir="ltr" style="gap: 6px;">
             {{-- Previous --}}
             @if ($paginator->onFirstPage())
                 <span class="{{ $cell }} text-[#bbb] bg-white border border-[#ebebeb] cursor-default"

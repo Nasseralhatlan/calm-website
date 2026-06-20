@@ -51,6 +51,7 @@ function adminWizardPayload(array $overrides = []): array
         'check_out_time' => '11:00',
         'max_guests' => 5,
         'rules' => 'Quiet.',
+        'location_url' => 'https://maps.google.com/?q=24.7,46.6',
         'status' => PlaceStatus::Active->value,
         'review_status' => PlaceReviewStatus::Approved->value,
         'rejection_reason' => null,
@@ -99,6 +100,16 @@ it('saves an admin edit without forcing re-review, syncing amenities/photos/list
         ->and($place->attributeValues)->toHaveCount(1)
         ->and($place->photos)->toHaveCount(5)
         ->and($place->lists->pluck('id')->all())->toBe([$list->id]);
+});
+
+it('saves the location link on an admin edit', function (): void {
+    $place = adminPlace($this->host);
+
+    $this->actingAs($this->admin, 'api')
+        ->put("/admin/places/{$place->id}", adminWizardPayload(['location_url' => 'https://maps.app.goo.gl/adminEdit']))
+        ->assertRedirect(route('admin.places.index'));
+
+    expect($place->refresh()->location_url)->toBe('https://maps.app.goo.gl/adminEdit');
 });
 
 it('lets the admin change status + review from the admin step', function (): void {

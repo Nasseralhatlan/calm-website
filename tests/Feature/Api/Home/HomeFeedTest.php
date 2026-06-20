@@ -52,18 +52,45 @@ it('returns active countries through GET /api/countries', function (): void {
         ]);
 });
 
-it('returns active cities with their areas through GET /api/cities', function (): void {
-    $activeCount = City::query()->active()->count();
+it('returns only active cities that have a visible place, with their non-empty areas', function (): void {
+    $host = User::factory()->create(['phone' => '512345690']);
+    $area = CityArea::query()->first();
 
-    $this->getJson('/api/cities')
+    // A sibling area in the SAME city with no places — must be excluded from the
+    // city's areas list even though the city itself is returned.
+    $emptyArea = CityArea::query()->create([
+        'city_id' => $area->city_id, 'name_en' => 'Empty Area', 'name_ar' => 'منطقة فارغة',
+    ]);
+
+    // One visible place, living in $area.
+    makeVisiblePlace($host);
+
+    $response = $this->getJson('/api/cities')
         ->assertOk()
         ->assertJsonPath('status', 200)
-        ->assertJsonCount($activeCount, 'data')
         ->assertJsonStructure([
             'status', 'message', 'data' => [
                 ['id', 'name_en', 'name_ar', 'avatar', 'country_id', 'areas' => [['id', 'name_en', 'name_ar']]],
             ],
         ]);
+
+    // Only the city that owns the place is returned (other active, empty cities are dropped).
+    $data = $response->json('data');
+    expect($data)->toHaveCount(1)
+        ->and($data[0]['id'])->toBe($area->city_id);
+
+    // Its areas include the one with a place but not the empty sibling.
+    $areaIds = collect($data[0]['areas'])->pluck('id');
+    expect($areaIds)->toContain($area->id)
+        ->and($areaIds)->not->toContain($emptyArea->id);
+});
+
+it('omits cities whose only places are not visible from GET /api/cities', function (): void {
+    $host = User::factory()->create(['phone' => '512345691']);
+    // A pending (non-visible) place — the city must NOT appear.
+    makeVisiblePlace($host, ['review_status' => PlaceReviewStatus::PendingReview->value]);
+
+    $this->getJson('/api/cities')->assertOk()->assertJsonCount(0, 'data');
 });
 
 it('returns active place types through GET /api/place-types', function (): void {

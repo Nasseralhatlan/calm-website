@@ -122,6 +122,31 @@ it('excludes expired bookings from the guest list', function (): void {
         ->assertJsonPath('data.items.0.id', $kept->id);
 });
 
+it('reveals the place location link only for confirmed and completed bookings', function (): void {
+    $url = 'https://maps.google.com/?q=24.7,46.6';
+    $guest = User::factory()->create(['phone' => '519000040']);
+    $host = User::factory()->create(['phone' => '519000041']);
+    $place = listPlace($host, ['location_url' => $url]);
+
+    // Sort order: pending_payment → confirmed → completed → cancelled.
+    listBooking($place, $guest, ['booking_status' => BookingStatus::PendingPayment->value]);
+    listBooking($place, $guest, ['booking_status' => BookingStatus::Confirmed->value]);
+    listBooking($place, $guest, ['booking_status' => BookingStatus::Completed->value, 'end_date' => now()->subDay()->toDateString()]);
+    listBooking($place, $guest, ['booking_status' => BookingStatus::CanceledByHost->value, 'canceled_at' => now()->subDay()]);
+
+    $this->actingAs($guest, 'api')
+        ->getJson('/api/bookings')
+        ->assertOk()
+        ->assertJsonPath('data.items.0.status', 'pending_payment')
+        ->assertJsonPath('data.items.0.place.location_url', null)   // hidden before payment
+        ->assertJsonPath('data.items.1.status', 'confirmed')
+        ->assertJsonPath('data.items.1.place.location_url', $url)   // unlocked
+        ->assertJsonPath('data.items.2.status', 'completed')
+        ->assertJsonPath('data.items.2.place.location_url', $url)   // unlocked
+        ->assertJsonPath('data.items.3.status', 'canceled_by_host')
+        ->assertJsonPath('data.items.3.place.location_url', null);  // hidden after cancellation
+});
+
 it('only returns the authenticated guest\'s bookings', function (): void {
     $guest = User::factory()->create(['phone' => '519000003']);
     $other = User::factory()->create(['phone' => '519000004']);

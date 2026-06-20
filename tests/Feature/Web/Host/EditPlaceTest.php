@@ -67,6 +67,7 @@ function editPayload(array $overrides = []): array
         'check_out_time' => '11:00',
         'max_guests' => 6,
         'rules' => 'Quiet after 10pm.',
+        'location_url' => 'https://maps.google.com/?q=24.7,46.6',
     ], $overrides);
 }
 
@@ -96,6 +97,49 @@ it('updates the details and resubmits the place for review', function (): void {
     expect($place->review_status)->toBe(PlaceReviewStatus::PendingReview);
     // …and offline until an admin re-approves it.
     expect($place->status)->toBe(PlaceStatus::Inactive);
+});
+
+it('saves the pasted location link on update', function (): void {
+    $host = User::factory()->create(['phone' => '513000020']);
+    $place = editablePlace($host);
+
+    $this->actingAs($host, 'api')
+        ->put("/my-places/{$place->id}", editPayload(['location_url' => 'https://maps.google.com/?q=24.7,46.6']))
+        ->assertRedirect();
+
+    expect($place->refresh()->location_url)->toBe('https://maps.google.com/?q=24.7,46.6');
+});
+
+it('rejects an invalid location link on update', function (): void {
+    $host = User::factory()->create(['phone' => '513000021']);
+    $place = editablePlace($host);
+
+    $this->actingAs($host, 'api')
+        ->from("/my-places/{$place->id}/edit")
+        ->put("/my-places/{$place->id}", editPayload(['location_url' => 'not a url']))
+        ->assertSessionHasErrors('location_url');
+});
+
+it('pre-fills the saved location link in the edit form', function (): void {
+    $host = User::factory()->create(['phone' => '513000024']);
+    $place = editablePlace($host, ['location_url' => 'https://maps.app.goo.gl/abc123XYZ']);
+
+    // The init payload JSON-escapes slashes (https:\/\/…), so assert on the
+    // unique tail to confirm the saved value is hydrated into the edit form.
+    $this->actingAs($host, 'api')
+        ->get("/my-places/{$place->id}/edit")
+        ->assertOk()
+        ->assertSee('abc123XYZ');
+});
+
+it('requires a location link on update', function (): void {
+    $host = User::factory()->create(['phone' => '513000022']);
+    $place = editablePlace($host);
+
+    $this->actingAs($host, 'api')
+        ->from("/my-places/{$place->id}/edit")
+        ->put("/my-places/{$place->id}", editPayload(['location_url' => '']))
+        ->assertSessionHasErrors('location_url');
 });
 
 it('clears stale rejection feedback when a place is edited', function (): void {

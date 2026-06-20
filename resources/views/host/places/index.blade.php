@@ -147,7 +147,6 @@
                 </div>
             @endforeach
         </div>
-
         @if($places->hasPages())<div style="margin-top: 24px;">{{ $places->links() }}</div>@endif
     @endif
 @endsection
