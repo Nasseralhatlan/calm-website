@@ -209,7 +209,7 @@
         @if($isHost)
             <div style="{{ $row }}">
                 <span class="text-[#717171]">{{ $isRtl ? 'عمولة كالم' : 'Calm commission' }} ({{ $rate($booking->commission_rate) }}%)</span>
-                <span class="font-semibold text-[#ef4444] tabular-nums" dir="ltr">− {{ $sar($booking->commission_amount) }} {{ $cur }}</span>
+                <span class="font-semibold text-[#717171] tabular-nums" dir="ltr">− {{ $sar($booking->commission_amount) }} {{ $cur }}</span>
             </div>
             <div style="{{ $row }} border-top:1px solid #f0f0f0;margin-top:4px;">
                 <span class="font-bold text-[#222]">{{ $isRtl ? 'صافي أرباحك' : 'Your payout' }}</span>

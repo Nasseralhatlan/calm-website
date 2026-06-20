@@ -9,11 +9,11 @@
     $place = $booking->place;
     $backRoute = $isHost ? 'user.bookings' : 'user.my-bookings';
 
-    $supportPhone = config('support.phone');
-    $supportWhatsapp = config('support.whatsapp');
-    $supportEmail = config('support.email');
-    $supportHours = config('support.hours');
-    $waNumber = preg_replace('/[^0-9]/', '', (string) $supportWhatsapp);
+    // Support contacts come from the admin Settings (key→value), same source as
+    // the landing + /support pages. WhatsApp reuses the support phone.
+    $supportPhone = $support['support_phone'] ?? null;
+    $supportEmail = $support['support_email'] ?? null;
+    $waNumber = $supportPhone ? preg_replace('/[^0-9]/', '', $supportPhone) : null;
 @endphp
 
 @section('title', $isRtl ? 'تفاصيل الحجز' : 'Booking details')
@@ -39,21 +39,24 @@
                 {{ $isRtl ? 'لأي تعديل أو إلغاء أو استفسار عن هذا الحجز، تواصل مع فريق الدعم.' : 'For any change, cancellation or question about this booking, reach our support team.' }}
             </p>
             <div class="grid grid-cols-1 sm:grid-cols-2" style="gap: 10px;">
-                <a href="tel:{{ $supportPhone }}"
-                   class="inline-flex items-center justify-center font-semibold text-[#222] bg-[#f7f7f7] hover:bg-[#efefef] transition-colors {{ $fa }}"
-                   style="padding: 12px; border-radius: 14px; font-size: 14px; gap: 8px;">
-                    <span>📞</span><span dir="ltr">{{ $supportPhone }}</span>
-                </a>
-                <a href="https://wa.me/{{ $waNumber }}" target="_blank" rel="noopener"
-                   class="inline-flex items-center justify-center font-semibold text-white transition-colors {{ $fa }}"
-                   style="padding: 12px; border-radius: 14px; font-size: 14px; gap: 8px; background-color: #25D366;">
-                    <span>💬</span><span>{{ $isRtl ? 'واتساب' : 'WhatsApp' }}</span>
-                </a>
+                @if($supportPhone)
+                    <a href="tel:{{ $supportPhone }}"
+                       class="inline-flex items-center justify-center font-semibold text-[#222] bg-[#f7f7f7] hover:bg-[#efefef] transition-colors {{ $fa }}"
+                       style="padding: 12px; border-radius: 14px; font-size: 14px; gap: 8px;">
+                        <span>📞</span><span dir="ltr">{{ $supportPhone }}</span>
+                    </a>
+                    <a href="https://wa.me/{{ $waNumber }}" target="_blank" rel="noopener"
+                       class="inline-flex items-center justify-center font-semibold text-white transition-colors {{ $fa }}"
+                       style="padding: 12px; border-radius: 14px; font-size: 14px; gap: 8px; background-color: #25D366;">
+                        <span>💬</span><span>{{ $isRtl ? 'واتساب' : 'WhatsApp' }}</span>
+                    </a>
+                @endif
             </div>
-            <div class="flex items-center flex-wrap text-[12px] text-[#999] {{ $fa }}" style="gap: 6px 16px; margin-top: 14px;">
-                @if($supportEmail)<a href="mailto:{{ $supportEmail }}" class="hover:text-[#F88379]" dir="ltr">{{ $supportEmail }}</a>@endif
-                @if($supportHours)<span>· {{ $isRtl ? 'ساعات العمل' : 'Hours' }}: <span dir="ltr">{{ $supportHours }}</span></span>@endif
-            </div>
+            @if($supportEmail)
+                <div class="flex items-center flex-wrap text-[12px] text-[#999] {{ $fa }}" style="gap: 6px 16px; margin-top: 14px;">
+                    <a href="mailto:{{ $supportEmail }}" class="hover:text-[#F88379]" dir="ltr">{{ $supportEmail }}</a>
+                </div>
+            @endif
         </div>
     </div>
 @endsection

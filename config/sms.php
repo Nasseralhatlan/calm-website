@@ -21,6 +21,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Per-phone mock override
+    |--------------------------------------------------------------------------
+    |
+    | Comma-separated phones that ALWAYS use the mock driver (fixed OTP 111111,
+    | no real SMS — neither OTP nor notifications) even when the driver is
+    | sms_saudi. For testers / App Store review. Matched on the last 9 digits.
+    |
+    */
+
+    'mock_phones' => array_filter(array_map('trim', explode(',', (string) env('SMS_MOCK_PHONES', '')))),
+
+    /*
+    |--------------------------------------------------------------------------
     | SMS Saudi (api-server14) driver settings
     |--------------------------------------------------------------------------
     */

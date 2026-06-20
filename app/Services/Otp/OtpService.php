@@ -8,6 +8,7 @@ use App\Contracts\SmsDeliveryContract;
 use App\Enums\OtpType;
 use App\Models\Otp;
 use App\Models\User;
+use App\Support\MockPhoneRegistry;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
@@ -22,6 +23,7 @@ final class OtpService
 
     public function __construct(
         private readonly SmsDeliveryContract $sms,
+        private readonly MockPhoneRegistry $mockPhones,
     ) {}
 
     /**
@@ -39,7 +41,7 @@ final class OtpService
             return $active;
         }
 
-        $plain = $this->generateCode();
+        $plain = $this->generateCode($type, $identifier);
 
         $otp = Otp::query()->create([
             'user_id' => $user->id,
@@ -119,14 +121,17 @@ final class OtpService
         };
     }
 
-    private function generateCode(): string
+    private function generateCode(OtpType $type, string $identifier): string
     {
         // Dev convenience: the mock SMS driver doesn't deliver to a real phone,
         // so a random code would just clutter the log and force the dev to
         // open it on every login. Hard-code "111111" so anyone running the
         // app locally (or in CI) can sign in without checking laravel.log.
-        // The real `sms_saudi` driver still gets a fresh random code.
-        if (config('sms.driver') === 'mock') {
+        // The real `sms_saudi` driver still gets a fresh random code — EXCEPT
+        // for whitelisted phones (testers / App Store review), which also get
+        // the fixed code so they can log in without receiving a real SMS.
+        if (config('sms.driver') === 'mock'
+            || ($type === OtpType::Phone && $this->mockPhones->has($identifier))) {
             return str_repeat('1', self::OTP_LENGTH);
         }
 
