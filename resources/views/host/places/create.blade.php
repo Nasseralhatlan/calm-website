@@ -380,6 +380,10 @@
                                    placeholder="https://maps.google.com/..."
                                    class="w-full bg-transparent outline-none text-[15px] text-[#222] py-4 px-5 {{ $fa }}">
                         </div>
+                        <p x-show="locationUrl.trim().length > 0 && !isValidLocationUrl()" x-cloak
+                           class="mt-2 text-sm text-[#dc2626] {{ $fa }}">
+                            {{ $isRtl ? 'الرجاء إدخال رابط صحيح يبدأ بـ http:// أو https://' : 'Please enter a valid link starting with http:// or https://' }}
+                        </p>
                     </label>
                 </section>
 
@@ -1041,12 +1045,6 @@ function registerWizard() {
         uploadCounter: 0,       // monotonic id source for upload rows
 
         init() {
-            // Base price → mirror into all 7 day prices.
-            this.$watch('price', (val) => {
-                const n = Number(val) || 0;
-                Object.keys(this.dayPrices).forEach((day) => { this.dayPrices[day] = n; });
-            });
-
             // Resume a draft if the controller handed us one via `?draft=<id>`.
             if (init.draft) {
                 this.placeTypeId = init.draft.place_type_id;
@@ -1054,8 +1052,8 @@ function registerWizard() {
                 this.description = init.draft.description || '';
                 this.cityId      = init.draft.city_id || null;
                 this.cityAreaId  = init.draft.city_area_id || null;
-                // Assign price BEFORE day prices — the watcher flattens all 7 days to the
-                // base value, then we overwrite with whatever was actually persisted.
+                // Per-day prices fall back to the base price server-side when left
+                // at 0, so we just load whatever was actually persisted.
                 this.price       = init.draft.price || 0;
                 Object.assign(this.dayPrices, init.draft.day_prices || {});
                 this.checkInTime  = init.draft.check_in_time || '15:00';
@@ -1177,7 +1175,7 @@ function registerWizard() {
                 case 1: return !!this.placeTypeId;
                 case 2: return this.title.trim().length > 0;
                 case 3: return !!this.cityId;          // city pick
-                case 4: return !!this.cityAreaId && this.locationUrl.trim().length > 0; // area pick + location link
+                case 4: return !!this.cityAreaId && this.isValidLocationUrl(); // area pick + valid location link
                 case 5: return Number(this.price) > 0; // pricing
                 case 6: return Object.keys(this.selectedAttributes).length > 0;        // attribute pick
                 case 7: return this.selectedAttributesList().every((e) => e.count >= 1); // configure
@@ -1188,6 +1186,18 @@ function registerWizard() {
 
                 case 9: return this.checkInTime.trim().length > 0 && this.checkOutTime.trim().length > 0;
                 default: return true;
+            }
+        },
+
+        /** A pasted map link must be a valid http(s) URL — matches the server 'url' rule. */
+        isValidLocationUrl() {
+            const v = (this.locationUrl || '').trim();
+            if (v.length === 0) return false;
+            try {
+                const u = new URL(v);
+                return u.protocol === 'http:' || u.protocol === 'https:';
+            } catch (e) {
+                return false;
             }
         },
 
