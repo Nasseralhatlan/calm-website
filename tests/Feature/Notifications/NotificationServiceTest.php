@@ -204,7 +204,7 @@ it('notifies the host when their place is approved', function (): void {
 
     $row = UserNotification::query()->where('user_id', $host->id)->sole();
     expect($row->type)->toBe('place_approved')
-        ->and($row->title_en)->toBe('Your place was approved')
+        ->and($row->title_en)->toBe('Place approved')
         ->and($row->data['place_id'])->toBe($place->id);
 });
 
@@ -224,7 +224,7 @@ it('notifies the host when their place is submitted for review', function (): vo
     ]);
 
     $row = UserNotification::query()->where('user_id', $host->id)->where('type', 'place_submitted')->sole();
-    expect($row->title_en)->toBe('Your place was submitted for review')
+    expect($row->title_en)->toBe('Place received')
         ->and($row->data['place_id'])->toBe($place->id)
         ->and($row->body_ar)->toContain('تطبيق كالم')   // names the Calm app for new hosts
         ->and($row->body_en)->toContain('Calm app')

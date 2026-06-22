@@ -99,160 +99,132 @@ final class NotificationService
     }
 
     // ── System-event notifications ───────────────────────────────────────────
+    //
+    // Message text lives in config/notifications.php (one editable place, no
+    // user-generated content). Each method only resolves the recipient + the
+    // system values (booking ref, dates, reason) and fires notify().
 
     public function bookingConfirmed(Booking $booking): void
     {
-        $place = $booking->place?->title ?? ($booking->place_id ? 'مكانك' : '');
-        $checkIn = $this->checkInAt($booking);
-        $checkOut = $booking->checkoutAt();
-        $ref = $booking->reference;
-
-        $this->notify($booking->guest, [
-            'type' => 'booking_confirmed',
-            'title_ar' => 'تم تأكيد حجزك',
-            'title_en' => 'Your booking is confirmed',
-            'body_ar' => "تم تأكيد حجزك في {$place}. الدخول {$this->stayLabel($checkIn, 'ar')}، والخروج {$this->stayLabel($checkOut, 'ar')}. رقم الحجز: {$ref}. نتمنى لك إقامة سعيدة.",
-            'body_en' => "Your booking at {$place} is confirmed. Check-in {$this->stayLabel($checkIn, 'en')}, check-out {$this->stayLabel($checkOut, 'en')}. Booking ref: {$ref}. Enjoy your stay!",
-            'data' => ['booking_id' => $booking->id, 'place_id' => $booking->place_id],
-        ]);
+        $this->notify($booking->guest, $this->compose(
+            'booking_confirmed', 'guest', $this->bookingVars($booking),
+            ['booking_id' => $booking->id, 'place_id' => $booking->place_id],
+        ));
     }
 
     public function bookingCancelled(Booking $booking): void
     {
-        $place = $booking->place?->title ?? 'المكان';
-
-        $ref = $booking->reference;
-
-        $this->notify($booking->guest, [
-            'type' => 'booking_cancelled',
-            'title_ar' => 'تم إلغاء حجزك',
-            'title_en' => 'Your booking was cancelled',
-            'body_ar' => "تم إلغاء حجزك في {$place}. رقم الحجز: {$ref}.",
-            'body_en' => "Your booking at {$place} has been cancelled. Booking ref: {$ref}.",
-            'data' => ['booking_id' => $booking->id, 'place_id' => $booking->place_id],
-        ]);
+        $this->notify($booking->guest, $this->compose(
+            'booking_cancelled', 'guest', $this->refVars($booking),
+            ['booking_id' => $booking->id, 'place_id' => $booking->place_id],
+        ));
     }
 
     /**
-     * Host-initiated cancellation of a confirmed booking. The guest gets a warm
-     * apology; the host gets a calm confirmation. Wording is intentionally soft —
-     * cancellations affect trust in the platform.
+     * Host-initiated cancellation of a confirmed booking — both parties told.
      */
     public function bookingCanceledByHost(Booking $booking): void
     {
-        $place = $booking->place?->title ?? 'المكان';
-        $ref = $booking->reference;
+        $vars = $this->refVars($booking);
+        $data = ['booking_id' => $booking->id, 'place_id' => $booking->place_id];
 
-        $this->notify($booking->guest, [
-            'type' => 'booking_canceled_by_host',
-            'title_ar' => 'نعتذر، تم إلغاء حجزك',
-            'title_en' => 'Sorry — your booking was cancelled',
-            'body_ar' => "نأسف لإبلاغك بأنه تم إلغاء حجزك في \"{$place}\" من قِبل المضيف. رقم الحجز: {$ref}. نعتذر عن الإزعاج، وفريقنا سعيد بمساعدتك في إيجاد بديل مناسب.",
-            'body_en' => "We're sorry to let you know your booking at \"{$place}\" was cancelled by the host. Booking ref: {$ref}. Apologies for the inconvenience — our team is happy to help you find a great alternative.",
-            'data' => ['booking_id' => $booking->id, 'place_id' => $booking->place_id],
-        ]);
-
-        $this->notify($booking->host, [
-            'type' => 'booking_canceled_by_host',
-            'title_ar' => 'تم إلغاء الحجز',
-            'title_en' => 'Booking cancelled',
-            'body_ar' => "تم إلغاء حجز الضيف في \"{$place}\" بناءً على طلبك. رقم الحجز: {$ref}. شكراً لإشعارنا.",
-            'body_en' => "The guest's booking at \"{$place}\" has been cancelled per your request. Booking ref: {$ref}. Thanks for letting us know.",
-            'data' => ['booking_id' => $booking->id, 'place_id' => $booking->place_id],
-        ]);
+        $this->notify($booking->guest, $this->compose('booking_canceled_by_host', 'guest', $vars, $data));
+        $this->notify($booking->host, $this->compose('booking_canceled_by_host', 'host', $vars, $data));
     }
 
     /**
-     * Platform/admin cancellation of a confirmed booking — typically at the
-     * guest's request. The guest gets a friendly confirmation; the host a gentle
-     * heads-up. Soft wording, since this touches the business relationship.
+     * Platform/admin cancellation of a confirmed booking — both parties told.
      */
     public function bookingCanceledByAdmin(Booking $booking): void
     {
-        $place = $booking->place?->title ?? 'المكان';
-        $ref = $booking->reference;
+        $vars = $this->refVars($booking);
+        $data = ['booking_id' => $booking->id, 'place_id' => $booking->place_id];
 
-        $this->notify($booking->guest, [
-            'type' => 'booking_canceled_by_admin',
-            'title_ar' => 'تم إلغاء حجزك',
-            'title_en' => 'Your booking was cancelled',
-            'body_ar' => "تم إلغاء حجزك في \"{$place}\" بناءً على طلبك. رقم الحجز: {$ref}. نتمنى استضافتك مجدداً قريباً.",
-            'body_en' => "Your booking at \"{$place}\" has been cancelled as requested. Booking ref: {$ref}. We'd love to host you again soon.",
-            'data' => ['booking_id' => $booking->id, 'place_id' => $booking->place_id],
-        ]);
-
-        $this->notify($booking->host, [
-            'type' => 'booking_canceled_by_admin',
-            'title_ar' => 'تم إلغاء حجز',
-            'title_en' => 'A booking was cancelled',
-            'body_ar' => "نود إعلامك بأنه تم إلغاء حجز في \"{$place}\" بناءً على طلب الضيف. رقم الحجز: {$ref}. نعتذر عن أي إزعاج.",
-            'body_en' => "Just so you know, a booking at \"{$place}\" was cancelled at the guest's request. Booking ref: {$ref}. Apologies for any inconvenience.",
-            'data' => ['booking_id' => $booking->id, 'place_id' => $booking->place_id],
-        ]);
+        $this->notify($booking->guest, $this->compose('booking_canceled_by_admin', 'guest', $vars, $data));
+        $this->notify($booking->host, $this->compose('booking_canceled_by_admin', 'host', $vars, $data));
     }
 
     public function placeSubmitted(Place $place): void
     {
-        $title = $place->title ?? 'مكانك';
-
-        $this->notify($place->host, [
-            'type' => 'place_submitted',
-            'title_ar' => 'تم استلام مكانك للمراجعة',
-            'title_en' => 'Your place was submitted for review',
-            'body_ar' => "استلمنا \"{$title}\" وهو الآن قيد المراجعة. سنخبرك فور اكتمالها ليظهر مكانك في تطبيق كالم.",
-            'body_en' => "We received \"{$title}\" — it's now under review. We'll let you know once it's live on the Calm app.",
-            'data' => ['place_id' => $place->id],
-        ]);
+        $this->notify($place->host, $this->compose(
+            'place_submitted', 'host', ['ar' => [], 'en' => []], ['place_id' => $place->id],
+        ));
     }
 
     public function hostNewBooking(Booking $booking): void
     {
-        $place = $booking->place?->title ?? 'مكانك';
-        $checkIn = $this->checkInAt($booking);
-        $checkOut = $booking->checkoutAt();
-        $ref = $booking->reference;
-
-        $this->notify($booking->host, [
-            'type' => 'host_new_booking',
-            'title_ar' => 'لديك حجز جديد',
-            'title_en' => 'You have a new booking',
-            'body_ar' => "لديك حجز جديد على \"{$place}\". الدخول {$this->stayLabel($checkIn, 'ar')}، والخروج {$this->stayLabel($checkOut, 'ar')}. رقم الحجز: {$ref}.",
-            'body_en' => "You've got a new booking on \"{$place}\". Check-in {$this->stayLabel($checkIn, 'en')}, check-out {$this->stayLabel($checkOut, 'en')}. Booking ref: {$ref}.",
-            'data' => ['booking_id' => $booking->id, 'place_id' => $booking->place_id],
-        ]);
+        $this->notify($booking->host, $this->compose(
+            'host_new_booking', 'host', $this->bookingVars($booking),
+            ['booking_id' => $booking->id, 'place_id' => $booking->place_id],
+        ));
     }
 
     public function placeApproved(Place $place): void
     {
-        $title = $place->title ?? 'مكانك';
-
-        $this->notify($place->host, [
-            'type' => 'place_approved',
-            'title_ar' => 'تمت الموافقة على مكانك',
-            'title_en' => 'Your place was approved',
-            'body_ar' => "أصبح \"{$title}\" متاحاً للحجز الآن في تطبيق كالم.",
-            'body_en' => "\"{$title}\" is now live and available for booking on the Calm app.",
-            'data' => ['place_id' => $place->id],
-        ]);
+        $this->notify($place->host, $this->compose(
+            'place_approved', 'host', ['ar' => [], 'en' => []], ['place_id' => $place->id],
+        ));
     }
 
     public function placeRejected(Place $place, ?string $reason = null): void
     {
-        $title = $place->title ?? 'مكانك';
         $reason = $reason !== null && $reason !== '' ? $reason : null;
+        // A reasonless rejection uses the shorter template.
+        $audience = $reason !== null ? 'host' : 'host_no_reason';
 
-        $this->notify($place->host, [
-            'type' => 'place_rejected',
-            'title_ar' => 'مكانك يحتاج إلى تعديلات',
-            'title_en' => 'Your place needs changes',
-            'body_ar' => $reason !== null
-                ? "يحتاج \"{$title}\" إلى تعديلات: {$reason}"
-                : "يحتاج \"{$title}\" إلى بعض التعديلات قبل الموافقة عليه.",
-            'body_en' => $reason !== null
-                ? "\"{$title}\" needs changes: {$reason}"
-                : "\"{$title}\" needs some changes before it can be approved.",
-            'data' => ['place_id' => $place->id],
-        ]);
+        $this->notify($place->host, $this->compose(
+            'place_rejected', $audience,
+            ['ar' => ['{reason}' => (string) $reason], 'en' => ['{reason}' => (string) $reason]],
+            ['place_id' => $place->id],
+            type: 'place_rejected',
+        ));
+    }
+
+    /**
+     * Build a notify() payload from a config template, interpolating the AR/EN
+     * placeholder maps. `$vars` is `['ar' => ['{x}' => '…'], 'en' => [...]]`.
+     *
+     * @param  array{ar: array<string, string>, en: array<string, string>}  $vars
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function compose(string $key, string $audience, array $vars, array $data, ?string $type = null): array
+    {
+        $t = config("notifications.{$key}.{$audience}");
+
+        return [
+            'type' => $type ?? $key,
+            'title_ar' => strtr($t['title_ar'], $vars['ar']),
+            'title_en' => strtr($t['title_en'], $vars['en']),
+            'body_ar' => strtr($t['body_ar'], $vars['ar']),
+            'body_en' => strtr($t['body_en'], $vars['en']),
+            'data' => $data,
+        ];
+    }
+
+    /**
+     * @return array{ar: array<string, string>, en: array<string, string>}
+     */
+    private function refVars(Booking $booking): array
+    {
+        $ref = (string) $booking->reference;
+
+        return ['ar' => ['{ref}' => $ref], 'en' => ['{ref}' => $ref]];
+    }
+
+    /**
+     * @return array{ar: array<string, string>, en: array<string, string>}
+     */
+    private function bookingVars(Booking $booking): array
+    {
+        $ref = (string) $booking->reference;
+        $checkIn = $this->checkInAt($booking);
+        $checkOut = $booking->checkoutAt();
+
+        return [
+            'ar' => ['{ref}' => $ref, '{checkIn}' => $this->stayLabel($checkIn, 'ar'), '{checkOut}' => $this->stayLabel($checkOut, 'ar')],
+            'en' => ['{ref}' => $ref, '{checkIn}' => $this->stayLabel($checkIn, 'en'), '{checkOut}' => $this->stayLabel($checkOut, 'en')],
+        ];
     }
 
     /** Check-in moment = the stay's start date at its check-in time. */
