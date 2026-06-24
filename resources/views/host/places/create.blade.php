@@ -1463,11 +1463,13 @@ function registerWizard() {
         },
         /**
          * Shrink a photo in the browser BEFORE the presigned upload so we store
-         * one smaller WebP per photo (visually lossless): resize-first to a
-         * 2560px max edge + WebP @ 0.90. iPhone HEIC/HEIF is converted to JPEG
-         * first via heic2any (lazy-loaded — it bundles libheif WASM). Anything
-         * that can't be processed falls back to the original so uploads never
-         * break. Small non-HEIC files (< 350 KB) pass through untouched.
+         * one web-optimized WebP per photo: resize to a 2048px max edge + WebP
+         * @ 0.82, capped at ~300 KB (browser-image-compression lowers quality
+         * further only if a photo exceeds the cap). Sharp on real devices, much
+         * smaller than the multi-MB originals. iPhone HEIC/HEIF is converted to
+         * JPEG first via heic2any (lazy-loaded — it bundles libheif WASM).
+         * Anything that can't be processed falls back to the original so uploads
+         * never break. Files already < 150 KB pass through untouched.
          */
         async _compress(file) {
             const isHeic = /image\/heic|image\/heif/.test(file.type) || /\.(heic|heif)$/i.test(file.name);
@@ -1485,16 +1487,16 @@ function registerWizard() {
                 } catch (e) {
                     console.warn('[upload] HEIC convert failed, trying original', e);
                 }
-            } else if (file.size < 250 * 1024) {
-                return file; // already small, non-HEIC — no meaningful gain
+            } else if (file.size < 150 * 1024) {
+                return file; // already small (< 150 KB), non-HEIC — nothing to gain
             }
 
             if (!window.imageCompression) return work;
             try {
                 const out = await window.imageCompression(work, {
-                    maxWidthOrHeight: 2560,   // resize-first → visually lossless on real screens
-                    initialQuality: 0.82,     // visually-lossless floor for photos, ~25-35% smaller than 0.90
-                    maxSizeMB: 1.5,           // safety ceiling for unusually heavy images (rarely engages)
+                    maxSizeMB: 0.3,           // ~300 KB cap — web-optimized, keeps photos sharp
+                    maxWidthOrHeight: 2048,   // plenty for full-screen on real devices
+                    initialQuality: 0.82,     // crisp WebP; the lib only drops further if over the cap
                     fileType: 'image/webp',
                     useWebWorker: true,       // off the main thread → UI stays responsive
                 });
