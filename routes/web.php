@@ -94,6 +94,8 @@ Route::middleware('auth:api')->group(function (): void {
     Route::get('/bookings/{booking}', [UserDashboardController::class, 'showBooking'])->name('user.bookings.show');
     Route::get('/financials', [UserDashboardController::class, 'financials'])->name('user.financials');
     Route::get('/favorites', [UserDashboardController::class, 'favorites'])->name('user.favorites');
+    // Support inside the dashboard chrome (sidebar). Public /support redirects here when logged in.
+    Route::get('/account/support', [PageController::class, 'userSupport'])->name('user.support');
 });
 
 // ─── Admin (auth + role) ─────────────────────────────────────────────────────

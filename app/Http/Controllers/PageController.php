@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Services\Place\SettingService;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
 
 /**
@@ -14,12 +15,30 @@ use Illuminate\View\View;
  */
 class PageController extends Controller
 {
-    /** Support page — contact details come from admin settings. */
-    public function support(SettingService $settings): View
+    /**
+     * Public support page (legal chrome). A signed-in user is sent to the
+     * dashboard version so they keep the sidebar.
+     */
+    public function support(SettingService $settings): View|RedirectResponse
     {
+        if (auth('api')->check()) {
+            return redirect()->route('user.support');
+        }
+
         $values = $settings->byKeys(['support_phone', 'support_email']);
 
         return view('pages.support', [
+            'supportPhone' => $values['support_phone'] ?? null,
+            'supportEmail' => $values['support_email'] ?? null,
+        ]);
+    }
+
+    /** Support inside the user dashboard (with sidebar). */
+    public function userSupport(SettingService $settings): View
+    {
+        $values = $settings->byKeys(['support_phone', 'support_email']);
+
+        return view('user.support', [
             'supportPhone' => $values['support_phone'] ?? null,
             'supportEmail' => $values['support_email'] ?? null,
         ]);

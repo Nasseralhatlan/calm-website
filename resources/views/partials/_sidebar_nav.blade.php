@@ -71,8 +71,8 @@
         'title_ar' => 'الحساب',
         'title_en' => 'Account',
         'items' => [
-            ['route' => 'profile',       'label_ar' => 'الملف الشخصي', 'label_en' => 'Profile', 'icon' => 'user'],
-            ['route' => 'pages.support', 'label_ar' => 'الدعم',         'label_en' => 'Support', 'icon' => 'help'],
+            ['route' => 'profile',      'label_ar' => 'الملف الشخصي', 'label_en' => 'Profile', 'icon' => 'user'],
+            ['route' => 'user.support', 'label_ar' => 'الدعم',         'label_en' => 'Support', 'icon' => 'help'],
         ],
     ];
 @endphp

@@ -2,6 +2,7 @@
 
 use App\Jobs\CompleteEndedBookings;
 use App\Jobs\ExpireStaleBookings;
+use App\Jobs\PurgeDeletedAccounts;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -21,4 +22,11 @@ Schedule::job(new ExpireStaleBookings)
 // Not time-critical, so hourly is plenty — stateless, all state is in the DB.
 Schedule::job(new CompleteEndedBookings)
     ->hourly()
+    ->withoutOverlapping();
+
+// Permanently scrub PII on accounts soft-deleted past the retention window.
+// No-ops unless ACCOUNT_RETAIN_DAYS is set, so deleted accounts are kept (and
+// support-restorable) forever by default.
+Schedule::job(new PurgeDeletedAccounts)
+    ->daily()
     ->withoutOverlapping();

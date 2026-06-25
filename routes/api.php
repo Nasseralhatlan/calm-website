@@ -74,6 +74,8 @@ Route::middleware(['auth:api', 'throttle:authenticated'])->group(function (): vo
     // the POST alias below — PHP only parses multipart bodies on POST.
     Route::patch('/user', [UserController::class, 'update']);
     Route::post('/user', [UserController::class, 'update']);
+    // Delete the account (OTP-confirmed). Soft-delete + support-recoverable.
+    Route::delete('/user', [UserController::class, 'destroy']);
 
     // ── Notifications API — TEMPORARILY DISABLED (code kept; uncomment to re-enable). ──
     // // Expo push-token registration (call on login + token refresh; remove on logout).
