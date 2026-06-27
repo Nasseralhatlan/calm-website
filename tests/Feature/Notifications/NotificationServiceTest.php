@@ -114,30 +114,30 @@ it('writes one in-app row and fires SMS + push to every device', function (): vo
         ->and($row->title_en)->toBe('Title')
         ->and($row->read_at)->toBeNull();
 
-    // SMS once, in the user's language (ar).
+    // SMS once, in English (the outbound language for now).
     expect($sms->calls)->toHaveCount(1)
         ->and($sms->calls[0]['phone'])->toBe('513000001')
-        ->and($sms->calls[0]['message'])->toContain('عنوان');
+        ->and($sms->calls[0]['message'])->toContain('Title');
 
-    // Push once to both tokens, ar title.
+    // Push once to both tokens, English title.
     expect($push->calls)->toHaveCount(1)
         ->and($push->calls[0]['tokens'])->toEqualCanonicalizing(['ExponentPushToken[a]', 'ExponentPushToken[b]'])
-        ->and($push->calls[0]['title'])->toBe('عنوان');
+        ->and($push->calls[0]['title'])->toBe('Title');
 });
 
-it('always delivers Arabic on SMS + push regardless of user locale', function (): void {
+it('always delivers English on SMS + push regardless of user locale', function (): void {
     config(['push.enabled' => true]);
     $sms = fakeSms();
     $push = fakePush();
-    // Even an en-locale user receives Arabic on the outbound channels for now.
-    $user = User::factory()->create(['phone' => '513000002', 'locale' => 'en']);
+    // Even an ar-locale user receives English on the outbound channels for now.
+    $user = User::factory()->create(['phone' => '513000002', 'locale' => 'ar']);
     DeviceToken::query()->create(['user_id' => $user->id, 'token' => 'ExponentPushToken[c]']);
 
     $this->service->notify($user, samplePayload());
 
-    expect($sms->calls[0]['message'])->toContain('عنوان')
-        ->and($sms->calls[0]['message'])->not->toContain('Title')
-        ->and($push->calls[0]['title'])->toBe('عنوان');
+    expect($sms->calls[0]['message'])->toContain('Title')
+        ->and($sms->calls[0]['message'])->not->toContain('عنوان')
+        ->and($push->calls[0]['title'])->toBe('Title');
 });
 
 it('still delivers in-app + SMS when the user has no device token (push skipped)', function (): void {

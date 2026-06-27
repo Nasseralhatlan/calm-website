@@ -18,7 +18,7 @@ use Illuminate\Support\Carbon;
  * One entry point for every notification. Each call writes the in-app row
  * (instant feed, bilingual) and then fans the same message out to SMS + Expo
  * push (queued) — all three channels, every time. Outbound SMS/push are sent
- * in Arabic for now; the in-app row keeps both languages for the app.
+ * in English for now; the in-app row keeps both languages for the app.
  *
  * `$payload` shape: ['type', 'title_ar', 'title_en', 'body_ar', 'body_en', 'data'?].
  */
@@ -40,12 +40,12 @@ final class NotificationService
             'data' => $payload['data'] ?? null,
         ]);
 
-        // All outbound SMS/push are sent in Arabic for now.
+        // All outbound SMS/push are sent in English for now.
         // (The in-app row above still stores both languages for the app to localize.)
         SendNotificationChannels::dispatch(
             $user,
-            $payload['title_ar'],
-            $payload['body_ar'],
+            $payload['title_en'],
+            $payload['body_en'],
             $payload['data'] ?? [],
         );
 

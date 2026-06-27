@@ -35,6 +35,9 @@ final class OwnerAlert extends Mailable implements ShouldQueue
 
     public function content(): Content
     {
-        return new Content(text: 'emails.owner-alert', with: ['lines' => $this->lines]);
+        return new Content(
+            view: 'emails.owner-alert',
+            with: ['heading' => $this->subjectLine, 'lines' => $this->lines],
+        );
     }
 }
