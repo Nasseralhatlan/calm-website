@@ -39,7 +39,7 @@
 {{-- ── TITLE BLOCK (centered, like master) ── --}}
 <div class="text-center" style="margin-bottom: 24px;">
     <h1 class="text-[26px] sm:text-[32px] font-bold tracking-tight text-[#222] {{ $fa }}" style="line-height: 1.2;">
-        {{ $place->title ?: ($isRtl ? '— بدون عنوان —' : '— Untitled —') }}
+        {{ $place->localized_title ?: ($isRtl ? '— بدون عنوان —' : '— Untitled —') }}
     </h1>
     <div class="flex flex-wrap items-center justify-center {{ $fa }}" style="gap: 8px; margin-top: 12px;">
         {{-- Place type pill with the type icon --}}
@@ -144,7 +144,7 @@
 <div style="margin-top: 48px;">
 
     {{-- DESCRIPTION (master pattern, inline show-more) --}}
-    @if($place->description)
+    @if($place->localized_description)
         <section class="{{ $start }} border-b border-[#ebebeb]" style="padding-bottom: 48px;"
                  x-data="{ expanded: false }">
             <h2 class="text-[22px] sm:text-2xl font-semibold text-[#222] {{ $fa }}" style="margin-bottom: 20px;">
@@ -153,8 +153,8 @@
             <p class="text-[16px] text-[#222] {{ $fa }}"
                :style="expanded
                    ? 'line-height: 1.7; white-space: pre-line;'
-                   : 'line-height: 1.7; white-space: pre-line; display: -webkit-box; -webkit-line-clamp: 4; line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden;'">{{ $place->description }}</p>
-            @if(mb_strlen($place->description) > 200)
+                   : 'line-height: 1.7; white-space: pre-line; display: -webkit-box; -webkit-line-clamp: 4; line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden;'">{{ $place->localized_description }}</p>
+            @if(mb_strlen($place->localized_description) > 200)
                 <button type="button" @click="expanded = !expanded"
                         class="w-full flex items-center justify-center font-semibold text-[#222] hover:bg-[#ebebeb] transition-colors {{ $fa }}"
                         style="margin-top: 20px; padding: 14px 20px; background-color: #f7f7f7; border-radius: 14px;">
@@ -330,12 +330,12 @@
     @endif
 
     {{-- ── HOUSE RULES (preserved if host wrote any) ── --}}
-    @if($place->rules)
+    @if($place->localized_rules)
         <section style="padding-top: 48px; padding-bottom: 48px; border-top: 1px solid #ebebeb;">
             <h2 class="text-[22px] sm:text-2xl font-semibold text-[#222] {{ $start }} {{ $fa }}" style="margin-bottom: 20px;">
                 {{ $isRtl ? 'قواعد المكان' : 'House rules' }}
             </h2>
-            <p class="text-[15px] text-[#222] leading-relaxed whitespace-pre-line {{ $start }} {{ $fa }}">{{ $place->rules }}</p>
+            <p class="text-[15px] text-[#222] leading-relaxed whitespace-pre-line {{ $start }} {{ $fa }}">{{ $place->localized_rules }}</p>
         </section>
     @endif
 </div>

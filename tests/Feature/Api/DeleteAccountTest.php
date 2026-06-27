@@ -12,6 +12,7 @@ use App\Models\CityArea;
 use App\Models\Place;
 use App\Models\PlaceType;
 use App\Models\User;
+use App\Services\Auth\OtpAuthService;
 use App\Services\Otp\OtpService;
 use App\Services\User\AccountDeletionService;
 
@@ -101,7 +102,7 @@ it('lets the same phone register a fresh account after deletion', function (): v
     $this->withHeader('Authorization', 'Bearer '.$token)->deleteJson('/api/user', ['code' => $code])->assertOk();
 
     // A fresh OTP request for the same number creates a brand-new active user.
-    app(\App\Services\Auth\OtpAuthService::class)->requestOtp(OtpType::Phone, '512000020');
+    app(OtpAuthService::class)->requestOtp(OtpType::Phone, '512000020');
 
     $fresh = User::query()->where('phone', '512000020')->first(); // excludes the trashed one
     expect($fresh)->not->toBeNull()

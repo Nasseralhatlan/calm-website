@@ -42,7 +42,11 @@ class Place extends Model
         'place_type_id',
         'city_area_id',
         'title',
+        'title_ar',
+        'title_en',
         'description',
+        'description_ar',
+        'description_en',
         'price',
         'price_sunday',
         'price_monday',
@@ -56,6 +60,8 @@ class Place extends Model
         'checkout_next_day',
         'max_guests',
         'rules',
+        'rules_ar',
+        'rules_en',
         'location_url',
         'status',
         'review_status',
@@ -81,6 +87,33 @@ class Place extends Model
             'checkout_next_day' => 'boolean',
             'reviewed_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Listing content in the current app locale, falling back to the other
+     * language and finally to the canonical column. Used by user-facing web
+     * views; the API returns both *_ar/*_en for the client to localize.
+     */
+    public function getLocalizedTitleAttribute(): ?string
+    {
+        return $this->pickLocale($this->title_ar, $this->title_en, $this->title);
+    }
+
+    public function getLocalizedDescriptionAttribute(): ?string
+    {
+        return $this->pickLocale($this->description_ar, $this->description_en, $this->description);
+    }
+
+    public function getLocalizedRulesAttribute(): ?string
+    {
+        return $this->pickLocale($this->rules_ar, $this->rules_en, $this->rules);
+    }
+
+    private function pickLocale(?string $ar, ?string $en, ?string $canonical): ?string
+    {
+        return app()->getLocale() === 'ar'
+            ? ($ar ?: $en ?: $canonical)
+            : ($en ?: $ar ?: $canonical);
     }
 
     public function host(): BelongsTo

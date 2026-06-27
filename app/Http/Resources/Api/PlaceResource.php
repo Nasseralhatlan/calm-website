@@ -26,8 +26,15 @@ class PlaceResource extends JsonResource
     {
         return [
             'id' => $this->id,
+            // `title`/`description` are the canonical value (= *_ar ?: *_en); the
+            // *_ar/*_en pairs let the app show the user's language (like the
+            // name_ar/name_en reference fields). Either may be null.
             'title' => $this->title,
+            'title_ar' => $this->title_ar,
+            'title_en' => $this->title_en,
             'description' => $this->description,
+            'description_ar' => $this->description_ar,
+            'description_en' => $this->description_en,
             'price' => (int) $this->price,
             'per_day_prices' => [
                 'sunday' => (int) $this->price_sunday,
@@ -45,6 +52,8 @@ class PlaceResource extends JsonResource
             'checkout_next_day' => (bool) $this->checkout_next_day,
             'max_guests' => $this->max_guests !== null ? (int) $this->max_guests : null,
             'rules' => $this->rules,
+            'rules_ar' => $this->rules_ar,
+            'rules_en' => $this->rules_en,
             // Cover = the first "shown outside" photo (falls back to the first
             // gallery photo if the host hasn't featured any).
             'cover_photo_url' => $this->coverPhoto?->url

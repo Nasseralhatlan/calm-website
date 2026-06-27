@@ -36,6 +36,18 @@ it('sends an OK request with the right query string shape', function (): void {
     });
 });
 
+it('tags Arabic messages with language=2 so the gateway encodes them correctly', function (): void {
+    Http::fake([
+        'api-server14.com/*' => Http::response('OK,smsid:4-abc,mobiles:1,time:...'),
+    ]);
+
+    // Arabic body (letters + Arabic-Indic digits) — even though the driver's
+    // configured default is '1' (English), the content drives the flag.
+    makeSmsSaudi()->send('512345678', 'تم تأكيد حجزك. رقم الحجز: ١٢٣');
+
+    Http::assertSent(fn ($request) => $request['language'] === '2');
+});
+
 it('does not double-prefix the country code', function (): void {
     Http::fake([
         'api-server14.com/*' => Http::response('OK,smsid:1-abc,mobiles:1,time:...'),

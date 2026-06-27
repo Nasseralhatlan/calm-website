@@ -41,7 +41,7 @@ function adminPlace(User $host, array $attrs = []): Place
  */
 function adminWizardPayload(array $overrides = []): array
 {
-    return array_merge([
+    $data = array_merge([
         'title' => 'Admin edited title',
         'description' => 'Updated.',
         'place_type_id' => PlaceType::query()->first()->id,
@@ -56,6 +56,16 @@ function adminWizardPayload(array $overrides = []): array
         'review_status' => PlaceReviewStatus::Approved->value,
         'rejection_reason' => null,
     ], $overrides);
+
+    // Wizard posts bilingual content — map single-field test values onto *_ar.
+    foreach (['title', 'description', 'rules'] as $field) {
+        if (array_key_exists($field, $data)) {
+            $data["{$field}_ar"] = $data[$field];
+            unset($data[$field]);
+        }
+    }
+
+    return $data;
 }
 
 it('renders the admin edit wizard pre-filled with the admin step', function (): void {

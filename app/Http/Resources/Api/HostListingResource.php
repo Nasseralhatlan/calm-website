@@ -26,6 +26,8 @@ class HostListingResource extends JsonResource
         return [
             'id' => $this->id,
             'title' => $this->title,
+            'title_ar' => $this->title_ar,
+            'title_en' => $this->title_en,
             'cover_photo_url' => $this->coverPhoto?->url,
             'price' => (int) $this->price,
             'max_guests' => $this->max_guests !== null ? (int) $this->max_guests : null,

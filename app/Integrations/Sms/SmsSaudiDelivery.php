@@ -25,6 +25,11 @@ use Throwable;
  *    the full international form, so we prepend the configured country code.
  *  - The gateway returns 200 for both success and error — we MUST look at the
  *    body, not the status code.
+ *  - The `language` flag (1=English, 2=Arabic, 3=Unicode) tells the gateway how
+ *    to encode the body. Our messages are bilingual — the same transport sends
+ *    English OTPs and Arabic/English notifications — so we pick the flag from
+ *    the message content (Arabic script → 2) rather than a single static value;
+ *    a hard-coded English flag would corrupt Arabic text.
  */
 final class SmsSaudiDelivery implements SmsDeliveryContract
 {
@@ -46,7 +51,7 @@ final class SmsSaudiDelivery implements SmsDeliveryContract
                 ->asForm()
                 ->get($this->endpoint, [
                     'apikey' => $this->apiKey,
-                    'language' => $this->language,
+                    'language' => $this->resolveLanguage($message),
                     'sender' => $this->sender,
                     'mobile' => $internationalPhone,
                     'message' => $message,
@@ -68,6 +73,16 @@ final class SmsSaudiDelivery implements SmsDeliveryContract
             'mobile' => $internationalPhone,
             'response' => $body,
         ]);
+    }
+
+    /**
+     * Pick the gateway language flag from the message body: any Arabic-script
+     * character (letters or Arabic-Indic digits) means the Arabic encoding (2),
+     * otherwise fall back to the configured default (normally 1 = English).
+     */
+    private function resolveLanguage(string $message): string
+    {
+        return preg_match('/\p{Arabic}/u', $message) === 1 ? '2' : $this->language;
     }
 
     /**

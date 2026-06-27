@@ -16,7 +16,8 @@ use Illuminate\Database\Eloquent\Builder;
  * One entry point for every notification. Each call writes the in-app row
  * (instant feed, bilingual) and then fans the same message out to SMS + Expo
  * push (queued) — all three channels, every time. Outbound SMS/push are sent
- * in English for now; the in-app row keeps both languages for the app.
+ * in the recipient's language (`users.locale`, default Arabic); the in-app row
+ * keeps both languages for the app to localize.
  *
  * `$payload` shape: ['type', 'title_ar', 'title_en', 'body_ar', 'body_en', 'data'?].
  */
@@ -38,12 +39,14 @@ final class NotificationService
             'data' => $payload['data'] ?? null,
         ]);
 
-        // All outbound SMS/push are sent in English for now.
-        // (The in-app row above still stores both languages for the app to localize.)
+        // Outbound SMS/push follow the user's language (defaulting to Arabic).
+        // The in-app row above still stores both languages for the app to localize.
+        $en = $user->locale === 'en';
+
         SendNotificationChannels::dispatch(
             $user,
-            $payload['title_en'],
-            $payload['body_en'],
+            $en ? $payload['title_en'] : $payload['title_ar'],
+            $en ? $payload['body_en'] : $payload['body_ar'],
             $payload['data'] ?? [],
         );
 

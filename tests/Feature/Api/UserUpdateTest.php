@@ -32,6 +32,23 @@ it('updates the authenticated user via PATCH /api/user', function (): void {
     expect($fresh->age)->toBe(30);
 });
 
+it('switches the app language via PATCH /api/user', function (): void {
+    $user = User::factory()->create(['phone' => '512345678', 'locale' => 'ar']);
+    $token = auth('api')->login($user);
+
+    $this->withHeader('Authorization', 'Bearer '.$token)
+        ->patchJson('/api/user', ['locale' => 'en'])
+        ->assertOk()
+        ->assertJsonPath('data.locale', 'en');
+
+    expect(User::find($user->id)->locale)->toBe('en');
+
+    // Invalid locale is rejected.
+    $this->withHeader('Authorization', 'Bearer '.$token)
+        ->patchJson('/api/user', ['locale' => 'fr'])
+        ->assertStatus(422);
+});
+
 it('rejects an invalid email on PATCH /api/user', function (): void {
     $user = User::factory()->create(['phone' => '512345678']);
     $token = auth('api')->login($user);

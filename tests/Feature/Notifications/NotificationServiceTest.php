@@ -114,30 +114,31 @@ it('writes one in-app row and fires SMS + push to every device', function (): vo
         ->and($row->title_en)->toBe('Title')
         ->and($row->read_at)->toBeNull();
 
-    // SMS once, in English (the outbound language for now).
+    // SMS once, in the user's language (ar).
     expect($sms->calls)->toHaveCount(1)
         ->and($sms->calls[0]['phone'])->toBe('513000001')
-        ->and($sms->calls[0]['message'])->toContain('Title');
+        ->and($sms->calls[0]['message'])->toContain('عنوان');
 
-    // Push once to both tokens, English title.
+    // Push once to both tokens, Arabic title.
     expect($push->calls)->toHaveCount(1)
         ->and($push->calls[0]['tokens'])->toEqualCanonicalizing(['ExponentPushToken[a]', 'ExponentPushToken[b]'])
-        ->and($push->calls[0]['title'])->toBe('Title');
+        ->and($push->calls[0]['title'])->toBe('عنوان');
 });
 
-it('always delivers English on SMS + push regardless of user locale', function (): void {
-    config(['push.enabled' => true]);
+it('delivers SMS + push in the user\'s locale', function (): void {
     $sms = fakeSms();
-    $push = fakePush();
-    // Even an ar-locale user receives English on the outbound channels for now.
-    $user = User::factory()->create(['phone' => '513000002', 'locale' => 'ar']);
-    DeviceToken::query()->create(['user_id' => $user->id, 'token' => 'ExponentPushToken[c]']);
 
-    $this->service->notify($user, samplePayload());
+    // Arabic user (default) → Arabic.
+    $ar = User::factory()->create(['phone' => '513000002', 'locale' => 'ar']);
+    $this->service->notify($ar, samplePayload());
+    expect($sms->calls[0]['message'])->toContain('عنوان')
+        ->and($sms->calls[0]['message'])->not->toContain('Title');
 
-    expect($sms->calls[0]['message'])->toContain('Title')
-        ->and($sms->calls[0]['message'])->not->toContain('عنوان')
-        ->and($push->calls[0]['title'])->toBe('Title');
+    // English user → English.
+    $en = User::factory()->create(['phone' => '513000003', 'locale' => 'en']);
+    $this->service->notify($en, samplePayload());
+    expect($sms->calls[1]['message'])->toContain('Title')
+        ->and($sms->calls[1]['message'])->not->toContain('عنوان');
 });
 
 it('still delivers in-app + SMS when the user has no device token (push skipped)', function (): void {

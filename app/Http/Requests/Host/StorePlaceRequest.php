@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Host;
 
+use App\Http\Requests\Concerns\DerivesCanonicalContent;
 use App\Models\Place;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
 
 class StorePlaceRequest extends FormRequest
 {
+    use DerivesCanonicalContent;
+
     public function authorize(): bool
     {
         return $this->user() !== null;
@@ -29,8 +32,11 @@ class StorePlaceRequest extends FormRequest
             'host_phone' => $this->user()?->isAdmin()
                 ? ['nullable', 'string', 'regex:/^5\d{8}$/']
                 : ['nullable'],
-            'title' => ['required', 'string', 'max:255'],
-            'description' => ['nullable', 'string', 'max:10000'],
+            // Bilingual title — at least one language required.
+            'title_ar' => ['nullable', 'required_without:title_en', 'string', 'max:255'],
+            'title_en' => ['nullable', 'required_without:title_ar', 'string', 'max:255'],
+            'description_ar' => ['nullable', 'string', 'max:10000'],
+            'description_en' => ['nullable', 'string', 'max:10000'],
             'place_type_id' => ['required', 'uuid', 'exists:place_types,id'],
             'city_area_id' => ['required', 'uuid', 'exists:city_areas,id'],
             'price' => ['required', 'integer', 'min:0'],
@@ -38,7 +44,8 @@ class StorePlaceRequest extends FormRequest
             'check_out_time' => ['required', 'string', 'max:8'],
             'checkout_next_day' => ['sometimes', 'boolean'],
             'max_guests' => ['required', 'integer', 'between:1,50'],
-            'rules' => ['nullable', 'string', 'max:10000'],
+            'rules_ar' => ['nullable', 'string', 'max:10000'],
+            'rules_en' => ['nullable', 'string', 'max:10000'],
             // A map link the host pastes (Google Maps, etc.); required on submit,
             // only revealed to the guest once their booking is confirmed.
             'location_url' => ['required', 'string', 'url', 'max:2048'],
@@ -98,9 +105,11 @@ class StorePlaceRequest extends FormRequest
      */
     public function placeData(): array
     {
-        return collect($this->validated())
+        $data = collect($this->validated())
             ->except(['draft_id', 'host_phone', 'attributes', 'attribute_image_paths', 'extra_image_paths', 'featured'])
             ->toArray();
+
+        return $this->withCanonicalContent($data);
     }
 
     /**

@@ -51,6 +51,9 @@ class UpdateProfileRequest extends FormRequest
             // Frontend posts YYYY-MM-DD. Lower bound matches age:13.
             'birth_date' => ['sometimes', 'nullable', 'date', 'date_format:Y-m-d', 'before:today', 'after:1900-01-01'],
             'email' => ['sometimes', 'nullable', 'email:rfc', 'max:254', Rule::unique('users', 'email')->ignore($userId)],
+            // App language — drives notification language (SMS/push) + the in-app
+            // feed. Defaults to 'ar' at the DB level for new accounts.
+            'locale' => ['sometimes', Rule::in(['ar', 'en'])],
             // Payout bank — free-text bank name (informational).
             'bank' => ['sometimes', 'nullable', 'string', 'max:120'],
             // Saudi IBAN: "SA" + 2 check digits + 18-digit BBAN = 24 chars.

@@ -21,7 +21,7 @@ function imgPaths(int $n): array
 
 function createPayload(array $overrides = []): array
 {
-    return array_merge([
+    $data = array_merge([
         'title' => 'Image-rule place',
         'description' => 'x',
         'place_type_id' => PlaceType::query()->first()->id,
@@ -33,6 +33,16 @@ function createPayload(array $overrides = []): array
         'location_url' => 'https://maps.google.com/?q=24.7,46.6',
         'extra_image_paths' => imgPaths(5),
     ], $overrides);
+
+    // Wizard posts bilingual content — map single-field test values onto *_ar.
+    foreach (['title', 'description', 'rules'] as $field) {
+        if (array_key_exists($field, $data)) {
+            $data["{$field}_ar"] = $data[$field];
+            unset($data[$field]);
+        }
+    }
+
+    return $data;
 }
 
 it('creates a place with exactly 5 images', function (): void {

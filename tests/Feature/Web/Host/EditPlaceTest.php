@@ -57,7 +57,7 @@ function editablePlace(User $host, array $attrs = []): Place
  */
 function editPayload(array $overrides = []): array
 {
-    return array_merge([
+    $data = array_merge([
         'title' => 'Updated title',
         'description' => 'Updated description.',
         'place_type_id' => PlaceType::query()->first()->id,
@@ -69,6 +69,17 @@ function editPayload(array $overrides = []): array
         'rules' => 'Quiet after 10pm.',
         'location_url' => 'https://maps.google.com/?q=24.7,46.6',
     ], $overrides);
+
+    // The wizard posts bilingual content (title_ar/_en, …); map the single-field
+    // test value onto *_ar so canonical title/description/rules still derive.
+    foreach (['title', 'description', 'rules'] as $field) {
+        if (array_key_exists($field, $data)) {
+            $data["{$field}_ar"] = $data[$field];
+            unset($data[$field]);
+        }
+    }
+
+    return $data;
 }
 
 it('shows the edit form to the place owner pre-filled', function (): void {
@@ -175,7 +186,7 @@ it('validates required fields on update', function (): void {
 
     $this->actingAs($host, 'api')
         ->put("/my-places/{$place->id}", editPayload(['title' => '', 'price' => 'free']))
-        ->assertSessionHasErrors(['title', 'price']);
+        ->assertSessionHasErrors(['title_ar', 'price']);
 
     // Untouched — a failed validation never reaches the service.
     $place->refresh();

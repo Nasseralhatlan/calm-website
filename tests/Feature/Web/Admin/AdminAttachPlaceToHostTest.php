@@ -21,7 +21,7 @@ beforeEach(function (): void {
  */
 function placeSubmitPayload(array $overrides = []): array
 {
-    return array_merge([
+    $data = array_merge([
         'title' => 'Test Place',
         'description' => 'A nice place by the lake.',
         'place_type_id' => PlaceType::query()->first()->id,
@@ -37,6 +37,16 @@ function placeSubmitPayload(array $overrides = []): array
             'places/uploads/4.jpg', 'places/uploads/5.jpg',
         ],
     ], $overrides);
+
+    // Wizard posts bilingual content — map single-field test values onto *_ar.
+    foreach (['title', 'description', 'rules'] as $field) {
+        if (array_key_exists($field, $data)) {
+            $data["{$field}_ar"] = $data[$field];
+            unset($data[$field]);
+        }
+    }
+
+    return $data;
 }
 
 it('attaches a new place to an existing host phone when admin submits', function (): void {

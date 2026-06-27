@@ -28,6 +28,8 @@ class UserResource extends JsonResource
             'birth_date' => $this->birth_date?->toDateString(),
             'phone' => $this->phone,
             'email' => $this->email,
+            // App language ('ar' default). Drives notification language + the feed.
+            'locale' => $this->locale,
             'country_id' => $this->country_id,
             // Payout bank account (null until the user adds one).
             'bank' => $this->bank,

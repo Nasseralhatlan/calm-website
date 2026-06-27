@@ -46,7 +46,11 @@ class BookingResource extends JsonResource
 
                 return $place ? [
                     'id' => $place->id,
+                    // Canonical title + the bilingual pair so the app can show
+                    // the place name in the viewer's language (with fallback).
                     'title' => $place->title,
+                    'title_ar' => $place->title_ar,
+                    'title_en' => $place->title_en,
                     'cover_photo_url' => $place->coverPhoto?->url,
                     'location_url' => $locationUnlocked ? $place->location_url : null,
                     'type' => $place->type ? [

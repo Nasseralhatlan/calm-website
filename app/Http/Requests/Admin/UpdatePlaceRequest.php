@@ -6,6 +6,7 @@ namespace App\Http\Requests\Admin;
 
 use App\Enums\PlaceReviewStatus;
 use App\Enums\PlaceStatus;
+use App\Http\Requests\Concerns\DerivesCanonicalContent;
 use App\Models\Place;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -13,6 +14,8 @@ use Illuminate\Validation\Validator;
 
 class UpdatePlaceRequest extends FormRequest
 {
+    use DerivesCanonicalContent;
+
     public function authorize(): bool
     {
         return true;
@@ -35,8 +38,10 @@ class UpdatePlaceRequest extends FormRequest
     public function rules(): array
     {
         $rules = [
-            'title' => ['required', 'string', 'max:255'],
-            'description' => ['nullable', 'string', 'max:10000'],
+            'title_ar' => ['nullable', 'required_without:title_en', 'string', 'max:255'],
+            'title_en' => ['nullable', 'required_without:title_ar', 'string', 'max:255'],
+            'description_ar' => ['nullable', 'string', 'max:10000'],
+            'description_en' => ['nullable', 'string', 'max:10000'],
             'place_type_id' => ['required', 'uuid', 'exists:place_types,id'],
             'city_area_id' => ['required', 'uuid', 'exists:city_areas,id'],
             'price' => ['required', 'integer', 'min:0'],
@@ -44,7 +49,8 @@ class UpdatePlaceRequest extends FormRequest
             'check_out_time' => ['required', 'string', 'max:8'],
             'checkout_next_day' => ['sometimes', 'boolean'],
             'max_guests' => ['required', 'integer', 'between:1,50'],
-            'rules' => ['nullable', 'string', 'max:10000'],
+            'rules_ar' => ['nullable', 'string', 'max:10000'],
+            'rules_en' => ['nullable', 'string', 'max:10000'],
             // A map link the host pastes (Google Maps, etc.); only revealed to
             // the guest once their booking is confirmed.
             'location_url' => ['required', 'string', 'url', 'max:2048'],
@@ -120,9 +126,11 @@ class UpdatePlaceRequest extends FormRequest
      */
     public function placeData(): array
     {
-        return collect($this->validated())
+        $data = collect($this->validated())
             ->except(['attributes', 'attribute_image_paths', 'extra_image_paths', 'featured', 'lists'])
             ->toArray();
+
+        return $this->withCanonicalContent($data);
     }
 
     /**

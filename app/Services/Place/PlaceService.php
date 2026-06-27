@@ -605,7 +605,11 @@ final class PlaceService
             ->when($f['city_area_id'] ?? null, fn ($q, $v) => $q->where('city_area_id', $v))
             ->when($f['q'] ?? null, fn ($q, $v) => $q->where(fn ($w) => $w
                 ->where('title', 'like', "%{$v}%")
-                ->orWhere('description', 'like', "%{$v}%")))
+                ->orWhere('title_ar', 'like', "%{$v}%")
+                ->orWhere('title_en', 'like', "%{$v}%")
+                ->orWhere('description', 'like', "%{$v}%")
+                ->orWhere('description_ar', 'like', "%{$v}%")
+                ->orWhere('description_en', 'like', "%{$v}%")))
             ->when($f['place_type_ids'] ?? null, fn ($q, $v) => $q->whereIn('place_type_id', $v))
             ->when($f['price_min'] ?? null, fn ($q, $v) => $q->where('price', '>=', $v))
             ->when($f['price_max'] ?? null, fn ($q, $v) => $q->where('price', '<=', $v))

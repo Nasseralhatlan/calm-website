@@ -57,7 +57,11 @@ function listBooking(Place $place, User $guest, array $attrs = []): Booking
 it('lists the guest\'s bookings with place details + price + status', function (): void {
     $guest = User::factory()->create(['phone' => '519000001']);
     $host = User::factory()->create(['phone' => '519000002']);
-    $place = listPlace($host, ['title' => 'Beach Stay']);
+    $place = listPlace($host, [
+        'title' => 'Beach Stay',
+        'title_ar' => 'استراحة الشاطئ',
+        'title_en' => 'Beach Stay',
+    ]);
 
     listBooking($place, $guest);
 
@@ -71,10 +75,13 @@ it('lists the guest\'s bookings with place details + price + status', function (
         ->assertJsonPath('data.items.0.start_date', now()->addDays(3)->toDateString())
         ->assertJsonPath('data.items.0.pricing.total', 2300)
         ->assertJsonPath('data.items.0.place.title', 'Beach Stay')
+        // Canonical title + bilingual pair so the app can localize per viewer.
+        ->assertJsonPath('data.items.0.place.title_ar', 'استراحة الشاطئ')
+        ->assertJsonPath('data.items.0.place.title_en', 'Beach Stay')
         ->assertJsonStructure(['data' => ['items' => [[
             'id', 'status', 'start_date', 'end_date', 'guests',
             'pricing' => ['total', 'total_minor'],
-            'place' => ['id', 'title', 'cover_photo_url', 'type', 'city'],
+            'place' => ['id', 'title', 'title_ar', 'title_en', 'cover_photo_url', 'type', 'city'],
         ]]]]);
 });
 

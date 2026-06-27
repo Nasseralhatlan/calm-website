@@ -7,9 +7,9 @@
     $locale  = app()->getLocale();
     $isRtl   = $locale === 'ar';
     $placeLabel  = $isRtl ? ($place->type?->name_ar ?? '') : ($place->type?->name_en ?? '');
-    $ogTitle = ($place->title ?: $placeLabel) . ' · Calm';
-    $ogDescription = $place->description
-        ? Str::limit(strip_tags($place->description), 180)
+    $ogTitle = ($place->localized_title ?: $placeLabel) . ' · Calm';
+    $ogDescription = $place->localized_description
+        ? Str::limit(strip_tags($place->localized_description), 180)
         : ($isRtl ? 'إقامة فاخرة من كالم' : 'A luxury stay on Calm');
     // OG image = the host's cover (first "shown outside" photo), else first photo.
     $firstPhoto = $place->coverPhoto ?? $place->photos->first();
@@ -17,7 +17,7 @@
     $ogUrl   = url()->current();
 @endphp
 
-@section('title', 'Calm — ' . ($place->title ?: $place->id))
+@section('title', 'Calm — ' . ($place->localized_title ?: $place->id))
 
 @section('meta')
     <meta name="description" content="{{ $ogDescription }}">
@@ -104,7 +104,7 @@
     // Preview: first 10 amenities (Airbnb shows 10).
     $previewAmenities = $amenities->take(10);
 
-    $description = trim((string) $place->description);
+    $description = trim((string) $place->localized_description);
 
     // Per-day pricing — only the panel renders when any day differs from base.
     $dayPrices = [
@@ -249,7 +249,7 @@
         {{-- TITLE BLOCK — centered --}}
         <div class="text-center mb-6">
             <h1 class="text-[26px] sm:text-[32px] font-bold tracking-tight text-[#222] {{ $fa }}" style="line-height: 1.2;">
-                {{ $place->title ?: $placeLabel }}
+                {{ $place->localized_title ?: $placeLabel }}
             </h1>
             <div class="flex flex-wrap items-center justify-center {{ $fa }}" style="gap: 8px; margin-top: 12px;">
                 <span class="inline-flex items-center text-[13px] text-[#717171] bg-[#fafafa]" style="gap: 6px; padding: 4px 12px; border-radius: 999px; corner-shape: squircle;">
@@ -393,7 +393,7 @@
              style="gap: 16px; margin-top: 32px; padding-bottom: 28px; border-bottom: 1px solid #ebebeb;">
             <div class="{{ $start }}">
                 <h2 class="text-[20px] sm:text-[24px] font-bold text-[#222]" style="line-height: 1.25;">
-                    {{ $place->title ?: $placeLabel }}
+                    {{ $place->localized_title ?: $placeLabel }}
                 </h2>
                 <p class="text-[14px] text-[#717171]" style="margin-top: 4px;">
                     @if($city)
@@ -703,12 +703,12 @@
             </section>
 
             {{-- HOUSE RULES — text content the host wrote in the wizard --}}
-            @if($place->rules)
+            @if($place->localized_rules)
                 <section style="padding-top: 56px; padding-bottom: 56px;">
                     <h2 class="text-[22px] sm:text-2xl font-semibold text-[#222] {{ $start }} {{ $fa }}" style="margin-bottom: 20px;">
                         {{ $isRtl ? 'قواعد المكان' : 'House rules' }}
                     </h2>
-                    <p class="text-[15px] sm:text-[16px] text-[#222] leading-relaxed whitespace-pre-line {{ $start }} {{ $fa }}">{{ $place->rules }}</p>
+                    <p class="text-[15px] sm:text-[16px] text-[#222] leading-relaxed whitespace-pre-line {{ $start }} {{ $fa }}">{{ $place->localized_rules }}</p>
                 </section>
             @endif
 

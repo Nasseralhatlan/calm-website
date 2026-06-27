@@ -13,9 +13,8 @@
     // Sensible default house rules pre-filled for a NEW place — the host can
     // edit, add to, or clear it. (Only seeds new places; existing/draft rules
     // override it on resume/edit.)
-    $defaultRules = $isRtl
-        ? "• المحافظة على المكان: يرجى الحفاظ على نظافة المكان والمرافق، وتسليمه بحالة جيدة كما تم استلامه.\n• الهدوء والخصوصية: يرجى احترام الجيران والمناطق المحيطة، وتجنب الإزعاج أو رفع الصوت خصوصًا في الأوقات المتأخرة.\n• الحفلات والتجمعات: لا يسمح بإقامة الحفلات أو التجمعات داخل المكان.\n• التدخين: يمنع التدخين داخل المكان.\n• الأثاث والممتلكات: يرجى عدم نقل أو إتلاف الأثاث والمرافق، ويتحمل الضيف مسؤولية أي تلفيات ناتجة عن سوء الاستخدام.\n• أوقات الدخول والخروج: يجب الالتزام بمواعيد تسجيل الدخول والخروج الموضحة في الحجز."
-        : "• Care for the property: Please keep the place and its facilities clean, and hand it over in good condition as you received it.\n• Quiet & privacy: Please respect the neighbors and surroundings, and avoid noise or loud sounds, especially late at night.\n• Parties & gatherings: Parties or gatherings inside the property are not allowed.\n• Smoking: Smoking inside the property is not allowed.\n• Furniture & property: Please do not move or damage the furniture or facilities; the guest is responsible for any damage caused by misuse.\n• Check-in & check-out: Please adhere to the check-in and check-out times shown in the booking.";
+    $defaultRulesAr = "• المحافظة على المكان: يرجى الحفاظ على نظافة المكان والمرافق، وتسليمه بحالة جيدة كما تم استلامه.\n• الهدوء والخصوصية: يرجى احترام الجيران والمناطق المحيطة، وتجنب الإزعاج أو رفع الصوت خصوصًا في الأوقات المتأخرة.\n• الحفلات والتجمعات: لا يسمح بإقامة الحفلات أو التجمعات داخل المكان.\n• التدخين: يمنع التدخين داخل المكان.\n• الأثاث والممتلكات: يرجى عدم نقل أو إتلاف الأثاث والمرافق، ويتحمل الضيف مسؤولية أي تلفيات ناتجة عن سوء الاستخدام.\n• أوقات الدخول والخروج: يجب الالتزام بمواعيد تسجيل الدخول والخروج الموضحة في الحجز.";
+    $defaultRulesEn = "• Care for the property: Please keep the place and its facilities clean, and hand it over in good condition as you received it.\n• Quiet & privacy: Please respect the neighbors and surroundings, and avoid noise or loud sounds, especially late at night.\n• Parties & gatherings: Parties or gatherings inside the property are not allowed.\n• Smoking: Smoking inside the property is not allowed.\n• Furniture & property: Please do not move or damage the furniture or facilities; the guest is responsible for any damage caused by misuse.\n• Check-in & check-out: Please adhere to the check-in and check-out times shown in the booking.";
 
     $photoLimitMsg = $isRtl ? 'الحد الأقصى ١٠ صور لكل قسم.' : 'Each section can have at most 10 images.';
 
@@ -69,8 +68,12 @@
     $jsonDraft = $draft ? [
         'id' => $draft->id,
         'place_type_id' => $draft->place_type_id,
-        'title' => $draft->title,
-        'description' => $draft->description,
+        // Bilingual content — fall back to the legacy single column (assumed the
+        // host's primary language) for places saved before this field existed.
+        'title_ar' => $draft->title_ar ?? $draft->title,
+        'title_en' => $draft->title_en,
+        'description_ar' => $draft->description_ar ?? $draft->description,
+        'description_en' => $draft->description_en,
         'city_id' => $draft->cityArea?->city_id,
         'city_area_id' => $draft->city_area_id,
         'price' => $draft->price,
@@ -87,7 +90,8 @@
         'check_out_time' => $draft->check_out_time,
         'checkout_next_day' => (bool) $draft->checkout_next_day,
         'max_guests' => $draft->max_guests,
-        'rules' => $draft->rules,
+        'rules_ar' => $draft->rules_ar ?? $draft->rules,
+        'rules_en' => $draft->rules_en,
         'location_url' => $draft->location_url,
         'review_status' => $draft->review_status?->value,
         'rejection_reason' => $draft->rejection_reason,
@@ -284,24 +288,48 @@
                     <h2 class="text-3xl sm:text-[34px] font-bold tracking-tight text-[#222] {{ $fa }}">{{ $isRtl ? 'المعلومات الأساسية' : 'The basics' }}</h2>
                     <p class="mt-2 text-[#717171] text-base {{ $fa }}">{{ $isRtl ? 'عنوان قصير ووصف يجذب الضيوف.' : 'A short title and a description guests will love.' }}</p>
 
+                    {{-- Title — Arabic + English (at least one required) --}}
                     <label class="block mt-10">
-                        <span class="text-sm font-semibold text-[#222] {{ $fa }}">{{ $isRtl ? 'العنوان' : 'Title' }}</span>
+                        <span class="text-sm font-semibold text-[#222] {{ $fa }}">{{ $isRtl ? 'العنوان (عربي)' : 'Title (Arabic)' }}</span>
                         <div class="mt-3 border border-[#dddddd] focus-within:border-[#222] transition-all bg-white shadow-card r-ios-lg overflow-hidden">
-                            <input name="title" x-model="title" type="text" maxlength="120"
-                                   placeholder="{{ $isRtl ? 'شاليه فاخر بإطلالة على الجبال' : 'Luxury chalet with mountain view' }}"
-                                   class="w-full bg-transparent outline-none text-[17px] text-[#222] py-4 px-5 {{ $fa }}">
+                            <input name="title_ar" x-model="titleAr" type="text" maxlength="120" dir="rtl"
+                                   placeholder="شاليه فاخر بإطلالة على الجبال"
+                                   class="w-full bg-transparent outline-none text-[17px] text-[#222] py-4 px-5 font-arabic">
                         </div>
                     </label>
-
-                    <label class="block mt-8">
-                        <span class="text-sm font-semibold text-[#222] {{ $fa }}">{{ $isRtl ? 'الوصف' : 'Description' }}</span>
+                    <label class="block mt-4">
+                        <span class="text-sm font-semibold text-[#222] {{ $fa }}">{{ $isRtl ? 'العنوان (إنجليزي)' : 'Title (English)' }}</span>
                         <div class="mt-3 border border-[#dddddd] focus-within:border-[#222] transition-all bg-white shadow-card r-ios-lg overflow-hidden">
-                            <textarea name="description" x-model="description" maxlength="5000" rows="6"
-                                      placeholder="{{ $isRtl ? 'صف ما يجعل مكانك مميزاً...' : 'Tell guests what makes your place special...' }}"
-                                      class="w-full bg-transparent outline-none resize-none text-[16px] text-[#222] py-4 px-5 leading-relaxed {{ $fa }}"></textarea>
+                            <input name="title_en" x-model="titleEn" type="text" maxlength="120" dir="ltr"
+                                   placeholder="Luxury chalet with mountain view"
+                                   class="w-full bg-transparent outline-none text-[17px] text-[#222] py-4 px-5">
+                        </div>
+                    </label>
+                    <p x-show="!titleAr.trim() && !titleEn.trim()" x-cloak class="mt-2 text-sm text-[#dc2626] {{ $fa }}">
+                        {{ $isRtl ? 'أدخل العنوان بالعربية أو الإنجليزية على الأقل.' : 'Enter the title in at least Arabic or English.' }}
+                    </p>
+
+                    {{-- Description — Arabic + English (optional) --}}
+                    <label class="block mt-8">
+                        <span class="text-sm font-semibold text-[#222] {{ $fa }}">{{ $isRtl ? 'الوصف (عربي)' : 'Description (Arabic)' }}</span>
+                        <div class="mt-3 border border-[#dddddd] focus-within:border-[#222] transition-all bg-white shadow-card r-ios-lg overflow-hidden">
+                            <textarea name="description_ar" x-model="descriptionAr" maxlength="5000" rows="5" dir="rtl"
+                                      placeholder="صف ما يجعل مكانك مميزاً..."
+                                      class="w-full bg-transparent outline-none resize-none text-[16px] text-[#222] py-4 px-5 leading-relaxed font-arabic"></textarea>
                         </div>
                         <div class="mt-1.5 text-xs text-[#717171] tabular-nums {{ $isRtl ? 'text-left' : 'text-right' }}">
-                            <span x-text="(description || '').length"></span> / 5000
+                            <span x-text="(descriptionAr || '').length"></span> / 5000
+                        </div>
+                    </label>
+                    <label class="block mt-4">
+                        <span class="text-sm font-semibold text-[#222] {{ $fa }}">{{ $isRtl ? 'الوصف (إنجليزي)' : 'Description (English)' }}</span>
+                        <div class="mt-3 border border-[#dddddd] focus-within:border-[#222] transition-all bg-white shadow-card r-ios-lg overflow-hidden">
+                            <textarea name="description_en" x-model="descriptionEn" maxlength="5000" rows="5" dir="ltr"
+                                      placeholder="Tell guests what makes your place special..."
+                                      class="w-full bg-transparent outline-none resize-none text-[16px] text-[#222] py-4 px-5 leading-relaxed"></textarea>
+                        </div>
+                        <div class="mt-1.5 text-xs text-[#717171] tabular-nums {{ $isRtl ? 'text-left' : 'text-right' }}">
+                            <span x-text="(descriptionEn || '').length"></span> / 5000
                         </div>
                     </label>
 
@@ -835,12 +863,21 @@
                     </div>
 
                     <label class="block mt-8">
-                        <span class="text-sm font-semibold text-[#222] {{ $fa }}">{{ $isRtl ? 'قواعد المكان (اختياري)' : 'House rules (optional)' }}</span>
+                        <span class="text-sm font-semibold text-[#222] {{ $fa }}">{{ $isRtl ? 'قواعد المكان — عربي (اختياري)' : 'House rules — Arabic (optional)' }}</span>
                         <div class="mt-3 border border-[#dddddd] focus-within:border-[#222] transition-all bg-white shadow-card r-ios-lg">
-                            <textarea name="rules" x-model="rules" rows="8" maxlength="5000"
-                                      placeholder="{{ $isRtl ? 'مثلاً: ممنوع التدخين، الحفلات بإذن مسبق...' : 'e.g. No smoking, no parties without prior approval...' }}"
-                                      class="w-full bg-transparent outline-none resize-y text-[15px] text-[#222] py-4 px-5 leading-relaxed {{ $fa }}"
-                                      style="min-height: 160px; max-height: 70vh;"></textarea>
+                            <textarea name="rules_ar" x-model="rulesAr" rows="6" maxlength="5000" dir="rtl"
+                                      placeholder="مثلاً: ممنوع التدخين، الحفلات بإذن مسبق..."
+                                      class="w-full bg-transparent outline-none resize-y text-[15px] text-[#222] py-4 px-5 leading-relaxed font-arabic"
+                                      style="min-height: 140px; max-height: 70vh;"></textarea>
+                        </div>
+                    </label>
+                    <label class="block mt-4">
+                        <span class="text-sm font-semibold text-[#222] {{ $fa }}">{{ $isRtl ? 'قواعد المكان — إنجليزي (اختياري)' : 'House rules — English (optional)' }}</span>
+                        <div class="mt-3 border border-[#dddddd] focus-within:border-[#222] transition-all bg-white shadow-card r-ios-lg">
+                            <textarea name="rules_en" x-model="rulesEn" rows="6" maxlength="5000" dir="ltr"
+                                      placeholder="e.g. No smoking, no parties without prior approval..."
+                                      class="w-full bg-transparent outline-none resize-y text-[15px] text-[#222] py-4 px-5 leading-relaxed"
+                                      style="min-height: 140px; max-height: 70vh;"></textarea>
                         </div>
                     </label>
                 </section>
@@ -1000,8 +1037,10 @@ function registerWizard() {
         // server ignores. Form submit also posts this via the visible input.
         hostPhone: '',
         placeTypeId: null,
-        title: '',
-        description: '',
+        titleAr: '',
+        titleEn: '',
+        descriptionAr: '',
+        descriptionEn: '',
         cityId: null,                   // intermediate — picked first
         cityAreaId: null,               // sent to server
         price: 0,
@@ -1023,9 +1062,10 @@ function registerWizard() {
         // Default to 1 — UI starts at the minimum so the +/− stepper has
         // something sensible to mutate. Required at final submit.
         maxGuests: 1,
-        // Pre-filled default rules for a new place; overridden by saved rules on
-        // draft-resume / edit (see init.draft.rules below).
-        rules: @js($defaultRules),
+        // Pre-filled default rules (both languages) for a new place; overridden
+        // by saved rules on draft-resume / edit (see init.draft below).
+        rulesAr: @js($defaultRulesAr),
+        rulesEn: @js($defaultRulesEn),
         // Map link (Google Maps, etc.) the host pastes; shown to guests only
         // after their booking is confirmed.
         locationUrl: '',
@@ -1048,8 +1088,10 @@ function registerWizard() {
             // Resume a draft if the controller handed us one via `?draft=<id>`.
             if (init.draft) {
                 this.placeTypeId = init.draft.place_type_id;
-                this.title       = init.draft.title || '';
-                this.description = init.draft.description || '';
+                this.titleAr       = init.draft.title_ar || '';
+                this.titleEn       = init.draft.title_en || '';
+                this.descriptionAr = init.draft.description_ar || '';
+                this.descriptionEn = init.draft.description_en || '';
                 this.cityId      = init.draft.city_id || null;
                 this.cityAreaId  = init.draft.city_area_id || null;
                 // Per-day prices fall back to the base price server-side when left
@@ -1060,7 +1102,8 @@ function registerWizard() {
                 this.checkOutTime = init.draft.check_out_time || '12:00';
                 this.checkoutNextDay = init.draft.checkout_next_day ?? true;
                 this.maxGuests    = init.draft.max_guests || 1;
-                this.rules        = init.draft.rules || '';
+                this.rulesAr      = init.draft.rules_ar || '';
+                this.rulesEn      = init.draft.rules_en || '';
                 this.locationUrl  = init.draft.location_url || '';
                 this.draftId      = init.draft.id;
 
@@ -1173,7 +1216,7 @@ function registerWizard() {
         canAdvance() {
             switch (this.step) {
                 case 1: return !!this.placeTypeId;
-                case 2: return this.title.trim().length > 0;
+                case 2: return this.titleAr.trim().length > 0 || this.titleEn.trim().length > 0;
                 case 3: return !!this.cityId;          // city pick
                 case 4: return !!this.cityAreaId && this.isValidLocationUrl(); // area pick + valid location link
                 case 5: return Number(this.price) > 0; // pricing
@@ -1639,15 +1682,18 @@ function registerWizard() {
                 // an empty value and falls back to the current user.
                 host_phone: (this.hostPhone || '').trim(),
                 place_type_id: this.placeTypeId,
-                title: this.title || null,
-                description: this.description || null,
+                title_ar: this.titleAr || null,
+                title_en: this.titleEn || null,
+                description_ar: this.descriptionAr || null,
+                description_en: this.descriptionEn || null,
                 city_area_id: this.cityAreaId || null,
                 price: Number(this.price) || 0,
                 check_in_time: this.checkInTime || '15:00',
                 check_out_time: this.checkOutTime || '12:00',
                 checkout_next_day: this.checkoutNextDay,
                 max_guests: Number(this.maxGuests) || null,
-                rules: this.rules || null,
+                rules_ar: this.rulesAr || null,
+                rules_en: this.rulesEn || null,
                 location_url: this.locationUrl || null,
                 last_step: this.step,
                 price_sunday:    this.dayPrices.sunday    || 0,
