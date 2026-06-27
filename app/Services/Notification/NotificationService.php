@@ -10,9 +10,7 @@ use App\Models\NotificationBroadcast;
 use App\Models\Place;
 use App\Models\User;
 use App\Models\UserNotification;
-use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Carbon;
 
 /**
  * One entry point for every notification. Each call writes the in-app row
@@ -218,39 +216,43 @@ final class NotificationService
     private function bookingVars(Booking $booking): array
     {
         $ref = (string) $booking->reference;
-        $checkIn = $this->checkInAt($booking);
-        $checkOut = $booking->checkoutAt();
 
         return [
-            'ar' => ['{ref}' => $ref, '{checkIn}' => $this->stayLabel($checkIn, 'ar'), '{checkOut}' => $this->stayLabel($checkOut, 'ar')],
-            'en' => ['{ref}' => $ref, '{checkIn}' => $this->stayLabel($checkIn, 'en'), '{checkOut}' => $this->stayLabel($checkOut, 'en')],
+            'ar' => ['{ref}' => $ref, '{dates}' => $this->dateRange($booking, 'ar')],
+            'en' => ['{ref}' => $ref, '{dates}' => $this->dateRange($booking, 'en')],
         ];
     }
 
-    /** Check-in moment = the stay's start date at its check-in time. */
-    private function checkInAt(Booking $booking): ?CarbonInterface
-    {
-        if ($booking->start_date === null) {
-            return null;
-        }
-
-        return Carbon::parse($booking->start_date->toDateString().' '.($booking->check_in_time ?: '00:00'));
-    }
-
     /**
-     * Gregorian date + AM/PM time, localized month name with Latin digits.
-     * The time is formatted separately so the meridiem stays "AM"/"PM" even in
-     * the Arabic variant (translatedFormat would localize it otherwise).
+     * The stay's date range — no times. Gregorian with a localized month name.
+     * Arabic uses Arabic-Indic digits ("٢٣ يونيو ٢٠٢٦") so RTL formatting isn't
+     * broken by Latin numerals; English uses Latin ("23 Jun 2026"). A single-day
+     * stay collapses to one date.
      */
-    private function stayLabel(?CarbonInterface $dt, string $locale): string
+    private function dateRange(Booking $booking, string $locale): string
     {
-        if ($dt === null) {
+        $start = $booking->start_date;
+        if ($start === null) {
             return '—';
         }
 
-        $date = $dt->copy()->locale($locale)->translatedFormat($locale === 'ar' ? 'j F Y' : 'j M Y');
-        $time = $dt->format('g:i A');
+        // Localized Gregorian month, Latin digits; for Arabic convert the digits
+        // to Arabic-Indic so the RTL date reads cleanly.
+        $arabicize = fn (string $s): string => strtr($s, [
+            '0' => '٠', '1' => '١', '2' => '٢', '3' => '٣', '4' => '٤',
+            '5' => '٥', '6' => '٦', '7' => '٧', '8' => '٨', '9' => '٩',
+        ]);
+        $label = fn ($d): string => $locale === 'ar'
+            ? $arabicize($d->copy()->locale('ar')->translatedFormat('j F Y'))
+            : $d->copy()->locale('en')->translatedFormat('j M Y');
 
-        return $locale === 'ar' ? "{$date}، {$time}" : "{$date}, {$time}";
+        $startLabel = $label($start);
+
+        $end = $booking->end_date;
+        if ($end === null || $end->isSameDay($start)) {
+            return $startLabel;
+        }
+
+        return $startLabel.' – '.$label($end);
     }
 }

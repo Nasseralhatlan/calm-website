@@ -11,10 +11,9 @@ declare(strict_types=1);
 | Keep them short. They contain NO user-generated content (no place names) —
 | only system values via placeholders:
 |
-|   {ref}       booking reference (e.g. CB-3QAKD4)
-|   {checkIn}   check-in date + time   (e.g. "23 يونيو 2026، 3:00 PM")
-|   {checkOut}  check-out date + time
-|   {reason}    admin's rejection note (place_rejected only)
+|   {ref}     booking reference (e.g. CB-3QAKD4)
+|   {dates}   stay date range, no times (e.g. "23 Jun 2026 – 25 Jun 2026")
+|   {reason}  admin's rejection note (place_rejected only)
 |
 | Structure: <type>.<audience>. Cancellations notify both guest and host, so
 | they have a `guest` and a `host` block. After editing, run:
@@ -28,8 +27,8 @@ return [
         'guest' => [
             'title_ar' => 'تم تأكيد حجزك',
             'title_en' => 'Booking confirmed',
-            'body_ar' => 'تم تأكيد حجزك في تطبيق كالم. رقم الحجز: {ref}.',
-            'body_en' => 'Your booking is confirmed on the Calm app. Ref: {ref}.',
+            'body_ar' => 'تم تأكيد حجزك بتاريخ {dates}. رقم الحجز: {ref}. لمزيد من التفاصيل، اطّلع على حجزك في تطبيق كالم.',
+            'body_en' => 'Your booking is confirmed for {dates}. Ref: {ref}. For more details, view your booking in the Calm app.',
         ],
     ],
 
@@ -37,8 +36,8 @@ return [
         'host' => [
             'title_ar' => 'حجز جديد',
             'title_en' => 'New booking',
-            'body_ar' => 'لديك حجز جديد في تطبيق كالم. رقم الحجز: {ref}.',
-            'body_en' => 'You have a new booking on the Calm app. Ref: {ref}.',
+            'body_ar' => 'لديك حجز جديد بتاريخ {dates} في تطبيق كالم. رقم الحجز: {ref}.',
+            'body_en' => 'You have a new booking for {dates} in the Calm app. Ref: {ref}.',
         ],
     ],
 
@@ -87,7 +86,7 @@ return [
             'title_ar' => 'تم استلام مكانك',
             'title_en' => 'Place received',
             'body_ar' => 'تم استلام مكانك وهو قيد المراجعة. سنخبرك عند ظهوره في تطبيق كالم.',
-            'body_en' => 'Your place was received and is under review. We\'ll let you know when it\'s live on the Calm app.',
+            'body_en' => 'Your place was received and is under review. We\'ll let you know when it\'s live in the Calm app.',
         ],
     ],
 
@@ -96,7 +95,7 @@ return [
             'title_ar' => 'تمت الموافقة على مكانك',
             'title_en' => 'Place approved',
             'body_ar' => 'تمت الموافقة على مكانك وأصبح متاحاً في تطبيق كالم.',
-            'body_en' => 'Your place was approved and is now live on the Calm app.',
+            'body_en' => 'Your place was approved and is now live in the Calm app.',
         ],
     ],
 

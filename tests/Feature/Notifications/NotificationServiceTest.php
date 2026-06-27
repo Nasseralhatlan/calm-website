@@ -270,14 +270,16 @@ it('notifies the guest when their booking is confirmed', function (): void {
         'max_guests' => 2, 'status' => PlaceStatus::Active->value, 'review_status' => PlaceReviewStatus::Approved->value,
     ]);
     $booking = newBooking($place, $guest);
-    $booking->update(['check_in_time' => '15:00', 'check_out_time' => '12:00']);
 
     $this->service->bookingConfirmed($booking);
 
     $row = UserNotification::query()->where('user_id', $guest->id)->sole();
     expect($row->type)->toBe('booking_confirmed')
         ->and($row->data['booking_id'])->toBe($booking->id)
-        ->and($row->body_ar)->toContain($booking->reference)        // booking reference (no dates/times)
+        ->and($row->body_en)->toContain($booking->reference)                       // ref
+        ->and($row->body_en)->toContain($booking->start_date->translatedFormat('Y')) // stay date (no time)
+        ->and($row->body_en)->toContain('view your booking in the Calm app')        // CTA
+        ->and($row->body_en)->not->toContain('PM')                                  // no check-in/out times
         ->and($sms->calls)->toHaveCount(1)
         ->and($sms->calls[0]['phone'])->toBe('513000034');
 });
