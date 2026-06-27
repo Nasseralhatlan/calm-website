@@ -28,8 +28,8 @@ return [
         'guest' => [
             'title_ar' => 'تم تأكيد حجزك',
             'title_en' => 'Booking confirmed',
-            'body_ar' => 'تم تأكيد حجزك. الدخول {checkIn}، الخروج {checkOut}. رقم الحجز: {ref}.',
-            'body_en' => 'Booking confirmed. Check-in {checkIn}, check-out {checkOut}. Ref: {ref}.',
+            'body_ar' => 'تم تأكيد حجزك في تطبيق كالم. رقم الحجز: {ref}.',
+            'body_en' => 'Your booking is confirmed on the Calm app. Ref: {ref}.',
         ],
     ],
 
@@ -37,8 +37,8 @@ return [
         'host' => [
             'title_ar' => 'حجز جديد',
             'title_en' => 'New booking',
-            'body_ar' => 'لديك حجز جديد. الدخول {checkIn}، الخروج {checkOut}. رقم الحجز: {ref}.',
-            'body_en' => 'New booking. Check-in {checkIn}, check-out {checkOut}. Ref: {ref}.',
+            'body_ar' => 'لديك حجز جديد في تطبيق كالم. رقم الحجز: {ref}.',
+            'body_en' => 'You have a new booking on the Calm app. Ref: {ref}.',
         ],
     ],
 

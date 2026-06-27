@@ -12,6 +12,7 @@ use App\Models\Place;
 use App\Models\PlaceReview;
 use App\Models\User;
 use App\Services\Notification\NotificationService;
+use App\Services\Notification\OwnerNotifier;
 use App\Services\Place\PlaceAvailabilityService;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -26,6 +27,7 @@ final class BookingService
         private readonly PlaceAvailabilityService $availability,
         private readonly MoyasarGateway $gateway,
         private readonly NotificationService $notifications,
+        private readonly OwnerNotifier $owner,
     ) {}
 
     /**
@@ -37,6 +39,7 @@ final class BookingService
         if ($transitionedTo === BookingStatus::Confirmed) {
             $this->notifications->bookingConfirmed($booking);   // guest
             $this->notifications->hostNewBooking($booking);     // host gets a booking
+            $this->owner->bookingPaid($booking);                // owners: revenue
         }
         // No guest SMS on Expired: an expired hold is an abandoned/unpaid booking,
         // not a real cancellation. bookingCancelled() stays for a future cancel flow.
@@ -124,6 +127,7 @@ final class BookingService
             // Free the dates immediately — a hold is worthless without a payment.
             $booking->update(['booking_status' => BookingStatus::Expired->value, 'payment_status' => 'creation_failed']);
             Log::error('Booking payment init failed', ['booking' => $booking->id, 'error' => $e->getMessage()]);
+            $this->owner->paymentFailed($booking, $e->getMessage()); // owners: payment broke
             abort(502, 'Could not start the payment. Please try again.');
         }
 

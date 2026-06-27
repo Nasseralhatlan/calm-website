@@ -277,9 +277,7 @@ it('notifies the guest when their booking is confirmed', function (): void {
     $row = UserNotification::query()->where('user_id', $guest->id)->sole();
     expect($row->type)->toBe('booking_confirmed')
         ->and($row->data['booking_id'])->toBe($booking->id)
-        ->and($row->body_ar)->toContain($booking->reference)        // booking reference
-        ->and($row->body_ar)->toContain($booking->start_date->translatedFormat('j')) // stay date present
-        ->and($row->body_ar)->toContain('PM')                       // AM/PM time
+        ->and($row->body_ar)->toContain($booking->reference)        // booking reference (no dates/times)
         ->and($sms->calls)->toHaveCount(1)
         ->and($sms->calls[0]['phone'])->toBe('513000034');
 });

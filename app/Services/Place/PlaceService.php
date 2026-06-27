@@ -14,13 +14,17 @@ use App\Models\PlacePhoto;
 use App\Models\PlaceType;
 use App\Models\User;
 use App\Services\Notification\NotificationService;
+use App\Services\Notification\OwnerNotifier;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 
 final class PlaceService
 {
-    public function __construct(private readonly NotificationService $notifications) {}
+    public function __construct(
+        private readonly NotificationService $notifications,
+        private readonly OwnerNotifier $owner,
+    ) {}
 
     public function paginate(?int $perPage = null, ?string $search = null): LengthAwarePaginator
     {
@@ -132,6 +136,7 @@ final class PlaceService
 
         // Notify the host their place is now in review (fired after commit).
         $this->notifications->placeSubmitted($place);
+        $this->owner->placeSubmitted($place); // owners: needs review
 
         return $place;
     }
@@ -447,6 +452,7 @@ final class PlaceService
 
         // Editing resubmits for review — notify the host (fired after commit).
         $this->notifications->placeSubmitted($place);
+        $this->owner->placeSubmitted($place); // owners: needs review
 
         return $place;
     }
