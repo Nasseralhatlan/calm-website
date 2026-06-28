@@ -14,6 +14,7 @@ declare(strict_types=1);
 |   {ref}     booking reference (e.g. CB-3QAKD4)
 |   {dates}   stay date range, no times (e.g. "23 Jun 2026 – 25 Jun 2026")
 |   {reason}  admin's rejection note (place_rejected only)
+|   {code}    one-time verification code (otp only)
 |
 | Structure: <type>.<audience>. Cancellations notify both guest and host, so
 | they have a `guest` and a `host` block. After editing, run:
@@ -22,6 +23,16 @@ declare(strict_types=1);
 */
 
 return [
+
+    // One-time verification code (sign-in / sign-up). Flat shape — a single
+    // line per channel, not title+body. The {code} stays in Latin digits so it
+    // matches the phone keypad. Delivered in the user's locale (default ar).
+    'otp' => [
+        'sms_ar' => 'رمز التحقق الخاص بك في كالم هو: {code}',
+        'sms_en' => 'Your Calm verification code is: {code}',
+        'email_subject_ar' => 'رمز التحقق في كالم',
+        'email_subject_en' => 'Your Calm verification code',
+    ],
 
     'booking_confirmed' => [
         'guest' => [

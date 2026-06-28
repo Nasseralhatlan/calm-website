@@ -450,14 +450,15 @@
 
                     <div class="mt-8">
                         <div class="text-sm font-semibold text-[#222] {{ $fa }}">{{ $isRtl ? 'السعر لكل يوم (اختياري)' : 'Per-day pricing (optional)' }}</div>
-                        <div class="text-xs text-[#717171] mt-1 {{ $fa }}">{{ $isRtl ? 'اترك 0 لاستخدام السعر الأساسي.' : 'Leave 0 to fall back to base.' }}</div>
+                        <div class="text-xs text-[#717171] mt-1 {{ $fa }}">{{ $isRtl ? 'اتركه فارغاً لاستخدام السعر الأساسي.' : 'Leave empty to use the base price.' }}</div>
                         <div class="mt-4 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
                             @foreach($dayLabels as $day => $label)
                                 @php $col = "price_{$day}"; @endphp
                                 <div>
                                     <label class="block text-[11px] font-bold text-[#717171] uppercase tracking-wider text-center {{ $fa }}" style="margin-bottom: 4px;">{{ $label }}</label>
                                     <input type="number" name="{{ $col }}" x-model.number="dayPrices['{{ $day }}']" min="0"
-                                           class="w-full bg-white border border-[#dddddd] focus:border-[#222] r-ios text-[14px] text-center tabular-nums py-2.5 px-2" dir="ltr">
+                                           :placeholder="_basePrice > 0 ? money(_basePrice) : '0'"
+                                           class="w-full bg-white border border-[#dddddd] focus:border-[#222] r-ios text-[14px] text-center tabular-nums py-2.5 px-2 placeholder:text-[#bbb]" dir="ltr">
                                 </div>
                             @endforeach
                         </div>
@@ -1044,8 +1045,11 @@ function registerWizard() {
         cityId: null,                   // intermediate — picked first
         cityAreaId: null,               // sent to server
         price: 0,
+        // Per-day overrides. Empty means "use the base price" — the input shows
+        // the base as a placeholder so every day visibly reflects it. A typed
+        // value overrides just that day. (Stored 0/null loads back as empty.)
         dayPrices: {
-            sunday: 0, monday: 0, tuesday: 0, wednesday: 0, thursday: 0, friday: 0, saturday: 0,
+            sunday: '', monday: '', tuesday: '', wednesday: '', thursday: '', friday: '', saturday: '',
         },
 
         // Commission percentage from settings — drives the pricing preview.
@@ -1095,9 +1099,12 @@ function registerWizard() {
                 this.cityId      = init.draft.city_id || null;
                 this.cityAreaId  = init.draft.city_area_id || null;
                 // Per-day prices fall back to the base price server-side when left
-                // at 0, so we just load whatever was actually persisted.
+                // at 0. Load real overrides; show 0/null as empty so the base
+                // placeholder takes over and nothing reads as "priced at zero".
                 this.price       = init.draft.price || 0;
-                Object.assign(this.dayPrices, init.draft.day_prices || {});
+                for (const [day, val] of Object.entries(init.draft.day_prices || {})) {
+                    this.dayPrices[day] = Number(val) > 0 ? Number(val) : '';
+                }
                 this.checkInTime  = init.draft.check_in_time || '15:00';
                 this.checkOutTime = init.draft.check_out_time || '12:00';
                 this.checkoutNextDay = init.draft.checkout_next_day ?? true;

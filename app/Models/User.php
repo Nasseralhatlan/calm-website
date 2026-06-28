@@ -46,6 +46,15 @@ class User extends Authenticatable implements JWTSubject
         'remember_token',
     ];
 
+    /**
+     * In-memory defaults so a just-created user (e.g. the OTP shell or an
+     * admin-attached host) carries its locale before being reloaded — keeps
+     * notifications/OTP from seeing a null locale. Mirrors the DB default.
+     */
+    protected $attributes = [
+        'locale' => 'ar',
+    ];
+
     protected function casts(): array
     {
         return [

@@ -8,6 +8,7 @@ use App\Enums\UserRole;
 use App\Models\Otp;
 use App\Models\User;
 use App\Services\Otp\OtpService;
+use App\Support\MockPhoneRegistry;
 use Illuminate\Support\Facades\Hash;
 use Tests\Support\TestSmsDelivery;
 
@@ -36,6 +37,22 @@ it('issues an otp for a new phone number and auto-creates the user', function ()
     expect($this->sink->sent)->toHaveCount(1);
     expect($this->sink->sent[0]['phone'])->toBe('512345678');
     expect($this->sink->lastCode())->toMatch('/^\d{6}$/');
+});
+
+it('sends the otp in the user\'s language (default Arabic, English when opted in)', function (): void {
+    $service = new OtpService($this->sink, app(MockPhoneRegistry::class));
+
+    // Default locale (ar) → Arabic body, code stays in Latin digits.
+    $arUser = User::factory()->create(['phone' => '512345678', 'locale' => 'ar']);
+    $service->issue($arUser, OtpType::Phone, $arUser->phone);
+    expect($this->sink->sent[0]['message'])
+        ->toContain('رمز التحقق')
+        ->toMatch('/\d{6}/');
+
+    // English-locale user → English body.
+    $enUser = User::factory()->create(['phone' => '512345679', 'locale' => 'en']);
+    $service->issue($enUser, OtpType::Phone, $enUser->phone);
+    expect($this->sink->sent[1]['message'])->toContain('Your Calm verification code is');
 });
 
 it('rejects invalid phone format', function (): void {

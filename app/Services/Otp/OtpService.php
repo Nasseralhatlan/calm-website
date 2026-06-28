@@ -52,7 +52,7 @@ final class OtpService
             'expires_at' => now()->addMinutes(self::TTL_MINUTES),
         ]);
 
-        $this->dispatch($type, $identifier, $plain);
+        $this->dispatch($type, $identifier, $plain, $user->locale);
 
         return $otp;
     }
@@ -109,14 +109,24 @@ final class OtpService
             ->first();
     }
 
-    private function dispatch(OtpType $type, string $identifier, string $code): void
+    /**
+     * Deliver the code in the recipient's language (default Arabic). Text lives
+     * in config/notifications.php ('otp'); only the {code} is interpolated here.
+     */
+    private function dispatch(OtpType $type, string $identifier, string $code, string $locale): void
     {
-        $message = "Your Calm verification code is: {$code}";
+        $en = $locale === 'en';
+        $body = strtr(
+            config($en ? 'notifications.otp.sms_en' : 'notifications.otp.sms_ar'),
+            ['{code}' => $code],
+        );
 
         match ($type) {
-            OtpType::Phone => $this->sms->send($identifier, $message),
-            OtpType::Email => Mail::raw($message, function ($mail) use ($identifier): void {
-                $mail->to($identifier)->subject('Your Calm verification code');
+            OtpType::Phone => $this->sms->send($identifier, $body),
+            OtpType::Email => Mail::raw($body, function ($mail) use ($identifier, $en): void {
+                $mail->to($identifier)->subject(
+                    config($en ? 'notifications.otp.email_subject_en' : 'notifications.otp.email_subject_ar'),
+                );
             }),
         };
     }
