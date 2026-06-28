@@ -179,6 +179,35 @@ it('orders photos by section then within, and maps featured_order from markers',
         ]);
 });
 
+it('coerces blank (null) per-day prices to 0 so the non-nullable columns persist', function (): void {
+    // The wizard sends a value only for days the host customized; untouched
+    // days arrive as null (empty inputs nulled by middleware). They must land
+    // as 0 ("use base price"), not blow up on the NOT NULL constraint.
+    $place = $this->service->createForHost(
+        $this->host,
+        [
+            'place_type_id' => $this->placeType->id,
+            'city_area_id' => $this->area->id,
+            'title_ar' => 'شاليه',
+            'price' => 500,
+            'price_thursday' => 700,
+            'price_friday' => 800,
+            'price_sunday' => null,
+            'price_monday' => null,
+            'price_tuesday' => null,
+            'price_wednesday' => null,
+            'price_saturday' => null,
+        ],
+        null,
+    );
+
+    expect($place->price_thursday)->toBe(700)
+        ->and($place->price_friday)->toBe(800)
+        ->and($place->price_sunday)->toBe(0)
+        ->and($place->price_monday)->toBe(0)
+        ->and($place->price_saturday)->toBe(0);
+});
+
 it('promotes a draft to PendingReview on final submit (createForHost)', function (): void {
     $draft = $this->service->saveDraftForHost(
         $this->host,

@@ -190,6 +190,16 @@ final class PlaceService
                 ->first();
         }
 
+        // Per-day price columns are non-nullable ("0" means "fall back to the
+        // base price"). A blank day input arrives here as null (empty strings
+        // are nulled by middleware), so coerce any provided-but-null day back
+        // to 0 before persisting — the last guard before the DB for every path.
+        foreach (Place::PRICE_COLUMNS as $column) {
+            if (array_key_exists($column, $data) && $data[$column] === null) {
+                $data[$column] = 0;
+            }
+        }
+
         $payload = [
             ...$data,
             'host_user_id' => $host->id,
