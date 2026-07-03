@@ -34,7 +34,10 @@ return [
     // corporate account with API credentials) is registered — its id below.
     'payouts_mode' => env('MOYASAR_PAYOUTS_MODE', 'manual'),
     'payout_account_id' => env('MOYASAR_PAYOUT_ACCOUNT_ID'),
-    'payout_purpose' => env('MOYASAR_PAYOUT_PURPOSE', 'expenses_services'),
+    // payment_to_merchant: verified against the live API — the IPS transfer
+    // channel rejects several enum-valid purposes (e.g. expenses_services)
+    // after creation with "Unsupported purpose".
+    'payout_purpose' => env('MOYASAR_PAYOUT_PURPOSE', 'payment_to_merchant'),
     // Moyasar bank destinations require a city; hosts don't store one yet.
     'payout_default_city' => env('MOYASAR_PAYOUT_DEFAULT_CITY', 'Riyadh'),
 ];
