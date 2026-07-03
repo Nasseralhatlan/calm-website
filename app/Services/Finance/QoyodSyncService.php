@@ -132,43 +132,51 @@ final class QoyodSyncService
      */
     private function pushInvoice(FinancialDocument $document, string $contactId, string $reference, array $lineItems, Booking $booking, array $payment): void
     {
-        $payload = [
-            'contact_id' => (int) $contactId,
-            'reference' => $reference,
-            'description' => "Calm booking {$booking->reference}",
-            'issue_date' => ($document->issued_at ?? now())->toDateString(),
-            'due_date' => ($document->issued_at ?? now())->toDateString(),
-            'status' => 'Approved',
-            'inventory_id' => (int) config('finance.qoyod.inventory_id', 1),
-            'line_items' => $lineItems,
-            'custom_fields' => ['booking_id' => $booking->id, 'booking_reference' => $booking->reference],
-        ];
+        // Resume-safe: Qoyod invoice references are UNIQUE, so if a previous
+        // attempt created the invoice but died on the payment call, we must
+        // NOT create it again — pick up at the payment step instead.
+        if ($document->external_document_id === null) {
+            // No custom_fields on purpose: Qoyod requires them to be
+            // pre-configured in the org settings; the booking linkage lives
+            // in `reference` + `description` instead.
+            $payload = [
+                'contact_id' => (int) $contactId,
+                'reference' => $reference,
+                'description' => "Calm booking {$booking->reference}",
+                'issue_date' => ($document->issued_at ?? now())->toDateString(),
+                'due_date' => ($document->issued_at ?? now())->toDateString(),
+                'status' => 'Approved',
+                'inventory_id' => (int) config('finance.qoyod.inventory_id', 1),
+                'line_items' => $lineItems,
+            ];
 
-        $response = $this->client->createInvoice($payload);
-        $invoice = (array) ($response['invoice'] ?? $response);
+            $response = $this->client->createInvoice($payload);
+            $invoice = (array) ($response['invoice'] ?? $response);
 
-        $document->update([
-            'external_provider' => 'qoyod',
-            'external_contact_id' => $contactId,
-            'external_document_id' => isset($invoice['id']) ? (string) $invoice['id'] : null,
-            'external_document_number' => $invoice['reference'] ?? $reference,
-            'external_payload' => $payload,
-            'external_response' => $response,
-            'external_status' => 'created',
-            'status' => FinancialDocument::STATUS_ISSUED,
-        ]);
+            $document->update([
+                'external_provider' => 'qoyod',
+                'external_contact_id' => $contactId,
+                'external_document_id' => isset($invoice['id']) ? (string) $invoice['id'] : null,
+                'external_document_number' => $invoice['reference'] ?? $reference,
+                'external_payload' => $payload,
+                'external_response' => $response,
+                'external_status' => 'created',
+            ]);
+        }
 
         // Both invoices are already settled in reality (guest paid via
         // Moyasar; commission withheld) — record the payment in Qoyod too.
-        if (isset($invoice['id'])) {
+        if ($document->external_document_id !== null) {
             $this->client->createInvoicePayment([
                 'reference' => $payment['reference'],
-                'invoice_id' => (string) $invoice['id'],
+                'invoice_id' => (string) $document->external_document_id,
                 'account_id' => (string) $payment['account_id'],
                 'date' => now()->toDateString(),
                 'amount' => $this->sar((int) $document->total_amount),
             ]);
         }
+
+        $document->update(['status' => FinancialDocument::STATUS_ISSUED]);
     }
 
     private function syncCreditNote(Booking $booking, FinancialDocument $document): void
@@ -226,12 +234,14 @@ final class QoyodSyncService
             return (string) $guest->qoyod_customer_id;
         }
 
-        $response = $this->client->createCustomer([
+        // Only `name` is required; empty optional fields are OMITTED (an
+        // empty-string email would trip Qoyod's format validation).
+        $response = $this->client->createCustomer(array_filter([
             'name' => (string) ($guest->name ?: 'Guest '.$guest->phone),
             'phone_number' => (string) $guest->phone,
             'email' => (string) ($guest->email ?? ''),
             'status' => 'Active',
-        ]);
+        ], fn ($value) => $value !== ''));
 
         $id = (string) ((array) ($response['contact'] ?? []))['id'];
         $guest->forceFill(['qoyod_customer_id' => $id])->save();
@@ -246,13 +256,13 @@ final class QoyodSyncService
         }
 
         $host = $booking->host;
-        $response = $this->client->createCustomer([
+        $response = $this->client->createCustomer(array_filter([
             'name' => (string) ($profile?->legal_name ?: $host?->name ?: 'Host '.$booking->host_user_id),
             'phone_number' => (string) ($host?->phone ?? ''),
             'email' => (string) ($host?->email ?? ''),
             'tax_number' => (string) ($profile?->vat_number ?? ''),
             'status' => 'Active',
-        ]);
+        ], fn ($value) => $value !== ''));
 
         $id = (string) ((array) ($response['contact'] ?? []))['id'];
         $profile?->update(['qoyod_customer_id' => $id]);

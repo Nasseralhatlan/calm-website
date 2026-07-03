@@ -158,6 +158,36 @@ it('marks failed syncs and retries them on the next sweep', function (): void {
         ->and($booking->financialDocuments()->where('status', FinancialDocument::STATUS_FAILED)->count())->toBe(0);
 });
 
+it('resumes at the payment step after a payment failure — never duplicates the invoice', function (): void {
+    qoyodOn();
+    Http::fake([
+        'api.qoyod.test/2.0/customers' => Http::response(['contact' => ['id' => 77]], 201),
+        'api.qoyod.test/2.0/invoices' => Http::sequence()
+            ->push(['invoice' => ['id' => 701, 'reference' => 'G']], 201)
+            ->push(['invoice' => ['id' => 702, 'reference' => 'C']], 201),
+        'api.qoyod.test/2.0/invoice_payments' => Http::sequence()
+            ->push('boom', 500)        // guest payment fails on the first sweep
+            ->push(['id' => 9], 200)   // commission payment succeeds
+            ->push(['id' => 10], 200), // guest payment retried on the second sweep
+    ]);
+
+    $booking = qsyncBooking($this->host, $this->guest);
+    (new FinalizeBookingFinances)->handle(app(BookingFinanceFinalizer::class), app(QoyodSyncService::class));
+
+    $guestDoc = $booking->financialDocuments()
+        ->where('document_subtype', FinancialDocument::GUEST_BOOKING_INVOICE)->sole();
+    // The invoice DID get created before the payment died — id must be kept
+    // so the retry resumes instead of colliding on the unique reference.
+    expect($guestDoc->status)->toBe(FinancialDocument::STATUS_FAILED)
+        ->and($guestDoc->external_document_id)->toBe('701');
+
+    (new FinalizeBookingFinances)->handle(app(BookingFinanceFinalizer::class), app(QoyodSyncService::class));
+
+    expect($guestDoc->fresh()->status)->toBe(FinancialDocument::STATUS_ISSUED);
+    // 2 customers + exactly 2 invoice creations + 3 payment attempts.
+    Http::assertSentCount(7);
+});
+
 it('returns a fresh expiring pdf link for a synced document', function (): void {
     qoyodOn();
     Http::fake([
