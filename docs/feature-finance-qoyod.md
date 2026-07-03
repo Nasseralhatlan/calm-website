@@ -85,20 +85,46 @@ sequence", the payout likely exists at Moyasar — check the dashboard before re
 
 Go-live checklist: (1) Moyasar activates Payouts on the account; (2) company bank
 account at Al Rajhi or SNB with bank API credentials; (3) one-time
-`POST /v1/payout_accounts` to register it → id into `MOYASAR_PAYOUT_ACCOUNT_ID`;
-(4) optionally adjust `payout_hold_hours` in admin settings; (5) set
-`MOYASAR_PAYOUTS_MODE=auto` + `php artisan optimize:clear`. Sandbox works with
-`sk_test_` keys for end-to-end rehearsal.
+`POST /v1/payout_accounts` to register it → id into `MOYASAR_PAYOUT_ACCOUNT_ID`
+(needs `account_type=bank`, `properties.iban`, and `credentials` with a 6–15 digit
+`company_code` + X509 `cert` + RSA/EC `key` in PEM); (4) optionally adjust
+`payout_hold_hours` in admin settings; (5) set `MOYASAR_PAYOUTS_MODE=auto` +
+`php artisan optimize:clear`. Sandbox works with `sk_test_` keys for end-to-end
+rehearsal (**live-verified 2026-07-04**: registered a sandbox payout account,
+executed + reconciled a real transfer). Field notes from the live API:
+`destination.mobile` is required, and the purpose must be `payment_to_merchant` —
+the IPS channel rejects several enum-valid purposes (e.g. `expenses_services`)
+after creation.
 
 ## One-time Qoyod setup (when going live)
 
-1. Paid Qoyod plan → General Settings → generate API key.
-2. Create 3 service products (stay, service fee, commission) + note ids; note the two
-   account ids (Moyasar clearing + commission settlement) from the chart of accounts.
-3. Env: `QOYOD_ENABLED=true`, `QOYOD_API_KEY`, `QOYOD_PRODUCT_STAY_ID`,
-   `QOYOD_PRODUCT_SERVICE_FEE_ID`, `QOYOD_PRODUCT_COMMISSION_ID`,
-   `QOYOD_MOYASAR_ACCOUNT_ID`, `QOYOD_SETTLEMENT_ACCOUNT_ID`.
+> **Live-verified 2026-07-04** end to end against the production Qoyod org + Moyasar
+> sandbox payouts: one SR-10 test booking → both invoices created + paid in Qoyod
+> (refs `-G`/`-C`), expiring PDF fetched, SR 8.85 payout executed and reconciled to
+> `paid` with the full movement trail. Test invoices/receipts were deleted afterwards
+> (delete the *receipts* first — Qoyod 422s deleting an invoice that has payments).
+
+Setup already done in the Qoyod org (ids to use in env):
+
+| Thing | Qoyod id |
+|---|---|
+| Product: Accommodation stay (`CALM-STAY`) | 1 |
+| Product: Calm service fee (`CALM-FEE`) | 2 |
+| Product: Platform commission (`CALM-COMM`) | 3 |
+| Moyasar clearing (Bank Current Account) | 8 |
+| Commission settlement offset (Accounts payable) | 14 |
+| Inventory (Main Branch) | 1 (default) |
+
+1. Paid Qoyod plan → General Settings → generate API key (rotate if ever exposed).
+2. Products + account ids above already exist; the accountant can remap the
+   settlement account later (payments post fine to account 14).
+3. Env: `QOYOD_ENABLED=true`, `QOYOD_API_KEY`, `QOYOD_PRODUCT_STAY_ID=1`,
+   `QOYOD_PRODUCT_SERVICE_FEE_ID=2`, `QOYOD_PRODUCT_COMMISSION_ID=3`,
+   `QOYOD_MOYASAR_ACCOUNT_ID=8`, `QOYOD_SETTLEMENT_ACCOUNT_ID=14`.
 4. `php artisan optimize:clear` — the next sweep syncs everything pending.
+
+Keep `QOYOD_ENABLED=false` everywhere except production — there is no Qoyod sandbox,
+so an enabled dev environment writes to the real books.
 
 VAT posture: rates are snapshotted per booking from `FINANCE_VAT_ENABLED`/`FINANCE_VAT_RATE`
 — set enabled=false while unregistered (docs then carry 0% VAT) and flip on registration;
