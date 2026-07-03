@@ -7,6 +7,7 @@ namespace App\Jobs;
 use App\Enums\BookingStatus;
 use App\Models\Booking;
 use App\Services\Finance\BookingFinanceFinalizer;
+use App\Services\Finance\QoyodSyncService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Foundation\Queue\Queueable;
@@ -25,7 +26,7 @@ class FinalizeBookingFinances implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public function handle(BookingFinanceFinalizer $finalizer): void
+    public function handle(BookingFinanceFinalizer $finalizer, QoyodSyncService $qoyod): void
     {
         // SQL narrows to plausible candidates; the exact checkout+N-hours
         // check happens in isDue() because checkout time derives from
@@ -52,5 +53,9 @@ class FinalizeBookingFinances implements ShouldQueue
                     }
                 }
             });
+
+        // Push any pending/failed tax documents to Qoyod (no-op while the
+        // integration is disabled). Retries happen naturally every sweep.
+        $qoyod->syncPendingDocuments();
     }
 }
