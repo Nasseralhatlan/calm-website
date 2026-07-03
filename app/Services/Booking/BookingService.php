@@ -11,6 +11,7 @@ use App\Models\Booking;
 use App\Models\Place;
 use App\Models\PlaceReview;
 use App\Models\User;
+use App\Services\Finance\BookingFinanceFinalizer;
 use App\Services\Notification\NotificationService;
 use App\Services\Notification\OwnerNotifier;
 use App\Services\Place\PlaceAvailabilityService;
@@ -30,6 +31,7 @@ final class BookingService
         private readonly MoyasarGateway $gateway,
         private readonly NotificationService $notifications,
         private readonly OwnerNotifier $owner,
+        private readonly BookingFinanceFinalizer $finance,
     ) {}
 
     /**
@@ -42,6 +44,7 @@ final class BookingService
             $this->notifications->bookingConfirmed($booking);   // guest
             $this->notifications->hostNewBooking($booking);     // host gets a booking
             $this->owner->bookingPaid($booking);                // owners: revenue
+            $this->finance->recordGuestPayment($booking);       // finance: money-in movement
         }
         // No guest SMS on Expired: an expired hold is an abandoned/unpaid booking,
         // not a real cancellation. bookingCancelled() stays for a future cancel flow.
@@ -275,6 +278,11 @@ final class BookingService
         } else {
             $this->notifications->bookingCanceledByAdmin($booking);
         }
+
+        // Finance trail (§14): Case B refund movement, or Case C credit notes
+        // when the invoices were already issued. Case A never reaches here
+        // (only confirmed bookings can be cancelled).
+        $this->finance->handleCancellation($booking);
 
         return $booking;
     }
@@ -591,7 +599,14 @@ final class BookingService
             'payout_reference' => $payoutStatus === 'paid' ? $reference : null,
         ]);
 
-        return $booking->refresh();
+        $booking->refresh();
+
+        // Finance trail: the payout movement (or its reversal on undo).
+        $payoutStatus === 'paid'
+            ? $this->finance->recordPayoutPaid($booking)
+            : $this->finance->recordPayoutUndo($booking);
+
+        return $booking;
     }
 
     /**

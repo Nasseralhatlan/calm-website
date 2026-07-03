@@ -2,6 +2,7 @@
 
 use App\Jobs\CompleteEndedBookings;
 use App\Jobs\ExpireStaleBookings;
+use App\Jobs\FinalizeBookingFinances;
 use App\Jobs\PurgeDeletedAccounts;
 use App\Jobs\SyncExternalCalendars;
 use Illuminate\Foundation\Inspiring;
@@ -37,4 +38,11 @@ Schedule::job(new PurgeDeletedAccounts)
 // how the platforms poll each other; hosts can also "Sync now" on demand.
 Schedule::job(new SyncExternalCalendars)
     ->hourly()
+    ->withoutOverlapping();
+
+// Issue each paid stay's financial documents (guest invoice, host commission
+// invoice, payout statement) once its checkout is more than N hours behind us
+// (finance.invoice.issue_after_checkout_hours). Idempotent per booking.
+Schedule::job(new FinalizeBookingFinances)
+    ->everyFifteenMinutes()
     ->withoutOverlapping();
