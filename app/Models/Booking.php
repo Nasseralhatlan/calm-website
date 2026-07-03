@@ -71,6 +71,8 @@ class Booking extends Model
         'payment_status_check_attempts',
         'payment_response',
         'payout_status',
+        'paid_out_at',
+        'payout_reference',
         'expires_at',
         'confirmed_at',
         'canceled_at',
@@ -97,7 +99,57 @@ class Booking extends Model
             'expires_at' => 'datetime',
             'confirmed_at' => 'datetime',
             'canceled_at' => 'datetime',
+            'paid_out_at' => 'datetime',
         ];
+    }
+
+    /**
+     * What the host is owed for this booking, in minor units (halalas):
+     * their gross booking amount minus Calm's commission. VAT is the guest's
+     * money and is remitted, never part of the host payout.
+     */
+    public function hostNetMinor(): int
+    {
+        return (int) $this->booking_amount - (int) $this->commission_amount;
+    }
+
+    /**
+     * Reconstruct the per-night rate lines for this stay from the place's
+     * per-weekday price columns (places store SAR; bookings snapshot halalas).
+     * Only trustworthy while the recomputed sum still equals the snapshotted
+     * booking_amount — the host may have changed prices since the guest
+     * booked. Returns null in that case so callers fall back to a
+     * nights × average line instead of showing a made-up split.
+     *
+     * @return list<array{date: CarbonImmutable, price_minor: int}>|null
+     */
+    public function nightlyRates(): ?array
+    {
+        $place = $this->place;
+        if ($place === null || $this->start_date === null || $this->end_date === null) {
+            return null;
+        }
+
+        $start = CarbonImmutable::parse($this->start_date->toDateString());
+        $end = CarbonImmutable::parse($this->end_date->toDateString());
+        // end_date is the last occupied night (inclusive). The cap only guards
+        // against pathological rows — real stays are days, not seasons.
+        if ($end->lessThan($start) || $start->diffInDays($end) > 92) {
+            return null;
+        }
+
+        $lines = [];
+        $sum = 0;
+        for ($cursor = $start; $cursor->lessThanOrEqualTo($end); $cursor = $cursor->addDay()) {
+            $column = Place::PRICE_COLUMNS[strtolower($cursor->format('l'))];
+            // Same fallback convention as the quote engine: a 0/null weekday
+            // column means "use the base price".
+            $priceMinor = (int) ($place->{$column} ?: $place->price) * 100;
+            $lines[] = ['date' => $cursor, 'price_minor' => $priceMinor];
+            $sum += $priceMinor;
+        }
+
+        return $sum === (int) $this->booking_amount ? $lines : null;
     }
 
     public function place(): BelongsTo

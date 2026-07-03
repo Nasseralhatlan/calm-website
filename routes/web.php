@@ -10,6 +10,7 @@ use App\Http\Controllers\Admin\CityAreasController;
 use App\Http\Controllers\Admin\CountriesController;
 use App\Http\Controllers\Admin\DashboardController;
 // use App\Http\Controllers\Admin\NotificationsController; // notifications temporarily disabled
+use App\Http\Controllers\Admin\PayoutsController;
 use App\Http\Controllers\Admin\PlaceListsController;
 use App\Http\Controllers\Admin\PlaceReviewController;
 use App\Http\Controllers\Admin\PlacesController;
@@ -165,6 +166,11 @@ Route::middleware(['auth:api', 'admin'])
         Route::get('/bookings', [BookingsController::class, 'index'])->name('bookings.index');
         Route::get('/bookings/{booking}', [BookingsController::class, 'show'])->name('bookings.show');
         Route::post('/bookings/{booking}/cancel', [BookingsController::class, 'cancel'])->name('bookings.cancel');
+
+        // Manual host payouts: queue of completed-but-unpaid stays, settled
+        // one by one after the operator's bank transfer (+ undo on mistakes).
+        Route::get('/payouts', [PayoutsController::class, 'index'])->name('payouts.index');
+        Route::post('/bookings/{booking}/payout', [PayoutsController::class, 'update'])->name('bookings.payout');
 
         // Curated landing-page lists ("Featured chalets", "Editor's picks", etc.)
         // Adding places to a list happens from the place's edit page; this

@@ -33,6 +33,7 @@
                 ['route' => 'admin.attributes.index',       'label_ar' => 'الخصائص',           'label_en' => 'Attributes',       'icon' => 'tag'],
                 ['route' => 'admin.reviews.index',          'label_ar' => 'التقييمات',         'label_en' => 'Reviews',          'icon' => 'star'],
                 ['route' => 'admin.bookings.index',         'label_ar' => 'الحجوزات',          'label_en' => 'Bookings',         'icon' => 'calendar'],
+                ['route' => 'admin.payouts.index',          'label_ar' => 'التحويلات',         'label_en' => 'Payouts',          'icon' => 'wallet'],
                 ['route' => 'admin.users.index',            'label_ar' => 'المستخدمون',        'label_en' => 'Users',            'icon' => 'user'],
                 // Notifications — temporarily disabled (route commented out):
                 // ['route' => 'admin.notifications.index',    'label_ar' => 'الإشعارات',         'label_en' => 'Notifications',    'icon' => 'bell'],

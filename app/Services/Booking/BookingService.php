@@ -20,6 +20,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 use RuntimeException;
 
 final class BookingService
@@ -463,6 +464,132 @@ final class BookingService
             'not_paid' => $notPaidMinor / 100,
             'not_paid_minor' => $notPaidMinor,
         ];
+    }
+
+    /**
+     * Everything the web "Finances" page shows a host in one call: the
+     * earnings summary (total / paid out / pending) plus their earning
+     * bookings (confirmed + completed — the same set earningsForHost sums),
+     * newest first, paginated, with the payout state per row.
+     *
+     * @return array{earnings: array<string, mixed>, bookings: LengthAwarePaginator<int, Booking>}
+     */
+    public function financeForHost(User $host, ?int $perPage = null): array
+    {
+        $bookings = Booking::query()
+            ->where('host_user_id', $host->id)
+            ->whereIn('booking_status', [BookingStatus::Confirmed->value, BookingStatus::Completed->value])
+            ->with(['place', 'place.coverPhoto', 'place.type'])
+            ->latest('start_date')
+            ->paginate($perPage ?? config('pagination.per_page'))
+            ->withQueryString();
+
+        return [
+            'earnings' => $this->earningsForHost($host),
+            'bookings' => $bookings,
+        ];
+    }
+
+    /**
+     * Everything the admin payouts queue needs in one call. The queue's
+     * payable set = COMPLETED stays (the hourly CompleteEndedBookings sweep
+     * flips confirmed → completed after checkout) still marked not_paid —
+     * oldest checkout first so long-waiting hosts get paid first. The `paid`
+     * tab lists settled rows (newest first) so a mistaken payout can be
+     * undone. Optional `q` searches the booking reference or host phone.
+     *
+     * @return array{bookings: LengthAwarePaginator<int, Booking>, totals: array{pending_count: int, pending_minor: int, upcoming_count: int, upcoming_minor: int, paid_count: int, paid_minor: int}}
+     */
+    public function payoutsIndexData(?string $q = null, string $tab = 'pending', ?int $perPage = null): array
+    {
+        $term = $q !== null && trim($q) !== '' ? trim($q) : null;
+
+        $query = Booking::query()
+            ->with(['place', 'place.coverPhoto', 'host'])
+            ->when($term, function ($query, string $term): void {
+                $phone = ltrim($term, '0'); // phones are stored without the leading 0
+                $query->where(function ($w) use ($term, $phone): void {
+                    $w->where('reference', 'like', "%{$term}%")
+                        ->orWhereHas('host', fn ($h) => $h->where('phone', 'like', "%{$phone}%"));
+                });
+            });
+
+        if ($tab === 'paid') {
+            $query->where('payout_status', 'paid')->latest('paid_out_at');
+        } else {
+            $query->where('booking_status', BookingStatus::Completed->value)
+                ->where('payout_status', 'not_paid')
+                ->oldest('end_date');
+        }
+
+        return [
+            'bookings' => $query->paginate($perPage ?? config('pagination.per_page'))->withQueryString(),
+            'totals' => $this->payoutTotals(),
+        ];
+    }
+
+    /**
+     * Header-card sums for the payouts queue, all in minor units: what's
+     * payable now (completed + not_paid), what's still upcoming (confirmed,
+     * not yet checked out), and what has been settled.
+     *
+     * @return array{pending_count: int, pending_minor: int, upcoming_count: int, upcoming_minor: int, paid_count: int, paid_minor: int}
+     */
+    private function payoutTotals(): array
+    {
+        $rows = Booking::query()
+            ->whereIn('booking_status', [BookingStatus::Confirmed->value, BookingStatus::Completed->value])
+            ->selectRaw('booking_status, payout_status, SUM(booking_amount - commission_amount) as net_minor, COUNT(*) as cnt')
+            ->groupBy('booking_status', 'payout_status')
+            ->get();
+
+        $totals = [
+            'pending_count' => 0, 'pending_minor' => 0,
+            'upcoming_count' => 0, 'upcoming_minor' => 0,
+            'paid_count' => 0, 'paid_minor' => 0,
+        ];
+
+        foreach ($rows as $row) {
+            [$count, $net] = [(int) $row->cnt, (int) $row->net_minor];
+
+            if ($row->payout_status === 'paid') {
+                $totals['paid_count'] += $count;
+                $totals['paid_minor'] += $net;
+            } elseif ($row->booking_status === BookingStatus::Completed->value) {
+                $totals['pending_count'] += $count;
+                $totals['pending_minor'] += $net;
+            } else {
+                $totals['upcoming_count'] += $count;
+                $totals['upcoming_minor'] += $net;
+            }
+        }
+
+        return $totals;
+    }
+
+    /**
+     * Manually settle (or un-settle) a host payout after the admin made the
+     * bank transfer. Only COMPLETED stays can be marked paid — confirmed
+     * bookings haven't happened yet and could still be cancelled. Reverting
+     * to not_paid clears the audit fields so the row re-enters the queue.
+     */
+    public function setPayoutStatus(Booking $booking, string $payoutStatus, ?string $reference = null): Booking
+    {
+        if ($payoutStatus === 'paid' && $booking->booking_status !== BookingStatus::Completed) {
+            throw ValidationException::withMessages([
+                'payout' => __('Only completed stays can be paid out — this booking is :state.', [
+                    'state' => $booking->booking_status->value,
+                ]),
+            ]);
+        }
+
+        $booking->update([
+            'payout_status' => $payoutStatus,
+            'paid_out_at' => $payoutStatus === 'paid' ? now() : null,
+            'payout_reference' => $payoutStatus === 'paid' ? $reference : null,
+        ]);
+
+        return $booking->refresh();
     }
 
     /**
