@@ -173,7 +173,7 @@ it('totals the host\'s earnings split by payout status', function (): void {
     $guest = User::factory()->create(['phone' => '54000021']);
     $place = hostApiPlace($host);
 
-    // Net per booking = booking_amount(200000) − commission(20000) = 180000 (1,800 SAR).
+    // Net per booking = 200000 − commission 20000 − commission VAT 3000 = 177000 (1,770 SAR).
     hostApiBooking($place, $guest, ['payout_status' => 'paid']);
     hostApiBooking($place, $guest, ['payout_status' => 'not_paid']);
     // These must NOT count toward earnings.
@@ -185,12 +185,12 @@ it('totals the host\'s earnings split by payout status', function (): void {
         ->assertOk()
         ->assertJsonPath('data.currency', 'SAR')
         ->assertJsonPath('data.bookings_count', 2)
-        ->assertJsonPath('data.total', 3600)
-        ->assertJsonPath('data.total_minor', 360000)
-        ->assertJsonPath('data.paid', 1800)
-        ->assertJsonPath('data.paid_minor', 180000)
-        ->assertJsonPath('data.not_paid', 1800)
-        ->assertJsonPath('data.not_paid_minor', 180000);
+        ->assertJsonPath('data.total', 3540)
+        ->assertJsonPath('data.total_minor', 354000)
+        ->assertJsonPath('data.paid', 1770)
+        ->assertJsonPath('data.paid_minor', 177000)
+        ->assertJsonPath('data.not_paid', 1770)
+        ->assertJsonPath('data.not_paid_minor', 177000);
 });
 
 it('returns zero earnings for a host with no confirmed bookings', function (): void {

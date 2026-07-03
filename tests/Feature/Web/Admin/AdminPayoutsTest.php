@@ -61,7 +61,7 @@ it('queues only completed, not-yet-paid bookings with host net + IBAN', function
         ->assertDontSee($alreadyPaid->reference)
         ->assertDontSee($cancelled->reference)
         // Host net = 200000 − 20000 = SR 1,800.00, and the IBAN for the transfer.
-        ->assertSee('1,800.00')
+        ->assertSee('1,770.00')
         ->assertSee('SA4420000001234567891234');
 });
 
@@ -140,7 +140,7 @@ it('feeds the host earnings buckets: paid moves from pending to paid', function 
     // Host's mobile earnings before: everything pending.
     $this->actingAs($this->host, 'api')
         ->getJson('/api/host/earnings')
-        ->assertJsonPath('data.not_paid_minor', 180000)
+        ->assertJsonPath('data.not_paid_minor', 177000)
         ->assertJsonPath('data.paid_minor', 0);
 
     $this->actingAs($this->admin, 'api')
@@ -149,7 +149,7 @@ it('feeds the host earnings buckets: paid moves from pending to paid', function 
     $this->actingAs($this->host, 'api')
         ->getJson('/api/host/earnings')
         ->assertJsonPath('data.not_paid_minor', 0)
-        ->assertJsonPath('data.paid_minor', 180000);
+        ->assertJsonPath('data.paid_minor', 177000);
 });
 
 it('searches the queue by host phone', function (): void {

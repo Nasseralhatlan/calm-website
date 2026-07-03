@@ -163,7 +163,7 @@ it('lets the host open the booking detail with payout + guest name, but NOT the 
         ->assertOk()
         ->assertSee('Sara Guest')        // guest name
         ->assertDontSee('517000015')     // guest phone is hidden from the host (admin only)
-        ->assertSee('1,800.00');         // payout = 2000 − 200 commission
+        ->assertSee('1,770.00');         // payout = 2000 − 200 commission − 30 commission VAT
 });
 
 it('404s the booking detail for a user who is neither guest nor host', function (): void {

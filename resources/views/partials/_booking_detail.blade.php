@@ -32,7 +32,10 @@
     $cur = $isRtl ? 'ر.س' : 'SAR';
     $rate = fn (float $r): string => rtrim(rtrim(number_format($r, 2), '0'), '.');
 
-    $payout = $booking->booking_amount - $booking->commission_amount;
+    // Frozen payout snapshot: gross − commission − commission VAT (legacy
+    // rows carry commission VAT 0, so their payout is unchanged).
+    $payout = $booking->hostNetMinor();
+    $commissionVat = (int) ($booking->commission_vat_amount ?? 0);
     $payoutPaid = $booking->payout_status === 'paid';
 
     $card = 'background:#fff;border-radius:24px;padding:24px;box-shadow:0px 8px 24px 0px rgba(0,0,0,0.05);';
@@ -212,8 +215,14 @@
                 <span class="text-[#717171]">{{ $isRtl ? 'عمولة كالم' : 'Calm commission' }} ({{ $rate($booking->commission_rate) }}%)</span>
                 <span class="font-semibold text-[#717171] tabular-nums" dir="ltr">− {{ $sar($booking->commission_amount) }} {{ $cur }}</span>
             </div>
+            @if($commissionVat > 0)
+                <div style="{{ $row }}">
+                    <span class="text-[#717171]">{{ $isRtl ? 'ضريبة العمولة' : 'Commission VAT' }} ({{ $rate((float) $booking->commission_vat_rate) }}%)</span>
+                    <span class="font-semibold text-[#717171] tabular-nums" dir="ltr">− {{ $sar($commissionVat) }} {{ $cur }}</span>
+                </div>
+            @endif
             <div style="{{ $row }} border-top:1px solid #f0f0f0;margin-top:4px;">
-                <span class="font-bold text-[#222]">{{ $isRtl ? 'صافي أرباحك' : 'Your payout' }}</span>
+                <span class="font-bold text-[#222]">{{ $isRtl ? 'المبلغ المستحق' : 'Your payout' }}</span>
                 <span class="font-bold text-[#10b981] tabular-nums" dir="ltr">{{ $sar($payout) }} {{ $cur }}</span>
             </div>
             <div style="{{ $row }}">

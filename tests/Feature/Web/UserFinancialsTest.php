@@ -53,9 +53,9 @@ it('shows earnings totals and per-booking payout badges to the host', function (
     $this->actingAs($this->host, 'api')
         ->get('/financials')
         ->assertOk()
-        // Cards: total 1,800 · paid 900 · pending 900.
-        ->assertSee('1,800.00')
-        ->assertSee('900.00')
+        // Cards: total 1,770 · paid 885 · pending 885 (commission VAT deducted).
+        ->assertSee('1,770.00')
+        ->assertSee('885.00')
         // Rows: reference + both badge states.
         ->assertSee($pending->reference)
         ->assertSee('قيد التحويل')   // pending payout badge

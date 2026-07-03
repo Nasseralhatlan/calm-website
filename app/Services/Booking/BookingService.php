@@ -433,7 +433,9 @@ final class BookingService
         $rows = Booking::query()
             ->where('host_user_id', $host->id)
             ->whereIn('booking_status', [BookingStatus::Confirmed->value, BookingStatus::Completed->value])
-            ->selectRaw('payout_status, SUM(booking_amount) as gross_minor, SUM(commission_amount) as commission_minor, COUNT(*) as cnt')
+            // host_payout_amount is the frozen per-booking payout (gross −
+            // commission − commission VAT); legacy rows were backfilled.
+            ->selectRaw('payout_status, SUM(host_payout_amount) as net_minor, COUNT(*) as cnt')
             ->groupBy('payout_status')
             ->get();
 
@@ -442,7 +444,7 @@ final class BookingService
         $count = 0;
 
         foreach ($rows as $row) {
-            $netMinor = (int) $row->gross_minor - (int) $row->commission_minor;
+            $netMinor = (int) $row->net_minor;
             $count += (int) $row->cnt;
 
             if ($row->payout_status === 'paid') {
@@ -539,7 +541,7 @@ final class BookingService
     {
         $rows = Booking::query()
             ->whereIn('booking_status', [BookingStatus::Confirmed->value, BookingStatus::Completed->value])
-            ->selectRaw('booking_status, payout_status, SUM(booking_amount - commission_amount) as net_minor, COUNT(*) as cnt')
+            ->selectRaw('booking_status, payout_status, SUM(host_payout_amount) as net_minor, COUNT(*) as cnt')
             ->groupBy('booking_status', 'payout_status')
             ->get();
 

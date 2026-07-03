@@ -138,6 +138,12 @@
                             <span class="text-[#717171] {{ $fa }}">{{ $isRtl ? 'عمولة كالم' : 'Calm commission' }} ({{ $pct($b->commission_rate) }}%)</span>
                             <span class="text-[#717171] tabular-nums" dir="ltr">− SR {{ $sr($b->commission_amount) }}</span>
                         </div>
+                        @if((int) $b->commission_vat_amount > 0)
+                            <div class="flex items-center justify-between text-[13px]" style="padding: 2px 0;">
+                                <span class="text-[#717171] {{ $fa }}">{{ $isRtl ? 'ضريبة العمولة' : 'Commission VAT' }} ({{ $pct((float) $b->commission_vat_rate) }}%)</span>
+                                <span class="text-[#717171] tabular-nums" dir="ltr">− SR {{ $sr((int) $b->commission_vat_amount) }}</span>
+                            </div>
+                        @endif
 
                         <div style="height: 2px; background: #d9dbdf; margin: 8px 0;"></div>
 

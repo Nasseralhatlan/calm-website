@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\BookingStatus;
+use App\Services\Finance\BookingPricingService;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class Booking extends Model
 {
@@ -25,6 +27,14 @@ class Booking extends Model
         static::creating(function (self $booking): void {
             if (empty($booking->reference)) {
                 $booking->reference = self::generateUniqueReference();
+            }
+
+            // Complete the finance snapshot (host_gross / guest_* /
+            // commission incl. VAT / host_payout) whenever a booking is
+            // created from legacy pricing fields only — keeps seeders, tests
+            // and every code path on one consistent money model.
+            foreach (app(BookingPricingService::class)->completeSnapshot($booking->getAttributes()) as $column => $value) {
+                $booking->{$column} = $value;
             }
         });
     }
@@ -76,6 +86,22 @@ class Booking extends Model
         'expires_at',
         'confirmed_at',
         'canceled_at',
+        // Finance snapshot (brief §2/§3) — frozen at creation.
+        'guest_vat_rate',
+        'guest_vat_amount',
+        'guest_total',
+        'guest_service_fee_amount',
+        'guest_service_fee_vat_amount',
+        'commission_amount_ex_vat',
+        'commission_vat_rate',
+        'commission_vat_amount',
+        'commission_total',
+        'host_gross_amount',
+        'host_payout_amount',
+        'guest_invoice_issued_at',
+        'host_commission_invoice_issued_at',
+        'payout_statement_generated_at',
+        'financial_completed_at',
     ];
 
     protected function casts(): array
@@ -100,17 +126,50 @@ class Booking extends Model
             'confirmed_at' => 'datetime',
             'canceled_at' => 'datetime',
             'paid_out_at' => 'datetime',
+            'guest_vat_rate' => 'float',
+            'guest_vat_amount' => 'integer',
+            'guest_total' => 'integer',
+            'guest_service_fee_amount' => 'integer',
+            'guest_service_fee_vat_amount' => 'integer',
+            'commission_amount_ex_vat' => 'integer',
+            'commission_vat_rate' => 'float',
+            'commission_vat_amount' => 'integer',
+            'commission_total' => 'integer',
+            'host_gross_amount' => 'integer',
+            'host_payout_amount' => 'integer',
+            'guest_invoice_issued_at' => 'datetime',
+            'host_commission_invoice_issued_at' => 'datetime',
+            'payout_statement_generated_at' => 'datetime',
+            'financial_completed_at' => 'datetime',
         ];
     }
 
     /**
      * What the host is owed for this booking, in minor units (halalas):
-     * their gross booking amount minus Calm's commission. VAT is the guest's
-     * money and is remitted, never part of the host payout.
+     * the frozen host_payout_amount = host_gross − (commission + its VAT).
+     * Historical rows were backfilled with commission VAT 0, so their payout
+     * is unchanged; the legacy fallback only covers rows created before the
+     * finance migration ran outside its backfill.
      */
     public function hostNetMinor(): int
     {
+        if ((int) $this->host_gross_amount > 0) {
+            return (int) $this->host_payout_amount;
+        }
+
         return (int) $this->booking_amount - (int) $this->commission_amount;
+    }
+
+    /** All financial documents born from this booking (invoices, statements, credit notes). */
+    public function financialDocuments(): MorphMany
+    {
+        return $this->morphMany(FinancialDocument::class, 'source');
+    }
+
+    /** All money movements recorded against this booking. */
+    public function financialMovements(): MorphMany
+    {
+        return $this->morphMany(FinancialMovement::class, 'source');
     }
 
     /**
