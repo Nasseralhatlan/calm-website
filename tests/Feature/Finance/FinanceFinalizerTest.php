@@ -16,6 +16,7 @@ use App\Models\PlaceType;
 use App\Models\User;
 use App\Services\Booking\BookingService;
 use App\Services\Finance\BookingFinanceFinalizer;
+use App\Services\Finance\QoyodSyncService;
 use Illuminate\Support\Carbon;
 
 beforeEach(function (): void {
@@ -77,9 +78,9 @@ it('freezes the full money snapshot at creation (commission VAT on top)', functi
 it('issues the three documents + movements once checkout passed the issue delay', function (): void {
     $booking = fdocBooking(fdocPlace($this->host), $this->guest);
 
-    (new FinalizeBookingFinances)->handle(app(BookingFinanceFinalizer::class));
+    (new FinalizeBookingFinances)->handle(app(BookingFinanceFinalizer::class), app(QoyodSyncService::class));
     // Second sweep must be a complete no-op.
-    (new FinalizeBookingFinances)->handle(app(BookingFinanceFinalizer::class));
+    (new FinalizeBookingFinances)->handle(app(BookingFinanceFinalizer::class), app(QoyodSyncService::class));
 
     $booking->refresh();
     expect($booking->financial_completed_at)->not->toBeNull()
@@ -128,7 +129,7 @@ it('does not issue anything before checkout + issue delay', function (): void {
         'start_date' => '2026-07-02', 'end_date' => '2026-07-03',
     ]);
 
-    (new FinalizeBookingFinances)->handle(app(BookingFinanceFinalizer::class));
+    (new FinalizeBookingFinances)->handle(app(BookingFinanceFinalizer::class), app(QoyodSyncService::class));
 
     expect($booking->refresh()->financial_completed_at)->toBeNull()
         ->and($booking->financialDocuments()->count())->toBe(0);
@@ -139,7 +140,7 @@ it('never issues documents for unpaid or expired bookings', function (): void {
     fdocBooking($place, $this->guest, ['payment_status' => null, 'payment_id' => null]);
     fdocBooking($place, $this->guest, ['booking_status' => BookingStatus::Expired->value]);
 
-    (new FinalizeBookingFinances)->handle(app(BookingFinanceFinalizer::class));
+    (new FinalizeBookingFinances)->handle(app(BookingFinanceFinalizer::class), app(QoyodSyncService::class));
 
     expect(FinancialDocument::query()->count())->toBe(0);
 });
@@ -161,7 +162,7 @@ it('records the payout movement on mark-paid and reverses it on undo', function 
     $booking = fdocBooking(fdocPlace($this->host), $this->guest, [
         'booking_status' => BookingStatus::Completed->value,
     ]);
-    (new FinalizeBookingFinances)->handle(app(BookingFinanceFinalizer::class));
+    (new FinalizeBookingFinances)->handle(app(BookingFinanceFinalizer::class), app(QoyodSyncService::class));
 
     $service = app(BookingService::class);
     $service->setPayoutStatus($booking, 'paid', 'TRF-1');
@@ -195,7 +196,7 @@ it('cancellation before invoicing (Case B) records a refund movement only', func
 
 it('cancellation after invoicing (Case C) credits both invoices', function (): void {
     $booking = fdocBooking(fdocPlace($this->host), $this->guest);
-    (new FinalizeBookingFinances)->handle(app(BookingFinanceFinalizer::class));
+    (new FinalizeBookingFinances)->handle(app(BookingFinanceFinalizer::class), app(QoyodSyncService::class));
 
     app(BookingService::class)
         ->cancelByAdmin($booking->refresh(), BookingStatus::CanceledByAdmin);
