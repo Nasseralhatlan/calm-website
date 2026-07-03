@@ -110,16 +110,17 @@ final class BookingFinanceFinalizer
         ]);
     }
 
-    /** §12 — admin settled the host's bank transfer. */
-    public function recordPayoutPaid(Booking $booking): void
+    /** §12 — the host's transfer settled: admin manual bank transfer ('bank') or automatic Moyasar payout ('moyasar'). */
+    public function recordPayoutPaid(Booking $booking, string $provider = 'bank'): void
     {
         $this->movement($booking, FinancialMovement::HOST_PAYOUT, [
             'from_party_type' => 'calm',
             'to_party_type' => 'host',
             'to_party_id' => $booking->host_user_id,
             'amount' => $booking->hostNetMinor(),
-            'provider' => 'bank',
+            'provider' => $provider,
             'provider_reference' => $booking->payout_reference,
+            'provider_transaction_id' => $booking->payout_id,
             'status' => FinancialMovement::STATUS_SUCCEEDED,
             'occurred_at' => now(),
         ]);

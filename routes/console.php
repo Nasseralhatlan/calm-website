@@ -3,7 +3,9 @@
 use App\Jobs\CompleteEndedBookings;
 use App\Jobs\ExpireStaleBookings;
 use App\Jobs\FinalizeBookingFinances;
+use App\Jobs\ProcessDuePayouts;
 use App\Jobs\PurgeDeletedAccounts;
+use App\Jobs\ReconcileMoyasarPayouts;
 use App\Jobs\SyncExternalCalendars;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
@@ -45,4 +47,18 @@ Schedule::job(new SyncExternalCalendars)
 // (finance.invoice.issue_after_checkout_hours). Idempotent per booking.
 Schedule::job(new FinalizeBookingFinances)
     ->everyFifteenMinutes()
+    ->withoutOverlapping();
+
+// Execute host payouts automatically via Moyasar Payouts once a completed
+// stay is invoiced and past its hold window (Setting payout_hold_hours).
+// No-op while MOYASAR_PAYOUTS_MODE=manual.
+Schedule::job(new ProcessDuePayouts)
+    ->everyFifteenMinutes()
+    ->withoutOverlapping();
+
+// Poll in-flight Moyasar transfers: paid → settle (movements + audit trail),
+// failed/returned → back to the queue with the bank's reason. No-op when
+// nothing is processing.
+Schedule::job(new ReconcileMoyasarPayouts)
+    ->everyTenMinutes()
     ->withoutOverlapping();

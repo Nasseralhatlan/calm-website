@@ -56,6 +56,40 @@ retry next sweep — an outage delays, never loses. PDF links come from
   Someone else's document → **404** (existence never leaks; admin allowed).
   Not synced / statement → **409**.
 
+## Automatic host payouts (Moyasar Payouts)
+
+Payouts can execute automatically instead of by hand. Mode flag: `MOYASAR_PAYOUTS_MODE`
+(`manual` default / `auto`). The rule is **documents before money** — a booking is
+*payable* (`Booking::isPayable()`) only when: completed + `payout_status=not_paid` +
+`financial_completed_at` set (invoices issued) + past `checkoutAt + payout_hold_hours`
+(Setting, default 24h — the dispute window, admin-editable, not exposed to the app).
+This gate applies to BOTH auto transfers and manual mark-paid (422 otherwise); rows
+in the queue show "Awaiting invoices" / "In hold until …" badges.
+
+Flow (auto mode): `ProcessDuePayouts` (15 min) → `HostPayoutService::executeDuePayouts`
+→ `POST /v1/payouts` (amount = `host_payout_amount` halalas, destination = host IBAN
+`users.bank_account` + name + mobile, city `MOYASAR_PAYOUT_DEFAULT_CITY`) → row goes
+`payout_status=processing` with `payout_id`. `ReconcileMoyasarPayouts` (10 min) polls:
+`paid` → settle (paid_out_at, `payout_reference` = sequence number, `host_payout`
+movement provider `moyasar`, payable → succeeded); `failed/returned/canceled` → back to
+`not_paid` with the bank's reason in `payout_failure` + a **Retry** button in the admin
+queue (the sweep deliberately skips failed rows). Manual mark-paid stays as fallback;
+it's blocked while a transfer is `processing`.
+
+Double-pay protection: the 16-digit Moyasar `sequence_number` is derived
+deterministically from (booking id, `payout_attempts`) — a crashed or concurrent
+create resends the SAME number and Moyasar rejects the duplicate. `payout_attempts`
+advances only on a CONFIRMED bank failure (that sequence was consumed without moving
+money), never on ambiguous timeouts. If a failure message ever says "duplicate
+sequence", the payout likely exists at Moyasar — check the dashboard before retrying.
+
+Go-live checklist: (1) Moyasar activates Payouts on the account; (2) company bank
+account at Al Rajhi or SNB with bank API credentials; (3) one-time
+`POST /v1/payout_accounts` to register it → id into `MOYASAR_PAYOUT_ACCOUNT_ID`;
+(4) optionally adjust `payout_hold_hours` in admin settings; (5) set
+`MOYASAR_PAYOUTS_MODE=auto` + `php artisan optimize:clear`. Sandbox works with
+`sk_test_` keys for end-to-end rehearsal.
+
 ## One-time Qoyod setup (when going live)
 
 1. Paid Qoyod plan → General Settings → generate API key.
@@ -76,4 +110,6 @@ historical documents keep their issued rates untouched.
 due window, unpaid/expired exclusion, payout trail, cancellation cases B/C),
 `QoyodSyncTest` (disabled = zero HTTP, full mirror with SAR decimals, failure retry,
 expiring pdf links), `FinanceDocumentAccessTest` (owner-only lists, 404 for others,
-admin pass, 409 pre-sync, 401).
+admin pass, 409 pre-sync, 401), `AutoPayoutTest` (manual mode = zero HTTP, transfer +
+settle with movements, bank-failure requeue + fresh sequence on retry, missing IBAN,
+hold-window/documents gating, manual mark-paid guards, admin processing tab + retry).

@@ -508,7 +508,7 @@ final class BookingService
      * tab lists settled rows (newest first) so a mistaken payout can be
      * undone. Optional `q` searches the booking reference or host phone.
      *
-     * @return array{bookings: LengthAwarePaginator<int, Booking>, totals: array{pending_count: int, pending_minor: int, upcoming_count: int, upcoming_minor: int, paid_count: int, paid_minor: int}}
+     * @return array{bookings: LengthAwarePaginator<int, Booking>, totals: array{pending_count: int, pending_minor: int, processing_count: int, processing_minor: int, upcoming_count: int, upcoming_minor: int, paid_count: int, paid_minor: int}}
      */
     public function payoutsIndexData(?string $q = null, string $tab = 'pending', ?int $perPage = null): array
     {
@@ -526,6 +526,9 @@ final class BookingService
 
         if ($tab === 'paid') {
             $query->where('payout_status', 'paid')->latest('paid_out_at');
+        } elseif ($tab === 'processing') {
+            // Transfers in flight at Moyasar — monitor only, no actions.
+            $query->where('payout_status', 'processing')->latest('updated_at');
         } else {
             $query->where('booking_status', BookingStatus::Completed->value)
                 ->where('payout_status', 'not_paid')
@@ -540,10 +543,11 @@ final class BookingService
 
     /**
      * Header-card sums for the payouts queue, all in minor units: what's
-     * payable now (completed + not_paid), what's still upcoming (confirmed,
-     * not yet checked out), and what has been settled.
+     * payable now (completed + not_paid), what's in flight at Moyasar
+     * (processing), what's still upcoming (confirmed, not yet checked out),
+     * and what has been settled.
      *
-     * @return array{pending_count: int, pending_minor: int, upcoming_count: int, upcoming_minor: int, paid_count: int, paid_minor: int}
+     * @return array{pending_count: int, pending_minor: int, processing_count: int, processing_minor: int, upcoming_count: int, upcoming_minor: int, paid_count: int, paid_minor: int}
      */
     private function payoutTotals(): array
     {
@@ -555,6 +559,7 @@ final class BookingService
 
         $totals = [
             'pending_count' => 0, 'pending_minor' => 0,
+            'processing_count' => 0, 'processing_minor' => 0,
             'upcoming_count' => 0, 'upcoming_minor' => 0,
             'paid_count' => 0, 'paid_minor' => 0,
         ];
@@ -565,6 +570,9 @@ final class BookingService
             if ($row->payout_status === 'paid') {
                 $totals['paid_count'] += $count;
                 $totals['paid_minor'] += $net;
+            } elseif ($row->payout_status === 'processing') {
+                $totals['processing_count'] += $count;
+                $totals['processing_minor'] += $net;
             } elseif ($row->booking_status === BookingStatus::Completed->value) {
                 $totals['pending_count'] += $count;
                 $totals['pending_minor'] += $net;
@@ -585,18 +593,49 @@ final class BookingService
      */
     public function setPayoutStatus(Booking $booking, string $payoutStatus, ?string $reference = null): Booking
     {
-        if ($payoutStatus === 'paid' && $booking->booking_status !== BookingStatus::Completed) {
+        // A Moyasar transfer is in flight — the reconciler owns this row
+        // until the bank answers paid or failed; touching it now could
+        // double-pay or lose the trail.
+        if ($booking->payout_status === 'processing') {
             throw ValidationException::withMessages([
-                'payout' => __('Only completed stays can be paid out — this booking is :state.', [
-                    'state' => $booking->booking_status->value,
+                'payout' => __('A Moyasar transfer is in progress for booking :ref — wait for it to settle or fail first.', [
+                    'ref' => $booking->reference,
                 ]),
             ]);
+        }
+
+        if ($payoutStatus === 'paid') {
+            if ($booking->booking_status !== BookingStatus::Completed) {
+                throw ValidationException::withMessages([
+                    'payout' => __('Only completed stays can be paid out — this booking is :state.', [
+                        'state' => $booking->booking_status->value,
+                    ]),
+                ]);
+            }
+
+            // Documents before money: the payout statement + invoices must
+            // exist before any money leaves.
+            if ($booking->financial_completed_at === null) {
+                throw ValidationException::withMessages([
+                    'payout' => __('Invoices for this booking are not issued yet — the payout unlocks once its financial documents are finalized.'),
+                ]);
+            }
+
+            $payableAt = $booking->payableAt();
+            if ($payableAt !== null && $payableAt->isFuture()) {
+                throw ValidationException::withMessages([
+                    'payout' => __('This payout is still in its hold window — payable from :time.', [
+                        'time' => $payableAt->format('Y-m-d H:i'),
+                    ]),
+                ]);
+            }
         }
 
         $booking->update([
             'payout_status' => $payoutStatus,
             'paid_out_at' => $payoutStatus === 'paid' ? now() : null,
             'payout_reference' => $payoutStatus === 'paid' ? $reference : null,
+            'payout_failure' => $payoutStatus === 'paid' ? null : $booking->payout_failure,
         ]);
 
         $booking->refresh();

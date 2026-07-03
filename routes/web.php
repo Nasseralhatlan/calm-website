@@ -167,10 +167,13 @@ Route::middleware(['auth:api', 'admin'])
         Route::get('/bookings/{booking}', [BookingsController::class, 'show'])->name('bookings.show');
         Route::post('/bookings/{booking}/cancel', [BookingsController::class, 'cancel'])->name('bookings.cancel');
 
-        // Manual host payouts: queue of completed-but-unpaid stays, settled
-        // one by one after the operator's bank transfer (+ undo on mistakes).
+        // Host payouts: queue of completed-but-unpaid stays. Manual mode:
+        // settled one by one after the operator's bank transfer (+ undo on
+        // mistakes). Auto mode: Moyasar transfers run on a schedule; retry
+        // re-attempts one failed transfer.
         Route::get('/payouts', [PayoutsController::class, 'index'])->name('payouts.index');
         Route::post('/bookings/{booking}/payout', [PayoutsController::class, 'update'])->name('bookings.payout');
+        Route::post('/bookings/{booking}/payout/retry', [PayoutsController::class, 'retry'])->name('bookings.payout.retry');
 
         // Curated landing-page lists ("Featured chalets", "Editor's picks", etc.)
         // Adding places to a list happens from the place's edit page; this

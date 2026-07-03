@@ -83,6 +83,9 @@ class Booking extends Model
         'payout_status',
         'paid_out_at',
         'payout_reference',
+        'payout_id',
+        'payout_failure',
+        'payout_attempts',
         'expires_at',
         'confirmed_at',
         'canceled_at',
@@ -119,6 +122,7 @@ class Booking extends Model
             'vat_amount' => 'integer',
             'total' => 'integer',
             'checkout_next_day' => 'boolean',
+            'payout_attempts' => 'integer',
             'booking_status' => BookingStatus::class,
             'payment_status_check_attempts' => 'integer',
             'payment_response' => 'array',
@@ -158,6 +162,38 @@ class Booking extends Model
         }
 
         return (int) $this->booking_amount - (int) $this->commission_amount;
+    }
+
+    /**
+     * When this booking's host payout unlocks: checkout + the payout hold
+     * window (Setting `payout_hold_hours`, default 24 — the dispute window).
+     */
+    public function payableAt(): ?CarbonImmutable
+    {
+        $checkout = $this->checkoutAt();
+        if ($checkout === null) {
+            return null;
+        }
+
+        $holdHours = (int) (Setting::query()->where('key', 'payout_hold_hours')->value('value') ?? 24);
+
+        return $checkout->addHours($holdHours);
+    }
+
+    /**
+     * Documents-before-money rule: a payout (automatic OR manual mark-paid)
+     * may only execute for a completed, unpaid stay whose financial documents
+     * are issued and whose hold window has passed.
+     */
+    public function isPayable(?CarbonImmutable $now = null): bool
+    {
+        $payableAt = $this->payableAt();
+
+        return $this->booking_status === BookingStatus::Completed
+            && $this->payout_status === 'not_paid'
+            && $this->financial_completed_at !== null
+            && $payableAt !== null
+            && $payableAt->lessThanOrEqualTo($now ?? CarbonImmutable::now());
     }
 
     /** All financial documents born from this booking (invoices, statements, credit notes). */

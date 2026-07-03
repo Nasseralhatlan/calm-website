@@ -43,6 +43,9 @@ function payoutBooking(Place $place, User $guest, array $attrs = []): Booking
         'guests' => 2, 'booking_price' => 100000, 'quantity' => 2, 'booking_amount' => 200000,
         'commission_rate' => 10, 'commission_amount' => 20000, 'vat_rate' => 15, 'vat_amount' => 30000,
         'total' => 230000, 'payout_status' => 'not_paid', 'confirmed_at' => now()->subDays(6),
+        // Payable state: mark-paid requires issued documents + a passed hold
+        // window (checkout was 3 days ago, so the 24h hold has cleared).
+        'financial_completed_at' => now()->subDays(2),
     ], $attrs));
 }
 

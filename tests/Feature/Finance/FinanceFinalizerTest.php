@@ -165,7 +165,9 @@ it('records the payout movement on mark-paid and reverses it on undo', function 
     (new FinalizeBookingFinances)->handle(app(BookingFinanceFinalizer::class), app(QoyodSyncService::class));
 
     $service = app(BookingService::class);
-    $service->setPayoutStatus($booking, 'paid', 'TRF-1');
+    // refresh: finalize() stamped financial_completed_at on a locked copy,
+    // and the mark-paid guard reads it (documents-before-money rule).
+    $service->setPayoutStatus($booking->refresh(), 'paid', 'TRF-1');
 
     $payout = $booking->financialMovements()->where('movement_type', FinancialMovement::HOST_PAYOUT)->sole();
     expect($payout->amount)->toBe(177000)
