@@ -10,6 +10,7 @@ use App\Models\Place;
 use App\Models\PlaceBlocking;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Validation\ValidationException;
 
 final class PlaceAvailabilityService
 {
@@ -312,6 +313,15 @@ final class PlaceAvailabilityService
     /** Lift a previously-blocked range — the place becomes available again. */
     public function unblock(PlaceBlocking $blocking): void
     {
+        // Imported (iCal) blocks mirror an external calendar — deleting one
+        // here would just resurrect on the next sync. They're freed by
+        // cancelling on the source platform or removing the feed.
+        if ($blocking->isImported()) {
+            throw ValidationException::withMessages([
+                'blocking' => __('This block comes from a connected calendar. Cancel it on the other platform or remove the feed instead.'),
+            ]);
+        }
+
         $blocking->delete();
     }
 

@@ -159,8 +159,9 @@
 
 {{-- ── 3 · Host & Guest ───────────────────────────────────────────── --}}
 @php
-    // Phone visibility: admin sees all; host sees the guest's phone; guests are routed to support.
-    $showGuestPhone = $isAdmin || $isHost;
+    // Phone visibility: only admin sees phone numbers. The host does NOT see the
+    // guest's phone; guests are routed to support instead of the host's number.
+    $showGuestPhone = $isAdmin;
     $showHostPhone = $isAdmin;
     $people = [
         ['label' => $isRtl ? 'المضيف' : 'Host', 'user' => $booking->host, 'phone' => $showHostPhone, 'self' => $isHost],

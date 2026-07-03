@@ -1,8 +1,15 @@
-# Feature plan (deferred): Two-way iCal calendar sync for host availability
+# Feature plan: Two-way iCal calendar sync for host availability
 
-> Status: **planned, not yet built.** Saved for later — we paused to work on another feature first.
-> Scope decisions made: host availability only, web dashboard only (no mobile API, no guest "add to
-> calendar").
+> Status: **built** (2026-07-02), with an expanded scope: web dashboard **and** mobile API
+> (`GET/POST /api/host/places/{place}/calendar-sync|calendar-feeds|calendar-token/rotate` —
+> documented for the app team in `docs/mobile-host-place-create-frontend-guide.md` §9).
+> Tests: `tests/Feature/Calendar/{CalendarExportTest,CalendarImportTest}.php`,
+> `tests/Feature/Api/Host/HostCalendarSyncTest.php`, `tests/Feature/Web/Host/CalendarSyncTest.php`.
+> Implementation notes vs. this plan: services live in `app/Services/Calendar/` with an extra
+> `CalendarSyncService` shared by web + API controllers; the feed route param is `{calendarFeed}`
+> (scoped binding via `Place::calendarFeeds()`); manual-unblock endpoints reject `source='ical'`
+> rows with 422 (the guard lives in `PlaceAvailabilityService::unblock`). Prod deploy needs
+> `composer install` + `php artisan migrate`; the hourly job rides the existing scheduler.
 
 ## Context
 Hosts who also list on Airbnb / Booking.com / Google Calendar need their Calm calendar to stay in sync so

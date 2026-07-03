@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Str;
 
 class Place extends Model
 {
@@ -160,6 +161,27 @@ class Place extends Model
     public function blockings(): HasMany
     {
         return $this->hasMany(PlaceBlocking::class);
+    }
+
+    /** External iCal feeds (Airbnb/Gathern/…) imported into this place. */
+    public function calendarFeeds(): HasMany
+    {
+        return $this->hasMany(PlaceCalendarFeed::class);
+    }
+
+    /**
+     * The secret for this place's public iCal export URL. Minted lazily on
+     * first use (places that never sync never carry one) and deliberately NOT
+     * in $fillable — only this method (and rotation) may set it, so it can
+     * never arrive via mass assignment from a request payload.
+     */
+    public function ensureCalendarToken(): string
+    {
+        if ($this->calendar_token === null) {
+            $this->forceFill(['calendar_token' => Str::lower(Str::random(40))])->save();
+        }
+
+        return (string) $this->calendar_token;
     }
 
     public function bookings(): HasMany

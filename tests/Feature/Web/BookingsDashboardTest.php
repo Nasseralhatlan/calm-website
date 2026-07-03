@@ -152,7 +152,7 @@ it('lets the guest open their booking detail', function (): void {
         ->assertSee('2,300.00'); // total the guest paid
 });
 
-it('lets the host open the booking detail with payout + guest contact', function (): void {
+it('lets the host open the booking detail with payout + guest name, but NOT the guest phone', function (): void {
     $host = User::factory()->create(['phone' => '517000014']);
     $guest = User::factory()->create(['phone' => '517000015', 'name' => 'Sara Guest']);
     $place = dashboardPlace($host);
@@ -161,9 +161,9 @@ it('lets the host open the booking detail with payout + guest contact', function
     $this->actingAs($host, 'api')
         ->get("/bookings/{$booking->id}")
         ->assertOk()
-        ->assertSee('Sara Guest')      // guest name
-        ->assertSee('517000015')       // guest phone — host can contact
-        ->assertSee('1,800.00');       // payout = 2000 − 200 commission
+        ->assertSee('Sara Guest')        // guest name
+        ->assertDontSee('517000015')     // guest phone is hidden from the host (admin only)
+        ->assertSee('1,800.00');         // payout = 2000 − 200 commission
 });
 
 it('404s the booking detail for a user who is neither guest nor host', function (): void {

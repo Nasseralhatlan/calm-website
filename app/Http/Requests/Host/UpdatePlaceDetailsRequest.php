@@ -134,6 +134,13 @@ class UpdatePlaceDetailsRequest extends FormRequest
      */
     public function photosData(): array
     {
+        // Mirror withValidator(): an edit that never touched the photo fields
+        // is details-only — return the syncPhotos() no-op shape so the
+        // existing gallery survives instead of being replaced with nothing.
+        if (! $this->has('attribute_image_paths') && ! $this->has('extra_image_paths')) {
+            return [];
+        }
+
         $validated = $this->validated();
 
         return [

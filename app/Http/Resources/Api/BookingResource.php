@@ -70,7 +70,9 @@ class BookingResource extends JsonResource
             'guest' => $this->whenLoaded('guest', fn () => [
                 'id' => $this->guest?->id,
                 'name' => $this->guest?->name,
-                'phone' => $this->guest?->phone,
+                // Public profile-picture URL (null when the guest has none).
+                // The guest's phone is intentionally NOT exposed to the host.
+                'avatar_url' => $this->guest?->avatar_url,
             ]),
             'status' => $this->booking_status->value,
             'start_date' => $this->start_date?->toDateString(),

@@ -18,6 +18,7 @@ use App\Services\Notification\OwnerNotifier;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 final class PlaceService
 {
@@ -468,27 +469,66 @@ final class PlaceService
     }
 
     /**
-     * The host's own places for the host app's "My listings" — ALL of them
-     * regardless of status (so drafts/pending/rejected show too), newest first,
-     * paginated, with the card relations + likes/reviews/bookings counts.
+     * The host's own places for the host app's "My listings" — ALL of them in
+     * one unpaginated response (hosts own a handful of places, so the app
+     * renders the full set at once), every status included so drafts/pending/
+     * rejected show too, newest first, with the card relations +
+     * likes/reviews/bookings counts. An optional $status narrows to one
+     * lifecycle tab: `active` filters the live status column; the other
+     * values are review_status stages.
      *
-     * @return LengthAwarePaginator<int, Place>
+     * @return Collection<int, Place>
      */
-    public function listingsForHost(User $host, ?int $perPage = null): LengthAwarePaginator
+    public function listingsForHost(User $host, ?string $status = null): Collection
     {
         return Place::query()
             ->where('host_user_id', $host->id)
+            ->when($status === 'active', fn ($q) => $q->where('status', PlaceStatus::Active->value))
+            ->when($status !== null && $status !== 'active', fn ($q) => $q->where('review_status', $status))
             ->with(['type', 'cityArea.city', 'coverPhoto'])
             ->withCount(['likes', 'publishedReviews', 'bookings'])
             ->withAvg('publishedReviews', 'rate')
             ->latest()
-            ->paginate($perPage ?? config('pagination.per_page'))
-            ->withQueryString();
+            ->get();
+    }
+
+    /**
+     * Hydrate a host-owned place for the mobile resume/edit screen: the raw
+     * editable columns plus its attribute values and flat photo list (the app
+     * regroups photos client-side, mirroring the web wizard JS). No visibility
+     * gate — drafts, pending and rejected rows are all editable by their
+     * owner; ownership itself is enforced by the controller.
+     */
+    public function editableForHost(Place $place): Place
+    {
+        return $place->load(['attributeValues', 'photos', 'cityArea:id,city_id']);
     }
 
     public function setReviewStatus(Place $place, PlaceReviewStatus $status): Place
     {
         $place->update(['review_status' => $status->value]);
+
+        return $place->refresh();
+    }
+
+    /**
+     * Host pause/unpause toggle. Deactivating (pausing) is always allowed, but
+     * activating requires the listing to already be Approved — a host must
+     * never be able to self-publish a draft/pending/rejected place around the
+     * review pipeline. Never touches review_status, so an approved paused
+     * place reactivates freely. Idempotent.
+     */
+    public function setStatusForHost(Place $place, PlaceStatus $status): Place
+    {
+        if ($status === PlaceStatus::Active && $place->review_status !== PlaceReviewStatus::Approved) {
+            throw ValidationException::withMessages([
+                'status' => __('Only approved places can be activated. This place is still :state.', [
+                    'state' => $place->review_status->value,
+                ]),
+            ]);
+        }
+
+        $place->update(['status' => $status->value]);
 
         return $place->refresh();
     }

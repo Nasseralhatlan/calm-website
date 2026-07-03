@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Enums\BookingStatus;
 use App\Enums\PlaceReviewStatus;
 use App\Enums\PlaceStatus;
+use App\Enums\UserRole;
 use App\Models\Booking;
 use App\Models\CityArea;
 use App\Models\Place;
@@ -72,8 +73,67 @@ it('returns bookings on the host\'s places with the guest + place', function ():
         ->assertJsonPath('data.pagination.total', 1)
         ->assertJsonPath('data.items.0.place.title', 'My Chalet')
         ->assertJsonPath('data.items.0.guest.name', 'Sara Guest')
-        ->assertJsonPath('data.items.0.guest.phone', '54000002')
+        // The guest's phone is not exposed to the host.
+        ->assertJsonMissingPath('data.items.0.guest.phone')
         ->assertJsonPath('data.items.0.pricing.total', 2300);
+});
+
+it('searches host bookings by reference or guest phone', function (): void {
+    $host = User::factory()->create(['phone' => '54001001']);
+    $sara = User::factory()->create(['phone' => '512345678', 'name' => 'Sara']);
+    $omar = User::factory()->create(['phone' => '598765432', 'name' => 'Omar']);
+    $place = hostApiPlace($host);
+
+    $saraBooking = hostApiBooking($place, $sara, ['reference' => 'CB-SARA01']);
+    $omarBooking = hostApiBooking($place, $omar, ['reference' => 'CB-OMAR99']);
+
+    // By (partial) reference.
+    $this->actingAs($host, 'api')
+        ->getJson('/api/host/bookings?q=SARA01')
+        ->assertOk()
+        ->assertJsonPath('data.pagination.total', 1)
+        ->assertJsonPath('data.items.0.id', $saraBooking->id);
+
+    // By guest phone — with a leading 0 / country code, still matches "5xxxxxxxx".
+    $this->actingAs($host, 'api')
+        ->getJson('/api/host/bookings?q=0598765432')
+        ->assertOk()
+        ->assertJsonPath('data.pagination.total', 1)
+        ->assertJsonPath('data.items.0.id', $omarBooking->id);
+
+    $this->actingAs($host, 'api')
+        ->getJson('/api/host/bookings?q=966512345678')
+        ->assertOk()
+        ->assertJsonPath('data.pagination.total', 1)
+        ->assertJsonPath('data.items.0.id', $saraBooking->id);
+
+    // No match → empty.
+    $this->actingAs($host, 'api')
+        ->getJson('/api/host/bookings?q=NOPE')
+        ->assertOk()
+        ->assertJsonPath('data.pagination.total', 0);
+});
+
+it('scopes the search to the caller only — an admin cannot find another host\'s bookings here', function (): void {
+    // This is a mobile host endpoint: it is ALWAYS scoped to the caller's own
+    // host_user_id, with no admin bypass.
+    $admin = User::factory()->create(['phone' => '54002001', 'role' => UserRole::Admin->value]);
+    $otherHost = User::factory()->create(['phone' => '54002002']);
+    $guest = User::factory()->create(['phone' => '512340000', 'name' => 'Guest']);
+
+    hostApiBooking(hostApiPlace($otherHost), $guest, ['reference' => 'CB-FIND01']);
+
+    // The admin has no bookings as a host, so searching another host's booking
+    // by reference or by the guest's phone returns nothing.
+    $this->actingAs($admin, 'api')
+        ->getJson('/api/host/bookings?q=CB-FIND01')
+        ->assertOk()
+        ->assertJsonPath('data.pagination.total', 0);
+
+    $this->actingAs($admin, 'api')
+        ->getJson('/api/host/bookings?q=0512340000')
+        ->assertOk()
+        ->assertJsonPath('data.pagination.total', 0);
 });
 
 it('requires auth for host bookings', function (): void {
@@ -93,7 +153,9 @@ it('returns all of the host\'s own listings including non-visible ones', functio
     $res = $this->actingAs($host, 'api')
         ->getJson('/api/host/listings')
         ->assertOk()
-        ->assertJsonPath('data.pagination.total', 2)
+        ->assertJsonCount(2, 'data.items')
+        // Listings are deliberately unpaginated — the app gets the full set.
+        ->assertJsonMissingPath('data.pagination')
         ->assertJsonStructure(['data' => ['items' => [['id', 'title', 'status', 'review_status', 'likes_count', 'bookings_count', 'rating']]]]);
 
     $statuses = collect($res->json('data.items'))->pluck('review_status')->sort()->values()->all();

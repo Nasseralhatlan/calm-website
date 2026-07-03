@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\BookingStatus;
 use App\Enums\UserRole;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -115,15 +116,34 @@ class User extends Authenticatable implements JWTSubject
         return $this->hasMany(Place::class, 'host_user_id');
     }
 
+    /**
+     * A host is anyone with a live listing OR who has hosted a real booking —
+     * the latter keeps host access (e.g. to view guest bookings + finances)
+     * even after they delete their only place. host_user_id is denormalized on
+     * bookings and survives the place's soft-delete, so deleted-place bookings
+     * still count. Scoped to confirmed/completed so abandoned holds don't.
+     */
     public function isHost(): bool
     {
-        return $this->places()->exists();
+        return $this->places()->exists()
+            || $this->hostBookings()
+                ->whereIn('booking_status', [
+                    BookingStatus::Confirmed->value,
+                    BookingStatus::Completed->value,
+                ])
+                ->exists();
     }
 
     /** Bookings this user has made as a guest. */
     public function bookings(): HasMany
     {
         return $this->hasMany(Booking::class, 'guest_user_id');
+    }
+
+    /** Bookings where this user is the host (host_user_id), incl. on deleted places. */
+    public function hostBookings(): HasMany
+    {
+        return $this->hasMany(Booking::class, 'host_user_id');
     }
 
     /** Places this user has liked (powers the heart icon + favorites list). */

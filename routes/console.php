@@ -3,6 +3,7 @@
 use App\Jobs\CompleteEndedBookings;
 use App\Jobs\ExpireStaleBookings;
 use App\Jobs\PurgeDeletedAccounts;
+use App\Jobs\SyncExternalCalendars;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -29,4 +30,11 @@ Schedule::job(new CompleteEndedBookings)
 // support-restorable) forever by default.
 Schedule::job(new PurgeDeletedAccounts)
     ->daily()
+    ->withoutOverlapping();
+
+// Mirror hosts' external iCal feeds (Airbnb / Gathern / Google) into
+// place_blockings so cross-platform bookings block dates here. Hourly matches
+// how the platforms poll each other; hosts can also "Sync now" on demand.
+Schedule::job(new SyncExternalCalendars)
+    ->hourly()
     ->withoutOverlapping();

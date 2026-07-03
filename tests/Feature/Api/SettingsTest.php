@@ -14,7 +14,10 @@ it('returns the whitelisted public settings publicly', function (): void {
         ->assertJsonPath('status', 200)
         ->assertJsonPath('data.support_phone', '+966500000000')
         ->assertJsonPath('data.support_email', 'support@calmapp.co')
-        ->assertJsonStructure(['status', 'message', 'data' => ['support_phone', 'support_email']]);
+        // Pricing rates for the host wizard's pricing-preview step.
+        ->assertJsonPath('data.commission_percentage', '10')
+        ->assertJsonPath('data.vat_percentage', '15')
+        ->assertJsonStructure(['status', 'message', 'data' => ['support_phone', 'support_email', 'commission_percentage', 'vat_percentage']]);
 });
 
 it('reflects admin-updated settings', function (): void {
@@ -34,9 +37,11 @@ it('returns null for a whitelisted setting that is not set', function (): void {
         ->assertJsonPath('data.support_email', 'support@calmapp.co');
 });
 
-it('exposes only whitelisted settings — never admin-only ones', function (): void {
+it('exposes only whitelisted settings — never arbitrary ones', function (): void {
+    Setting::query()->create(['key' => 'internal_admin_note', 'value' => 'top-secret-value']);
+
     $raw = $this->getJson('/api/settings')->assertOk()->getContent();
 
-    expect($raw)->not->toContain('commission_percentage')
-        ->and($raw)->not->toContain('vat_percentage');
+    expect($raw)->not->toContain('internal_admin_note')
+        ->and($raw)->not->toContain('top-secret-value');
 });

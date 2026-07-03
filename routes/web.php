@@ -18,6 +18,8 @@ use App\Http\Controllers\Admin\ReviewsController;
 use App\Http\Controllers\Admin\SettingsController;
 use App\Http\Controllers\Admin\UsersController;
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\CalendarFeedController;
+use App\Http\Controllers\Host\CalendarSyncController as HostCalendarSyncController;
 use App\Http\Controllers\Host\PlaceAvailabilityController as HostAvailabilityController;
 use App\Http\Controllers\Host\PlacesController as HostPlacesController;
 use App\Http\Controllers\LandingController;
@@ -48,6 +50,12 @@ Route::get('/cancellation-policy', [PageController::class, 'cancellation'])->nam
 Route::get('/community-standards', [PageController::class, 'community'])->name('pages.community');
 // Public support page — contact details rendered from admin settings.
 Route::get('/support', [PageController::class, 'support'])->name('pages.support');
+
+// Per-place iCal export — polled anonymously by Airbnb/Gathern/Google after
+// the host pastes the URL there. The secret {token} is the whole credential;
+// the controller hash_equals-checks it and 404s on mismatch.
+Route::get('/ical/places/{place}/{token}.ics', CalendarFeedController::class)
+    ->name('calendar.export');
 
 // ─── Auth (web, OTP → JWT cookie) ────────────────────────────────────────────
 Route::middleware('guest')->group(function (): void {
@@ -86,6 +94,20 @@ Route::middleware('auth:api')->group(function (): void {
     Route::delete('/my-places/{place}/blockings/{blocking}', [HostAvailabilityController::class, 'destroy'])
         ->scopeBindings()
         ->name('host.places.blockings.destroy');
+
+    // Calendar sync (Airbnb/Gathern-style iCal): imported feeds + export link,
+    // managed from the "Calendar sync" card on the Availability page.
+    Route::post('/my-places/{place}/calendar-feeds', [HostCalendarSyncController::class, 'store'])
+        ->name('host.places.calendar-feeds.store');
+    // {calendarFeed} (not {feed}) so the scoped binding resolves through the
+    // Place::calendarFeeds() relation.
+    Route::delete('/my-places/{place}/calendar-feeds/{calendarFeed}', [HostCalendarSyncController::class, 'destroy'])
+        ->scopeBindings()
+        ->name('host.places.calendar-feeds.destroy');
+    Route::post('/my-places/{place}/calendar-feeds/sync', [HostCalendarSyncController::class, 'syncNow'])
+        ->name('host.places.calendar-feeds.sync');
+    Route::post('/my-places/{place}/calendar-token/rotate', [HostCalendarSyncController::class, 'rotateToken'])
+        ->name('host.places.calendar-token.rotate');
 
     // Regular-user dashboard tabs (placeholders until each feature ships)
     Route::get('/bookings', [UserDashboardController::class, 'bookings'])->name('user.bookings');

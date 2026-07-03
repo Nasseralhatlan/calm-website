@@ -16,6 +16,7 @@ use App\Services\Notification\OwnerNotifier;
 use App\Services\Place\PlaceAvailabilityService;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -332,18 +333,91 @@ final class BookingService
     /**
      * Bookings guests placed on this host's places — the host app's "Bookings"
      * list. Newest first, paginated, with the place summary + the guest (so the
-     * host can see/contact them).
+     * host can see/contact them). An optional `$q` searches the booking reference
+     * or the guest's phone.
      *
      * @return LengthAwarePaginator<int, Booking>
      */
-    public function forHostPaginated(User $host, ?int $perPage = null): LengthAwarePaginator
+    public function forHostPaginated(User $host, ?string $q = null, ?int $perPage = null): LengthAwarePaginator
     {
         return Booking::query()
             ->where('host_user_id', $host->id)
+            ->when($q !== null && $q !== '', fn ($query) => $this->applyHostBookingSearch($query, $q))
             ->with(['place', 'place.coverPhoto', 'place.cityArea.city', 'place.type', 'guest'])
             ->latest()
             ->paginate($perPage ?? config('pagination.per_page'))
             ->withQueryString();
+    }
+
+    /**
+     * Narrow a host's bookings by a free-text query: matches the booking
+     * reference OR the guest's phone. The phone is normalized (digits only,
+     * country code / leading zero stripped) so "0501…", "966501…" and "501…"
+     * all match the stored "5xxxxxxxx".
+     *
+     * @param  Builder<Booking>  $query
+     */
+    private function applyHostBookingSearch(Builder $query, string $q): void
+    {
+        $phone = preg_replace('/^(966|0)/', '', (string) preg_replace('/\D/', '', $q));
+
+        $query->where(function ($sub) use ($q, $phone): void {
+            $sub->where('reference', 'like', '%'.$q.'%');
+
+            if ($phone !== '') {
+                $sub->orWhereHas('guest', fn ($g) => $g->where('phone', 'like', '%'.$phone.'%'));
+            }
+        });
+    }
+
+    /**
+     * Host home-screen highlights in one shot (no pagination). Three buckets of
+     * CONFIRMED bookings, decided by the real check-in / checkout instants
+     * (times included, not just dates), relative to now:
+     *   - ongoing:  guest is in-house now — checked in (check_in_time passed)
+     *               and not yet checked out. Covers a stay starting today whose
+     *               check-in time has already passed.
+     *   - today:    checking in later today (check-in date is today but its
+     *               check_in_time hasn't arrived yet).
+     *   - upcoming: checking in after today, within the next 7 days.
+     *
+     * checkInAt() = start_date @ check_in_time; checkoutAt() = end_date (+1 when
+     * checkout_next_day) @ check_out_time. Both are computed, so the buckets are
+     * resolved in PHP after a narrow DB pre-filter (future side capped at +7 days).
+     *
+     * @return array{ongoing: Collection<int, Booking>, today: Collection<int, Booking>, upcoming: Collection<int, Booking>}
+     */
+    public function homeHighlightsForHost(User $host): array
+    {
+        $now = CarbonImmutable::now();
+        $today = $now->startOfDay();
+        $upcomingUntil = $today->addDays(7)->endOfDay();
+
+        $candidates = Booking::query()
+            ->where('host_user_id', $host->id)
+            ->where('booking_status', BookingStatus::Confirmed->value)
+            ->whereDate('start_date', '<=', $upcomingUntil->toDateString())
+            ->with(['place', 'place.coverPhoto', 'place.cityArea.city', 'place.type', 'guest'])
+            ->orderBy('start_date')
+            ->get();
+
+        return [
+            // In-house right now: check-in instant passed, checkout still ahead.
+            'ongoing' => $candidates->filter(
+                fn (Booking $b): bool => ($b->checkInAt()?->lte($now) ?? false)
+                    && ($b->checkoutAt()?->gt($now) ?? false),
+            )->values(),
+            // Arriving later today: check-in is today but its time hasn't come yet.
+            'today' => $candidates->filter(
+                fn (Booking $b): bool => $b->start_date !== null
+                    && $b->start_date->isSameDay($today)
+                    && ($b->checkInAt()?->gt($now) ?? false),
+            )->values(),
+            // Future arrivals within the next 7 days.
+            'upcoming' => $candidates->filter(
+                fn (Booking $b): bool => $b->start_date !== null && $b->start_date->gt($today),
+            )->values(),
+        ];
     }
 
     /**

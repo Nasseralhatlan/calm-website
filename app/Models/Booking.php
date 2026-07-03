@@ -146,6 +146,28 @@ class Booking extends Model
         return $day->setTime((int) $hour, (int) $minute);
     }
 
+    /**
+     * The guest's real check-in instant: start_date at check_in_time. Unlike
+     * checkout there's no next-day flag — check-in is always on start_date.
+     * Falls back to the start of start_date when no time is set.
+     */
+    public function checkInAt(): ?CarbonImmutable
+    {
+        if ($this->start_date === null) {
+            return null;
+        }
+
+        $day = CarbonImmutable::parse($this->start_date->toDateString());
+
+        if ($this->check_in_time === null) {
+            return $day->startOfDay();
+        }
+
+        [$hour, $minute] = array_pad(explode(':', $this->check_in_time), 2, '0');
+
+        return $day->setTime((int) $hour, (int) $minute);
+    }
+
     /** True while this booking is still holding its dates against the calendar. */
     public function isActiveHold(): bool
     {
