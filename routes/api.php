@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BookingsController;
 use App\Http\Controllers\Api\CitiesController;
 use App\Http\Controllers\Api\CountriesController;
+use App\Http\Controllers\Api\FinanceDocumentsController;
 // use App\Http\Controllers\Api\DeviceTokenController; // notifications temporarily disabled
 use App\Http\Controllers\Api\HostBlockingController;
 use App\Http\Controllers\Api\HostCalendarSyncController;
@@ -152,6 +153,12 @@ Route::middleware(['auth:api', 'throttle:authenticated'])->group(function (): vo
     // Guest reviews: post one for a completed booking's place; delete own.
     Route::post('/bookings/{booking}/reviews', [ReviewsController::class, 'store']);
     Route::delete('/reviews/{review}', [ReviewsController::class, 'destroy']);
+
+    // Financial documents — strictly the viewer's own (guest: booking
+    // invoices/credit notes; host: commission invoices + payout statements).
+    // PDF links are Qoyod-hosted and expire; fetch fresh each time.
+    Route::get('/finance-documents', [FinanceDocumentsController::class, 'index']);
+    Route::get('/finance-documents/{document}/pdf-url', [FinanceDocumentsController::class, 'pdfUrl']);
 });
 
 // ─── Admin-only ──────────────────────────────────────────────────────────────

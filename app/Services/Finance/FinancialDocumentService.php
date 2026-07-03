@@ -6,6 +6,8 @@ namespace App\Services\Finance;
 
 use App\Models\Booking;
 use App\Models\FinancialDocument;
+use App\Models\User;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -236,6 +238,23 @@ final class FinancialDocumentService
 
             return $document;
         });
+    }
+
+    /**
+     * The viewer's own documents for the mobile "My documents" list — guests
+     * see their booking invoices/credit notes, hosts their commission
+     * invoices + payout statements. Newest first, paginated.
+     *
+     * @return LengthAwarePaginator<int, FinancialDocument>
+     */
+    public function forUser(User $user, ?int $perPage = null): LengthAwarePaginator
+    {
+        return FinancialDocument::query()
+            ->where('buyer_id', $user->id)
+            ->with('source')
+            ->latest('issued_at')
+            ->paginate($perPage ?? config('pagination.per_page'))
+            ->withQueryString();
     }
 
     /** Return-the-existing-or-create — the (source, subtype) idempotency rule. */
