@@ -173,6 +173,27 @@ final class PlaceService
      * matches one of this host's Draft places we update it; otherwise we
      * create a fresh row. Existing rows in non-Draft state are ignored.
      */
+    /**
+     * Per-day price columns are non-nullable ("0" means "fall back to the
+     * base price"). A blank day input arrives here as null (empty strings are
+     * nulled by middleware and the rules are nullable), so coerce any
+     * provided-but-null day back to 0 — the last guard before the DB, applied
+     * by EVERY place write path (host wizard, host edit, admin edit).
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private static function dayPricesToZero(array $data): array
+    {
+        foreach (Place::PRICE_COLUMNS as $column) {
+            if (array_key_exists($column, $data) && $data[$column] === null) {
+                $data[$column] = 0;
+            }
+        }
+
+        return $data;
+    }
+
     private function upsertPlace(User $host, array $data, ?string $draftId, PlaceReviewStatus $reviewStatus): Place
     {
         $existing = null;
@@ -191,15 +212,7 @@ final class PlaceService
                 ->first();
         }
 
-        // Per-day price columns are non-nullable ("0" means "fall back to the
-        // base price"). A blank day input arrives here as null (empty strings
-        // are nulled by middleware), so coerce any provided-but-null day back
-        // to 0 before persisting — the last guard before the DB for every path.
-        foreach (Place::PRICE_COLUMNS as $column) {
-            if (array_key_exists($column, $data) && $data[$column] === null) {
-                $data[$column] = 0;
-            }
-        }
+        $data = self::dayPricesToZero($data);
 
         $payload = [
             ...$data,
@@ -359,7 +372,7 @@ final class PlaceService
         $lists = $data['lists'] ?? null;
         unset($data['lists']);
 
-        $place->update($data);
+        $place->update(self::dayPricesToZero($data));
 
         if (is_array($lists)) {
             $this->syncLists($place, $lists);
@@ -382,7 +395,7 @@ final class PlaceService
     public function updateByAdmin(Place $place, array $data, array $attributes, array $photos, array $lists): Place
     {
         return DB::transaction(function () use ($place, $data, $attributes, $photos, $lists): Place {
-            $place->update($data);
+            $place->update(self::dayPricesToZero($data));
 
             // An edit carries the full desired state — empty amenities means
             // "remove them all" rather than "leave untouched".
@@ -441,7 +454,7 @@ final class PlaceService
     {
         $place = DB::transaction(function () use ($place, $data, $attributes, $photos): Place {
             $place->update([
-                ...$data,
+                ...self::dayPricesToZero($data),
                 'status' => PlaceStatus::Inactive->value,
                 'review_status' => PlaceReviewStatus::PendingReview->value,
                 'rejection_reason' => null,
