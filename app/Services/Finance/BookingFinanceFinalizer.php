@@ -18,7 +18,7 @@ use Illuminate\Support\Facades\Log;
  *  - guest pays            → guest_payment movement (nothing else yet)
  *  - checkout + N hours    → finalize(): guest invoice, commission invoice,
  *                            payout statement, withheld/payable movements
- *  - admin marks payout    → host_payout movement (undo → reversed)
+ *  - Moyasar payout lands  → host_payout movement (via HostPayoutService)
  *  - admin cancels         → Case A nothing / Case B refund movement /
  *                            Case C credit notes + refund movement
  *
@@ -130,19 +130,6 @@ final class BookingFinanceFinalizer
             ->where('movement_type', FinancialMovement::HOST_PAYOUT_PAYABLE)
             ->where('status', FinancialMovement::STATUS_PENDING)
             ->update(['status' => FinancialMovement::STATUS_SUCCEEDED, 'occurred_at' => now()]);
-    }
-
-    /** Undo of a mistaken mark-paid: the transfer never actually happened. */
-    public function recordPayoutUndo(Booking $booking): void
-    {
-        $booking->financialMovements()
-            ->where('movement_type', FinancialMovement::HOST_PAYOUT)
-            ->where('status', FinancialMovement::STATUS_SUCCEEDED)
-            ->update(['status' => FinancialMovement::STATUS_REVERSED]);
-
-        $booking->financialMovements()
-            ->where('movement_type', FinancialMovement::HOST_PAYOUT_PAYABLE)
-            ->update(['status' => FinancialMovement::STATUS_PENDING, 'occurred_at' => null]);
     }
 
     /**

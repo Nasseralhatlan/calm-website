@@ -10,7 +10,7 @@ use App\Http\Controllers\Admin\CityAreasController;
 use App\Http\Controllers\Admin\CountriesController;
 use App\Http\Controllers\Admin\DashboardController;
 // use App\Http\Controllers\Admin\NotificationsController; // notifications temporarily disabled
-use App\Http\Controllers\Admin\PayoutsController;
+use App\Http\Controllers\Admin\FinanceDocumentPdfController;
 use App\Http\Controllers\Admin\PlaceListsController;
 use App\Http\Controllers\Admin\PlaceReviewController;
 use App\Http\Controllers\Admin\PlacesController;
@@ -167,13 +167,11 @@ Route::middleware(['auth:api', 'admin'])
         Route::get('/bookings/{booking}', [BookingsController::class, 'show'])->name('bookings.show');
         Route::post('/bookings/{booking}/cancel', [BookingsController::class, 'cancel'])->name('bookings.cancel');
 
-        // Host payouts: queue of completed-but-unpaid stays. Manual mode:
-        // settled one by one after the operator's bank transfer (+ undo on
-        // mistakes). Auto mode: Moyasar transfers run on a schedule; retry
-        // re-attempts one failed transfer.
-        Route::get('/payouts', [PayoutsController::class, 'index'])->name('payouts.index');
-        Route::post('/bookings/{booking}/payout', [PayoutsController::class, 'update'])->name('bookings.payout');
-        Route::post('/bookings/{booking}/payout/retry', [PayoutsController::class, 'retry'])->name('bookings.payout.retry');
+        // Payouts are fully automatic (Moyasar). The only human action is
+        // retrying a transfer the bank rejected, from the booking's page.
+        Route::post('/bookings/{booking}/payout/retry', [BookingsController::class, 'retryPayout'])->name('bookings.payout.retry');
+        // Fresh expiring Qoyod PDF for a tax document (admin support view).
+        Route::get('/finance-documents/{document}/pdf', FinanceDocumentPdfController::class)->name('finance-documents.pdf');
 
         // Curated landing-page lists ("Featured chalets", "Editor's picks", etc.)
         // Adding places to a list happens from the place's edit page; this

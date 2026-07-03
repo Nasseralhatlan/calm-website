@@ -63,6 +63,18 @@
                 <span class="tabular-nums {{ $active ? 'text-white/80' : 'text-[#bbb]' }}" style="font-size: 12px;">{{ $counts[$key] ?? 0 }}</span>
             </a>
         @endforeach
+
+        {{-- Failed automatic payouts — the only payout state needing a human.
+             Shown only when at least one exists, so it acts as an alert. --}}
+        @if(($counts['payout_failed'] ?? 0) > 0 || $payoutFailed)
+            <a href="{{ route('admin.bookings.index', array_filter(['q' => $search, 'payout_failed' => $payoutFailed ? null : 1])) }}"
+               class="inline-flex items-center transition-all {{ $fa }}"
+               style="gap: 7px; padding: 7px 14px; border-radius: 999px; font-size: 13px; font-weight: 600;
+                      {{ $payoutFailed ? 'background-color: #b91c1c; color: #fff;' : 'background-color: #fef2f2; color: #b91c1c; box-shadow: 0px 4px 12px 0px rgba(0,0,0,0.04);' }}">
+                <span>⚠ {{ $isRtl ? 'تحويلات فاشلة' : 'Failed payouts' }}</span>
+                <span class="tabular-nums {{ $payoutFailed ? 'text-white/80' : '' }}" style="font-size: 12px;">{{ $counts['payout_failed'] ?? 0 }}</span>
+            </a>
+        @endif
     </div>
 
     @if($bookings->isEmpty())

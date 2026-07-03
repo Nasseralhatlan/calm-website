@@ -158,29 +158,6 @@ it('records the guest payment movement idempotently', function (): void {
         ->and($movement->provider_transaction_id)->toBe('pay_TEST123');
 });
 
-it('records the payout movement on mark-paid and reverses it on undo', function (): void {
-    $booking = fdocBooking(fdocPlace($this->host), $this->guest, [
-        'booking_status' => BookingStatus::Completed->value,
-    ]);
-    (new FinalizeBookingFinances)->handle(app(BookingFinanceFinalizer::class), app(QoyodSyncService::class));
-
-    $service = app(BookingService::class);
-    // refresh: finalize() stamped financial_completed_at on a locked copy,
-    // and the mark-paid guard reads it (documents-before-money rule).
-    $service->setPayoutStatus($booking->refresh(), 'paid', 'TRF-1');
-
-    $payout = $booking->financialMovements()->where('movement_type', FinancialMovement::HOST_PAYOUT)->sole();
-    expect($payout->amount)->toBe(177000)
-        ->and($payout->status)->toBe('succeeded')
-        ->and($payout->provider_reference)->toBe('TRF-1');
-    expect($booking->financialMovements()->where('movement_type', FinancialMovement::HOST_PAYOUT_PAYABLE)->sole()->status)->toBe('succeeded');
-
-    $service->setPayoutStatus($booking->refresh(), 'not_paid');
-
-    expect($booking->financialMovements()->where('movement_type', FinancialMovement::HOST_PAYOUT)->sole()->status)->toBe('reversed')
-        ->and($booking->financialMovements()->where('movement_type', FinancialMovement::HOST_PAYOUT_PAYABLE)->sole()->status)->toBe('pending');
-});
-
 it('cancellation before invoicing (Case B) records a refund movement only', function (): void {
     $booking = fdocBooking(fdocPlace($this->host), $this->guest, [
         'start_date' => '2026-07-10', 'end_date' => '2026-07-11', // future stay

@@ -20,6 +20,9 @@
     <div style="max-width: 860px; display: flex; flex-direction: column; gap: 16px;">
         @include('partials._booking_detail', ['booking' => $booking, 'audience' => 'admin'])
 
+        {{-- ── Finance: payout state, documents, money trail ── --}}
+        @include('admin.bookings._finance', ['booking' => $booking])
+
         {{-- ── Cancel actions (admin only) ── --}}
         <div style="background:#fff;border-radius:24px;padding:24px;box-shadow:0px 8px 24px 0px rgba(0,0,0,0.05);">
             <h2 class="text-[15px] font-bold text-[#222] {{ $fa }}" style="margin-bottom: 4px;">{{ $isRtl ? 'إلغاء الحجز' : 'Cancel booking' }}</h2>

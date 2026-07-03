@@ -16,13 +16,11 @@ use App\Models\FinancialMovement;
 use App\Models\Place;
 use App\Models\PlaceType;
 use App\Models\User;
-use App\Services\Booking\BookingService;
 use App\Services\Finance\BookingFinanceFinalizer;
 use App\Services\Finance\HostPayoutService;
 use App\Services\Finance\QoyodSyncService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Validation\ValidationException;
 
 beforeEach(function (): void {
     $this->seed();
@@ -204,51 +202,30 @@ it('respects the hold window and the documents-before-money rule', function (): 
         ->and($noDocs->refresh()->payout_status)->toBe('not_paid');
 });
 
-it('blocks manual mark-paid while processing, in hold, or before invoicing', function (): void {
-    $service = app(BookingService::class);
-
-    $processing = apoBooking($this->host, $this->guest, ['payout_status' => 'processing', 'payout_id' => 'po_7']);
-    expect(fn () => $service->setPayoutStatus($processing, 'paid'))
-        ->toThrow(ValidationException::class);
-    // Undo is equally off-limits while Moyasar owns the row.
-    expect(fn () => $service->setPayoutStatus($processing, 'not_paid'))
-        ->toThrow(ValidationException::class);
-
-    $noDocs = apoBooking($this->host, $this->guest, ['financial_completed_at' => null]);
-    expect(fn () => $service->setPayoutStatus($noDocs, 'paid'))
-        ->toThrow(ValidationException::class);
-
-    Carbon::setTestNow('2026-07-03 11:00:00'); // hold clears at 12:00
-    $inHold = apoBooking($this->host, $this->guest);
-    expect(fn () => $service->setPayoutStatus($inHold, 'paid'))
-        ->toThrow(ValidationException::class);
-
-    // Past the hold with documents issued → manual mark-paid still works.
-    Carbon::setTestNow('2026-07-03 12:00:00');
-    $service->setPayoutStatus($inHold->refresh(), 'paid', 'TRF-MANUAL');
-    expect($inHold->refresh()->payout_status)->toBe('paid');
-});
-
-it('shows processing transfers and failures with a retry action in the admin queue', function (): void {
+it('shows the payout state and failures with a retry action on the admin booking page', function (): void {
     $admin = User::factory()->create(['role' => UserRole::Admin->value, 'phone' => '598300001']);
 
     $processing = apoBooking($this->host, $this->guest, ['payout_status' => 'processing', 'payout_id' => 'po_55']);
     $failed = apoBooking($this->host, $this->guest, ['payout_failure' => 'Moyasar payout failed: Invalid IBAN']);
 
     $this->actingAs($admin, 'api')
-        ->get('/admin/payouts?tab=processing')
+        ->get("/admin/bookings/{$processing->id}")
         ->assertOk()
-        ->assertSee('po_55')
-        ->assertDontSee($failed->reference);
+        ->assertSee('po_55');
 
     $this->actingAs($admin, 'api')
-        ->get('/admin/payouts')
+        ->get("/admin/bookings/{$failed->id}")
+        ->assertOk()
+        ->assertSee('Invalid IBAN');
+
+    // Failed transfers surface on the bookings list behind the alert filter.
+    $this->actingAs($admin, 'api')
+        ->get('/admin/bookings?payout_failed=1')
         ->assertOk()
         ->assertSee($failed->reference)
-        ->assertSee('Invalid IBAN')
         ->assertDontSee($processing->reference);
 
-    // Retry endpoint re-executes the transfer.
+    // Retry re-fires the automatic transfer.
     autoPayoutsOn();
     Http::fake(['api.moyasar.com/v1/payouts' => Http::response(['id' => 'po_56', 'status' => 'queued'], 201)]);
     $this->actingAs($admin, 'api')
