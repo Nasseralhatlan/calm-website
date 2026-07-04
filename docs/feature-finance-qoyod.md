@@ -8,17 +8,23 @@
 
 ## Money model (per booking, all halalas, frozen at creation)
 
-| Field | Meaning |
-|---|---|
-| `host_gross_amount` | Stay value belonging to the host (= legacy `booking_amount`) |
-| `guest_vat_rate/amount`, `guest_total` | The Calm → Guest invoice numbers (= legacy `vat_*`, `total`) |
-| `guest_service_fee_amount` (+vat) | Optional Calm fee to guests — 0 until productized |
-| `commission_amount_ex_vat` | Calm's commission excluding VAT (= legacy `commission_amount`) |
-| `commission_vat_rate/amount`, `commission_total` | **15% VAT ON TOP of commission** — new bookings only; historical rows backfilled with 0 so old payouts never change |
-| `host_payout_amount` | `host_gross − commission_total` — THE payout number everywhere |
+One naming rule — components end `_amount` (always ex VAT), totals end `_total`,
+rates end `_rate` — across exactly three items, all derived from one stay value:
 
-`BookingPricingService` fills these at creation (also via a model `creating` hook, so
-seeders/tests/every path agree). `Booking::hostNetMinor()` returns `host_payout_amount`.
+| Item | Fields | Meaning |
+|---|---|---|
+| Stay | `nights`, `stay_amount` | The stay's value (sum of nightly prices, ex VAT) |
+| Guest | `guest_vat_rate/_amount`, `guest_total` | What the guest pays: stay + VAT |
+| Commission | `commission_rate`, `commission_amount`, `commission_vat_rate/_amount`, `commission_total` | Calm's cut of the stay, **VAT ON TOP** (historical rows carry commission VAT 0 so old payouts never changed) |
+| Host | `host_payout_amount` | `stay − commission_total` — THE payout number everywhere |
+
+`BookingPricingService` fills the derived fields at creation (also via a model
+`creating` hook, so seeders/tests/every path agree). `Booking::hostNetMinor()`
+returns `host_payout_amount`. Per-document issue timestamps live on
+`financial_documents.issued_at`; the booking only carries `financial_completed_at`
+(the documents-before-money gate). A future guest service fee returns as a fourth
+full item (`service_fee_amount/vat_rate/vat_amount/total`) — its half-built columns
+were removed rather than left as zero-filled inconsistencies.
 
 ## Document flow (brief §11)
 
@@ -117,7 +123,7 @@ Setup already done in the Qoyod org (ids to use in env):
 | Thing | Qoyod id |
 |---|---|
 | Product: Accommodation stay (`CALM-STAY`) | 1 |
-| Product: Calm service fee (`CALM-FEE`) | 2 |
+| Product: Calm service fee (`CALM-FEE`) | 2 (dormant — created for the future service-fee item; not referenced by code today) |
 | Product: Platform commission (`CALM-COMM`) | 3 |
 | Moyasar clearing (Bank Current Account) | 8 |
 | Commission settlement offset (Accounts payable) | 14 |
@@ -127,7 +133,7 @@ Setup already done in the Qoyod org (ids to use in env):
 2. Products + account ids above already exist; the accountant can remap the
    settlement account later (payments post fine to account 14).
 3. Env: `QOYOD_ENABLED=true`, `QOYOD_API_KEY`, `QOYOD_PRODUCT_STAY_ID=1`,
-   `QOYOD_PRODUCT_SERVICE_FEE_ID=2`, `QOYOD_PRODUCT_COMMISSION_ID=3`,
+   `QOYOD_PRODUCT_COMMISSION_ID=3`,
    `QOYOD_MOYASAR_ACCOUNT_ID=8`, `QOYOD_SETTLEMENT_ACCOUNT_ID=14`.
 4. `php artisan optimize:clear` — the next sweep syncs everything pending.
 

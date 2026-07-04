@@ -48,8 +48,8 @@ function delAcctBooking(Place $place, User $guest, array $attrs = []): Booking
         'booking_status' => BookingStatus::Confirmed->value,
         'start_date' => now()->addDays(3)->toDateString(),
         'end_date' => now()->addDays(4)->toDateString(),
-        'guests' => 2, 'booking_price' => 100000, 'quantity' => 2, 'host_gross_amount' => 200000,
-        'commission_rate' => 10, 'commission_amount_ex_vat' => 20000, 'guest_vat_rate' => 15, 'guest_vat_amount' => 30000,
+        'guests' => 2, 'nights' => 2, 'stay_amount' => 200000,
+        'commission_rate' => 10, 'commission_amount' => 20000, 'guest_vat_rate' => 15, 'guest_vat_amount' => 30000,
         'guest_total' => 230000, 'payout_status' => 'not_paid',
     ], $attrs));
 }

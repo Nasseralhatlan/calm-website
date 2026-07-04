@@ -76,7 +76,7 @@
         </div>
         <div class="min-w-0">
             <span class="block text-[11px] font-semibold uppercase tracking-wider text-[#bbb] {{ $fa }}" style="margin-bottom: 4px;">{{ $isRtl ? 'عدد الأيام' : 'Days' }}</span>
-            <span class="block text-[14px] font-semibold text-[#222] {{ $fa }}">{{ $booking->quantity }}</span>
+            <span class="block text-[14px] font-semibold text-[#222] {{ $fa }}">{{ $booking->nights }}</span>
         </div>
         <div class="min-w-0">
             <span class="block text-[11px] font-semibold uppercase tracking-wider text-[#bbb] {{ $fa }}" style="margin-bottom: 4px;">{{ $isRtl ? 'الضيوف' : 'Guests' }}</span>
@@ -207,13 +207,13 @@
     <div class="text-[14px] {{ $fa }}">
         <div style="{{ $row }}">
             <span class="text-[#717171]">{{ $isRtl ? 'قيمة الحجز' : 'Booking amount' }}</span>
-            <span class="font-semibold text-[#222] tabular-nums" dir="ltr">{{ $sar($booking->host_gross_amount) }} {{ $cur }}</span>
+            <span class="font-semibold text-[#222] tabular-nums" dir="ltr">{{ $sar($booking->stay_amount) }} {{ $cur }}</span>
         </div>
 
         @if($isHost)
             <div style="{{ $row }}">
                 <span class="text-[#717171]">{{ $isRtl ? 'عمولة كالم' : 'Calm commission' }} ({{ $rate($booking->commission_rate) }}%)</span>
-                <span class="font-semibold text-[#717171] tabular-nums" dir="ltr">− {{ $sar($booking->commission_amount_ex_vat) }} {{ $cur }}</span>
+                <span class="font-semibold text-[#717171] tabular-nums" dir="ltr">− {{ $sar($booking->commission_amount) }} {{ $cur }}</span>
             </div>
             @if($commissionVat > 0)
                 <div style="{{ $row }}">
@@ -237,7 +237,7 @@
             @if($isAdmin)
                 <div style="{{ $row }}">
                     <span class="text-[#717171]">{{ $isRtl ? 'عمولة كالم' : 'Calm commission' }} ({{ $rate($booking->commission_rate) }}%)</span>
-                    <span class="text-[#717171] tabular-nums" dir="ltr">{{ $sar($booking->commission_amount_ex_vat) }} {{ $cur }}</span>
+                    <span class="text-[#717171] tabular-nums" dir="ltr">{{ $sar($booking->commission_amount) }} {{ $cur }}</span>
                 </div>
             @endif
             <div style="{{ $row }} border-top:1px solid #f0f0f0;margin-top:4px;">

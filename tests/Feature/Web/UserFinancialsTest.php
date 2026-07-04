@@ -37,8 +37,8 @@ function finBooking(Place $place, User $guest, array $attrs = []): Booking
         'booking_status' => BookingStatus::Completed->value,
         'start_date' => now()->subDays(4)->toDateString(),
         'end_date' => now()->subDays(3)->toDateString(),
-        'guests' => 2, 'booking_price' => 100000, 'quantity' => 1, 'host_gross_amount' => 100000,
-        'commission_rate' => 10, 'commission_amount_ex_vat' => 10000, 'guest_vat_rate' => 15, 'guest_vat_amount' => 15000,
+        'guests' => 2, 'nights' => 1, 'stay_amount' => 100000,
+        'commission_rate' => 10, 'commission_amount' => 10000, 'guest_vat_rate' => 15, 'guest_vat_amount' => 15000,
         'guest_total' => 115000, 'payout_status' => 'not_paid', 'confirmed_at' => now()->subDays(6),
     ], $attrs));
 }
@@ -46,7 +46,7 @@ function finBooking(Place $place, User $guest, array $attrs = []): Booking
 it('shows earnings totals and per-booking payout badges to the host', function (): void {
     $place = finPlace($this->host);
     // One settled (net SR 900), one still pending (net SR 900).
-    finBooking($place, $this->guest, ['payout_status' => 'paid', 'paid_out_at' => now()]);
+    finBooking($place, $this->guest, ['payout_status' => 'paid', 'payout_paid_at' => now()]);
     $pending = finBooking($place, $this->guest);
 
     // The dashboard renders in Arabic by default — assert the Arabic badges.

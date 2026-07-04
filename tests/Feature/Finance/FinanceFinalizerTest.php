@@ -55,8 +55,8 @@ function fdocBooking(Place $place, User $guest, array $attrs = []): Booking
         'check_in_time' => '15:00',
         'check_out_time' => '12:00',
         'checkout_next_day' => false,
-        'guests' => 2, 'booking_price' => 100000, 'quantity' => 2, 'host_gross_amount' => 200000,
-        'commission_rate' => 10, 'commission_amount_ex_vat' => 20000, 'guest_vat_rate' => 15, 'guest_vat_amount' => 30000,
+        'guests' => 2, 'nights' => 2, 'stay_amount' => 200000,
+        'commission_rate' => 10, 'commission_amount' => 20000, 'guest_vat_rate' => 15, 'guest_vat_amount' => 30000,
         'guest_total' => 230000, 'payout_status' => 'not_paid',
         'payment_status' => 'paid', 'payment_id' => 'pay_TEST123', 'confirmed_at' => '2026-06-28 10:00:00',
     ], $attrs));
@@ -65,10 +65,10 @@ function fdocBooking(Place $place, User $guest, array $attrs = []): Booking
 it('freezes the full money snapshot at creation (commission VAT on top)', function (): void {
     $booking = fdocBooking(fdocPlace($this->host), $this->guest);
 
-    expect($booking->host_gross_amount)->toBe(200000)
+    expect($booking->stay_amount)->toBe(200000)
         ->and($booking->guest_vat_amount)->toBe(30000)
         ->and($booking->guest_total)->toBe(230000)
-        ->and($booking->commission_amount_ex_vat)->toBe(20000)
+        ->and($booking->commission_amount)->toBe(20000)
         ->and($booking->commission_vat_amount)->toBe(3000)   // 15% on top of commission
         ->and($booking->commission_total)->toBe(23000)
         ->and($booking->host_payout_amount)->toBe(177000)
@@ -83,10 +83,7 @@ it('issues the three documents + movements once checkout passed the issue delay'
     (new FinalizeBookingFinances)->handle(app(BookingFinanceFinalizer::class), app(QoyodSyncService::class));
 
     $booking->refresh();
-    expect($booking->financial_completed_at)->not->toBeNull()
-        ->and($booking->guest_invoice_issued_at)->not->toBeNull()
-        ->and($booking->host_commission_invoice_issued_at)->not->toBeNull()
-        ->and($booking->payout_statement_generated_at)->not->toBeNull();
+    expect($booking->financial_completed_at)->not->toBeNull();
 
     $docs = $booking->financialDocuments()->get()->keyBy('document_subtype');
     expect($docs)->toHaveCount(3);

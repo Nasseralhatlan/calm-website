@@ -96,11 +96,10 @@ final class BookingService
                 'checkout_next_day' => $locked->checkout_next_day,
                 'rules' => $locked->rules,
                 'guests' => $guests,
-                'booking_price' => (int) $locked->price * 100,  // base nightly snapshot, halalas
-                'quantity' => $quote['days'],
-                'host_gross_amount' => $pricing['subtotal_minor'],
+                'nights' => $quote['days'],
+                'stay_amount' => $pricing['subtotal_minor'],
                 'commission_rate' => $pricing['commission_rate'],
-                'commission_amount_ex_vat' => $pricing['commission_amount_minor'],
+                'commission_amount' => $pricing['commission_amount_minor'],
                 'guest_vat_rate' => $pricing['vat_rate'],
                 'guest_vat_amount' => $pricing['vat_amount_minor'],
                 'guest_total' => $pricing['total_minor'],
@@ -717,7 +716,7 @@ final class BookingService
 
             $fresh->payment_status = $invoice->status;
             $fresh->payment_response = $invoice->raw;
-            $fresh->payment_status_check_attempts = $fresh->payment_status_check_attempts + 1;
+            $fresh->payment_check_attempts = $fresh->payment_check_attempts + 1;
 
             if ($invoice->isPaid()) {
                 if ($invoice->amount !== $fresh->guest_total) {

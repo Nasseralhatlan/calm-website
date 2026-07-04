@@ -61,8 +61,8 @@ it('exposes checkout_next_day + checkout_at on the bookings API', function (): v
         'booking_status' => BookingStatus::Confirmed->value,
         'start_date' => '2026-06-18', 'end_date' => '2026-06-19',
         'check_in_time' => '15:00', 'check_out_time' => '12:00', 'checkout_next_day' => true,
-        'guests' => 2, 'booking_price' => 100000, 'quantity' => 1, 'host_gross_amount' => 100000,
-        'commission_rate' => 10, 'commission_amount_ex_vat' => 10000, 'guest_vat_rate' => 15, 'guest_vat_amount' => 15000,
+        'guests' => 2, 'nights' => 1, 'stay_amount' => 100000,
+        'commission_rate' => 10, 'commission_amount' => 10000, 'guest_vat_rate' => 15, 'guest_vat_amount' => 15000,
         'guest_total' => 115000, 'payout_status' => 'not_paid',
     ]);
 

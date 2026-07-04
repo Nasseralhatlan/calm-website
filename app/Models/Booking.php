@@ -66,17 +66,16 @@ class Booking extends Model
         'checkout_next_day',
         'rules',
         'guests',
-        'booking_price',
-        'quantity',
+        'nights',
         'commission_rate',
         'payment_id',
         'payment_url',
         'payment_method',
         'payment_status',
-        'payment_status_check_attempts',
+        'payment_check_attempts',
         'payment_response',
         'payout_status',
-        'paid_out_at',
+        'payout_paid_at',
         'payout_reference',
         'payout_id',
         'payout_failure',
@@ -84,21 +83,18 @@ class Booking extends Model
         'expires_at',
         'confirmed_at',
         'canceled_at',
-        // Finance snapshot (brief §2/§3) — frozen at creation.
+        // Money snapshot — frozen at creation. One rule, three items:
+        // guest pays stay + VAT; commission (+VAT on top) comes out of the
+        // host's payout; host gets stay − commission_total.
+        'stay_amount',
         'guest_vat_rate',
         'guest_vat_amount',
         'guest_total',
-        'guest_service_fee_amount',
-        'guest_service_fee_vat_amount',
-        'commission_amount_ex_vat',
+        'commission_amount',
         'commission_vat_rate',
         'commission_vat_amount',
         'commission_total',
-        'host_gross_amount',
         'host_payout_amount',
-        'guest_invoice_issued_at',
-        'host_commission_invoice_issued_at',
-        'payout_statement_generated_at',
         'financial_completed_at',
     ];
 
@@ -108,32 +104,26 @@ class Booking extends Model
             'start_date' => 'date',
             'end_date' => 'date',
             'guests' => 'integer',
-            'booking_price' => 'integer',
-            'quantity' => 'integer',
+            'nights' => 'integer',
             'commission_rate' => 'float',
             'checkout_next_day' => 'boolean',
             'payout_attempts' => 'integer',
             'booking_status' => BookingStatus::class,
-            'payment_status_check_attempts' => 'integer',
+            'payment_check_attempts' => 'integer',
             'payment_response' => 'array',
             'expires_at' => 'datetime',
             'confirmed_at' => 'datetime',
             'canceled_at' => 'datetime',
-            'paid_out_at' => 'datetime',
+            'payout_paid_at' => 'datetime',
+            'stay_amount' => 'integer',
             'guest_vat_rate' => 'float',
             'guest_vat_amount' => 'integer',
             'guest_total' => 'integer',
-            'guest_service_fee_amount' => 'integer',
-            'guest_service_fee_vat_amount' => 'integer',
-            'commission_amount_ex_vat' => 'integer',
+            'commission_amount' => 'integer',
             'commission_vat_rate' => 'float',
             'commission_vat_amount' => 'integer',
             'commission_total' => 'integer',
-            'host_gross_amount' => 'integer',
             'host_payout_amount' => 'integer',
-            'guest_invoice_issued_at' => 'datetime',
-            'host_commission_invoice_issued_at' => 'datetime',
-            'payout_statement_generated_at' => 'datetime',
             'financial_completed_at' => 'datetime',
         ];
     }
@@ -197,7 +187,7 @@ class Booking extends Model
      * Reconstruct the per-night rate lines for this stay from the place's
      * per-weekday price columns (places store SAR; bookings snapshot halalas).
      * Only trustworthy while the recomputed sum still equals the snapshotted
-     * host_gross_amount — the host may have changed prices since the guest
+     * stay_amount — the host may have changed prices since the guest
      * booked. Returns null in that case so callers fall back to a
      * nights × average line instead of showing a made-up split.
      *
@@ -229,7 +219,7 @@ class Booking extends Model
             $sum += $priceMinor;
         }
 
-        return $sum === (int) $this->host_gross_amount ? $lines : null;
+        return $sum === (int) $this->stay_amount ? $lines : null;
     }
 
     public function place(): BelongsTo

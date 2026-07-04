@@ -71,10 +71,10 @@
                             <span class="shrink-0 text-end">
                                 <span class="block font-bold text-[#222] text-[15px] tabular-nums" dir="ltr">SR {{ $sr($b->hostNetMinor()) }}</span>
                                 {{-- Where the number comes from: gross minus Calm's cut (commission + its VAT). --}}
-                                <span class="block text-[11px] text-[#bbb] tabular-nums" dir="ltr">SR {{ $sr($b->host_gross_amount) }} − SR {{ $sr((int) $b->host_gross_amount - $b->hostNetMinor()) }} {{ $isRtl ? 'عمولة' : 'fee' }}</span>
+                                <span class="block text-[11px] text-[#bbb] tabular-nums" dir="ltr">SR {{ $sr($b->stay_amount) }} − SR {{ $sr((int) $b->stay_amount - $b->hostNetMinor()) }} {{ $isRtl ? 'عمولة' : 'fee' }}</span>
                                 @if($paid)
                                     <span class="inline-flex items-center text-[11px] font-bold text-[#059669]" style="gap: 4px; background: #ecfdf5; padding: 2px 9px; border-radius: 999px;">
-                                        ✓ {{ $isRtl ? 'مدفوع' : 'Paid' }}@if($b->paid_out_at) · {{ $b->paid_out_at->isoFormat('D MMM') }}@endif
+                                        ✓ {{ $isRtl ? 'مدفوع' : 'Paid' }}@if($b->payout_paid_at) · {{ $b->payout_paid_at->isoFormat('D MMM') }}@endif
                                     </span>
                                 @else
                                     <span class="inline-flex items-center text-[11px] font-bold text-[#b45309]" style="gap: 4px; background: #fffbeb; padding: 2px 9px; border-radius: 999px;">

@@ -59,7 +59,7 @@
     <div style="margin-top: 14px;">
         @if($booking->payout_status === 'paid')
             <span class="inline-flex items-center text-[13px] font-semibold text-[#059669]" style="gap: 6px; background: #ecfdf5; padding: 6px 14px; border-radius: 999px;">
-                ✓ {{ $isRtl ? 'تم التحويل' : 'Paid' }} {{ $booking->paid_out_at?->isoFormat('D MMM YYYY, h:mm A') }}
+                ✓ {{ $isRtl ? 'تم التحويل' : 'Paid' }} {{ $booking->payout_paid_at?->isoFormat('D MMM YYYY, h:mm A') }}
             </span>
             @if($booking->payout_reference)
                 <span class="block text-[12px] text-[#717171] tabular-nums" dir="ltr" style="margin-top: 6px;">{{ $isRtl ? 'مرجع:' : 'Ref:' }} {{ $booking->payout_reference }}</span>

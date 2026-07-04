@@ -61,8 +61,8 @@ function apoBooking(User $host, User $guest, array $attrs = []): Booking
         'booking_status' => BookingStatus::Completed->value,
         'start_date' => '2026-07-01', 'end_date' => '2026-07-02',
         'check_in_time' => '15:00', 'check_out_time' => '12:00', 'checkout_next_day' => false,
-        'guests' => 2, 'booking_price' => 100000, 'quantity' => 2, 'host_gross_amount' => 200000,
-        'commission_rate' => 10, 'commission_amount_ex_vat' => 20000, 'guest_vat_rate' => 15, 'guest_vat_amount' => 30000,
+        'guests' => 2, 'nights' => 2, 'stay_amount' => 200000,
+        'commission_rate' => 10, 'commission_amount' => 20000, 'guest_vat_rate' => 15, 'guest_vat_amount' => 30000,
         'guest_total' => 230000, 'payout_status' => 'not_paid',
         'payment_status' => 'paid', 'payment_id' => 'pay_APO1',
         'financial_completed_at' => '2026-07-02 16:00:00',
@@ -114,7 +114,7 @@ it('transfers the host net with IBAN + deterministic sequence, then settles on r
 
     $booking->refresh();
     expect($booking->payout_status)->toBe('paid')
-        ->and($booking->paid_out_at)->not->toBeNull()
+        ->and($booking->payout_paid_at)->not->toBeNull()
         ->and($booking->payout_reference)->toBe($sequence);
 
     // Finance trail: host_payout via moyasar, payable settled.

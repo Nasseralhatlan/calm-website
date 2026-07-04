@@ -16,7 +16,8 @@ use Throwable;
  * documents-before-money rule (Booking::isPayable): completed stay, financial
  * documents issued, payout hold window passed. MOYASAR_PAYOUTS_MODE stays
  * 'manual' until the Moyasar product + bank account are live, so nothing here
- * runs until the flag flips — the admin mark-paid flow remains the fallback.
+ * runs until the flag flips (manual mode = payouts paused; there is no manual
+ * settlement path).
  *
  * Failure model: a create-time error (bad IBAN, API down) records
  * payout_failure and leaves the row not_paid — visible in the admin queue
@@ -197,7 +198,7 @@ final class HostPayoutService
     {
         $booking->update([
             'payout_status' => 'paid',
-            'paid_out_at' => now(),
+            'payout_paid_at' => now(),
             'payout_reference' => (string) ($payout['sequence_number'] ?? $payout['id'] ?? $booking->payout_id),
             'payout_failure' => null,
         ]);

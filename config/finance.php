@@ -38,7 +38,6 @@ return [
         // One-time Qoyod setup ids (created in the Qoyod UI, see docs):
         // generic service products + the accounts payments are booked against.
         'product_stay_id' => env('QOYOD_PRODUCT_STAY_ID'),
-        'product_service_fee_id' => env('QOYOD_PRODUCT_SERVICE_FEE_ID'),
         'product_commission_id' => env('QOYOD_PRODUCT_COMMISSION_ID'),
         'moyasar_account_id' => env('QOYOD_MOYASAR_ACCOUNT_ID'),      // guest payments clearing
         'settlement_account_id' => env('QOYOD_SETTLEMENT_ACCOUNT_ID'), // commission offset

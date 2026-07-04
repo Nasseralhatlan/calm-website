@@ -85,13 +85,9 @@ final class BookingFinanceFinalizer
                 'status' => FinancialMovement::STATUS_PENDING,
             ]);
 
-            $now = now();
-            $locked->update([
-                'guest_invoice_issued_at' => $locked->guest_invoice_issued_at ?? $now,
-                'host_commission_invoice_issued_at' => $locked->host_commission_invoice_issued_at ?? $now,
-                'payout_statement_generated_at' => $locked->payout_statement_generated_at ?? $now,
-                'financial_completed_at' => $now,
-            ]);
+            // Per-document issue timestamps live on financial_documents; the
+            // booking only carries the single "all documents done" gate.
+            $locked->update(['financial_completed_at' => now()]);
         });
     }
 

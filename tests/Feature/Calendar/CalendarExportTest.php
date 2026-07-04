@@ -54,8 +54,8 @@ it('serves bookings + manual blocks as all-day events with exclusive DTEND', fun
         'place_id' => $place->id, 'guest_user_id' => $guest->id, 'host_user_id' => $host->id,
         'booking_status' => BookingStatus::Confirmed->value,
         'start_date' => '2026-07-20', 'end_date' => '2026-07-21',
-        'guests' => 2, 'booking_price' => 100000, 'quantity' => 1, 'host_gross_amount' => 100000,
-        'commission_rate' => 10, 'commission_amount_ex_vat' => 10000, 'guest_vat_rate' => 15, 'guest_vat_amount' => 15000,
+        'guests' => 2, 'nights' => 1, 'stay_amount' => 100000,
+        'commission_rate' => 10, 'commission_amount' => 10000, 'guest_vat_rate' => 15, 'guest_vat_amount' => 15000,
         'guest_total' => 115000, 'payout_status' => 'not_paid', 'confirmed_at' => now(),
     ]);
 

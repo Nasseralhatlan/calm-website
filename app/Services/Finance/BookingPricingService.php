@@ -7,7 +7,7 @@ namespace App\Services\Finance;
 /**
  * Calculates and freezes the full booking money snapshot (brief §2):
  *
- *   host_gross_amount      what belongs to the host before commission
+ *   stay_amount      what belongs to the host before commission
  *   guest_* fields         the Calm → Guest invoice numbers
  *   commission_* fields    the Calm → Host invoice numbers (VAT ON TOP)
  *   host_payout_amount     host_gross − commission_total
@@ -28,39 +28,34 @@ final class BookingPricingService
      */
     public function completeSnapshot(array $attributes): array
     {
-        $hostGross = (int) ($attributes['host_gross_amount'] ?? 0);
-        if ($hostGross === 0 || (int) ($attributes['host_payout_amount'] ?? 0) > 0) {
+        $stayAmount = (int) ($attributes['stay_amount'] ?? 0);
+        if ($stayAmount === 0 || (int) ($attributes['host_payout_amount'] ?? 0) > 0) {
             return [];
         }
 
         $vatEnabled = (bool) config('finance.vat.enabled', true);
         $vatRate = $vatEnabled ? (float) config('finance.vat.rate', 15.0) : 0.0;
 
-        $serviceFee = (int) ($attributes['guest_service_fee_amount'] ?? 0);
-        $serviceFeeVat = (int) ($attributes['guest_service_fee_vat_amount'] ?? 0);
-
         $guestVatAmount = (int) ($attributes['guest_vat_amount'] ?? 0);
-        $guestTotal = (int) ($attributes['guest_total'] ?? ($hostGross + $serviceFee + $guestVatAmount + $serviceFeeVat));
+        $guestTotal = (int) ($attributes['guest_total'] ?? ($stayAmount + $guestVatAmount));
 
         // Commission side: VAT charged ON TOP of the commission, deducted from
         // the host's payout. Falls back to the booking's commission_rate when
-        // the ex-VAT amount wasn't provided explicitly.
-        $commissionExVat = (int) ($attributes['commission_amount_ex_vat']
-            ?? round($hostGross * (float) ($attributes['commission_rate'] ?? 0) / 100));
-        $commissionVat = (int) round($commissionExVat * $vatRate / 100);
-        $commissionTotal = $commissionExVat + $commissionVat;
+        // the amount wasn't provided explicitly.
+        $commissionAmount = (int) ($attributes['commission_amount']
+            ?? round($stayAmount * (float) ($attributes['commission_rate'] ?? 0) / 100));
+        $commissionVat = (int) round($commissionAmount * $vatRate / 100);
+        $commissionTotal = $commissionAmount + $commissionVat;
 
         return [
             'guest_vat_rate' => (float) ($attributes['guest_vat_rate'] ?? $vatRate),
             'guest_vat_amount' => $guestVatAmount,
             'guest_total' => $guestTotal,
-            'guest_service_fee_amount' => $serviceFee,
-            'guest_service_fee_vat_amount' => $serviceFeeVat,
-            'commission_amount_ex_vat' => $commissionExVat,
+            'commission_amount' => $commissionAmount,
             'commission_vat_rate' => $vatRate,
             'commission_vat_amount' => $commissionVat,
             'commission_total' => $commissionTotal,
-            'host_payout_amount' => max(0, $hostGross - $commissionTotal),
+            'host_payout_amount' => max(0, $stayAmount - $commissionTotal),
         ];
     }
 }

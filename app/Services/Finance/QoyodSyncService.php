@@ -87,19 +87,9 @@ final class QoyodSyncService
             'product_id' => (int) config('finance.qoyod.product_stay_id'),
             'description' => "Accommodation booking {$booking->reference}",
             'quantity' => 1,
-            'unit_price' => $this->sar((int) $booking->host_gross_amount),
+            'unit_price' => $this->sar((int) $booking->stay_amount),
             'tax_percent' => (float) $booking->guest_vat_rate,
         ]];
-
-        if ((int) $booking->guest_service_fee_amount > 0) {
-            $lineItems[] = [
-                'product_id' => (int) config('finance.qoyod.product_service_fee_id'),
-                'description' => 'Calm service fee',
-                'quantity' => 1,
-                'unit_price' => $this->sar((int) $booking->guest_service_fee_amount),
-                'tax_percent' => (float) $booking->guest_vat_rate,
-            ];
-        }
 
         $this->pushInvoice($document, $contactId, "{$booking->reference}-G", $lineItems, $booking, [
             'account_id' => (int) config('finance.qoyod.moyasar_account_id'),
@@ -116,7 +106,7 @@ final class QoyodSyncService
             'product_id' => (int) config('finance.qoyod.product_commission_id'),
             'description' => "Platform commission for booking {$booking->reference}",
             'quantity' => 1,
-            'unit_price' => $this->sar((int) $booking->commission_amount_ex_vat),
+            'unit_price' => $this->sar((int) $booking->commission_amount),
             'tax_percent' => (float) $booking->commission_vat_rate,
         ]];
 

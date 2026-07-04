@@ -37,35 +37,23 @@ final class FinancialDocumentService
                 'direction' => 'sales',
                 'status' => $this->initialTaxDocumentStatus(),
                 'is_tax_document' => true,
-                'subtotal_amount' => (int) $booking->host_gross_amount + (int) $booking->guest_service_fee_amount,
-                'vat_amount' => (int) $booking->guest_vat_amount + (int) $booking->guest_service_fee_vat_amount,
+                'subtotal_amount' => (int) $booking->stay_amount,
+                'vat_amount' => (int) $booking->guest_vat_amount,
                 'total_amount' => (int) $booking->guest_total,
                 'issued_at' => now(),
             ]);
 
             $document->lines()->create([
-                'description' => "Accommodation booking {$booking->reference} ({$booking->quantity} nights) · حجز رقم {$booking->reference}",
+                'description' => "Accommodation booking {$booking->reference} ({$booking->nights} nights) · حجز رقم {$booking->reference}",
                 'quantity' => 1,
-                'unit_amount' => (int) $booking->host_gross_amount,
-                'subtotal_amount' => (int) $booking->host_gross_amount,
+                'unit_amount' => (int) $booking->stay_amount,
+                'subtotal_amount' => (int) $booking->stay_amount,
                 'vat_rate' => (float) $booking->guest_vat_rate,
                 'vat_amount' => (int) $booking->guest_vat_amount,
-                'total_amount' => (int) $booking->host_gross_amount + (int) $booking->guest_vat_amount,
+                'total_amount' => (int) $booking->guest_total,
                 'source_type' => 'booking',
                 'source_id' => $booking->id,
             ]);
-
-            if ((int) $booking->guest_service_fee_amount > 0) {
-                $document->lines()->create([
-                    'description' => 'Calm service fee · رسوم خدمة كالم',
-                    'quantity' => 1,
-                    'unit_amount' => (int) $booking->guest_service_fee_amount,
-                    'subtotal_amount' => (int) $booking->guest_service_fee_amount,
-                    'vat_rate' => (float) $booking->guest_vat_rate,
-                    'vat_amount' => (int) $booking->guest_service_fee_vat_amount,
-                    'total_amount' => (int) $booking->guest_service_fee_amount + (int) $booking->guest_service_fee_vat_amount,
-                ]);
-            }
 
             return $document;
         });
@@ -86,7 +74,7 @@ final class FinancialDocumentService
                 'direction' => 'sales',
                 'status' => $this->initialTaxDocumentStatus(),
                 'is_tax_document' => true,
-                'subtotal_amount' => (int) $booking->commission_amount_ex_vat,
+                'subtotal_amount' => (int) $booking->commission_amount,
                 'vat_amount' => (int) $booking->commission_vat_amount,
                 'total_amount' => (int) $booking->commission_total,
                 'issued_at' => now(),
@@ -95,8 +83,8 @@ final class FinancialDocumentService
             $document->lines()->create([
                 'description' => "Platform commission for booking {$booking->reference} · عمولة حجز رقم {$booking->reference}",
                 'quantity' => 1,
-                'unit_amount' => (int) $booking->commission_amount_ex_vat,
-                'subtotal_amount' => (int) $booking->commission_amount_ex_vat,
+                'unit_amount' => (int) $booking->commission_amount,
+                'subtotal_amount' => (int) $booking->commission_amount,
                 'vat_rate' => (float) $booking->commission_vat_rate,
                 'vat_amount' => (int) $booking->commission_vat_amount,
                 'total_amount' => (int) $booking->commission_total,
@@ -123,7 +111,7 @@ final class FinancialDocumentService
                 'direction' => 'internal',
                 'status' => FinancialDocument::STATUS_ISSUED,
                 'is_tax_document' => false,
-                'subtotal_amount' => (int) $booking->host_gross_amount,
+                'subtotal_amount' => (int) $booking->stay_amount,
                 'vat_amount' => 0,
                 'total_amount' => $booking->hostNetMinor(),
                 'issued_at' => now(),
@@ -135,16 +123,16 @@ final class FinancialDocumentService
                 [
                     'description' => "Booking value {$booking->reference} · إجمالي قيمة الحجز",
                     'quantity' => 1,
-                    'unit_amount' => (int) $booking->host_gross_amount,
-                    'subtotal_amount' => (int) $booking->host_gross_amount,
-                    'total_amount' => (int) $booking->host_gross_amount,
+                    'unit_amount' => (int) $booking->stay_amount,
+                    'subtotal_amount' => (int) $booking->stay_amount,
+                    'total_amount' => (int) $booking->stay_amount,
                 ],
                 [
                     'description' => 'Commission (deduction) · العمولة',
                     'quantity' => 1,
-                    'unit_amount' => (int) $booking->commission_amount_ex_vat,
-                    'subtotal_amount' => (int) $booking->commission_amount_ex_vat,
-                    'total_amount' => (int) $booking->commission_amount_ex_vat,
+                    'unit_amount' => (int) $booking->commission_amount,
+                    'subtotal_amount' => (int) $booking->commission_amount,
+                    'total_amount' => (int) $booking->commission_amount,
                 ],
                 [
                     'description' => 'Commission VAT (deduction) · ضريبة العمولة',
@@ -216,7 +204,7 @@ final class FinancialDocumentService
                 'direction' => 'sales',
                 'status' => $this->initialTaxDocumentStatus(),
                 'is_tax_document' => true,
-                'subtotal_amount' => (int) $booking->commission_amount_ex_vat,
+                'subtotal_amount' => (int) $booking->commission_amount,
                 'vat_amount' => (int) $booking->commission_vat_amount,
                 'total_amount' => (int) $booking->commission_total,
                 'issued_at' => now(),
@@ -225,8 +213,8 @@ final class FinancialDocumentService
             $document->lines()->create([
                 'description' => "Commission reversal for booking {$booking->reference} · عكس عمولة حجز رقم {$booking->reference}",
                 'quantity' => 1,
-                'unit_amount' => (int) $booking->commission_amount_ex_vat,
-                'subtotal_amount' => (int) $booking->commission_amount_ex_vat,
+                'unit_amount' => (int) $booking->commission_amount,
+                'subtotal_amount' => (int) $booking->commission_amount,
                 'vat_rate' => (float) $booking->commission_vat_rate,
                 'vat_amount' => (int) $booking->commission_vat_amount,
                 'total_amount' => (int) $booking->commission_total,
