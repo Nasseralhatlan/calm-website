@@ -98,12 +98,12 @@ final class BookingService
                 'guests' => $guests,
                 'booking_price' => (int) $locked->price * 100,  // base nightly snapshot, halalas
                 'quantity' => $quote['days'],
-                'booking_amount' => $pricing['subtotal_minor'],
+                'host_gross_amount' => $pricing['subtotal_minor'],
                 'commission_rate' => $pricing['commission_rate'],
-                'commission_amount' => $pricing['commission_amount_minor'],
-                'vat_rate' => $pricing['vat_rate'],
-                'vat_amount' => $pricing['vat_amount_minor'],
-                'total' => $pricing['total_minor'],
+                'commission_amount_ex_vat' => $pricing['commission_amount_minor'],
+                'guest_vat_rate' => $pricing['vat_rate'],
+                'guest_vat_amount' => $pricing['vat_amount_minor'],
+                'guest_total' => $pricing['total_minor'],
                 'payout_status' => 'not_paid',
                 'expires_at' => $holdExpiresAt,
             ]);
@@ -121,7 +121,7 @@ final class BookingService
 
         try {
             $invoice = $this->gateway->createInvoice(
-                amountMinor: $booking->total,
+                amountMinor: $booking->guest_total,
                 description: 'Booking — '.$place->title,
                 callbackUrl: route('payments.moyasar.webhook'),
                 metadata: ['booking_id' => $booking->id],
@@ -720,10 +720,10 @@ final class BookingService
             $fresh->payment_status_check_attempts = $fresh->payment_status_check_attempts + 1;
 
             if ($invoice->isPaid()) {
-                if ($invoice->amount !== $fresh->total) {
+                if ($invoice->amount !== $fresh->guest_total) {
                     // Paid amount doesn't match what we quoted — never confirm.
                     Log::warning('Moyasar paid amount mismatch', [
-                        'booking' => $fresh->id, 'expected' => $fresh->total, 'paid' => $invoice->amount,
+                        'booking' => $fresh->id, 'expected' => $fresh->guest_total, 'paid' => $invoice->amount,
                     ]);
                     $fresh->booking_status = BookingStatus::Expired;
                     $transitionedTo = BookingStatus::Expired;

@@ -85,12 +85,14 @@ class BookingResource extends JsonResource
             'checkout_at' => $this->checkoutAt()?->toIso8601String(),
             'guests' => $this->guests,
             'currency' => 'SAR',
+            // JSON keys are the app's contract — sourced from the finance
+            // snapshot columns (guest side of the money model).
             'pricing' => [
-                'subtotal' => $this->booking_amount / 100,
-                'vat_percentage' => $this->vat_rate,
-                'vat' => $this->vat_amount / 100,
-                'total' => $this->total / 100,
-                'total_minor' => $this->total,
+                'subtotal' => $this->host_gross_amount / 100,
+                'vat_percentage' => $this->guest_vat_rate,
+                'vat' => $this->guest_vat_amount / 100,
+                'total' => $this->guest_total / 100,
+                'total_minor' => $this->guest_total,
             ],
             'payment' => [
                 'id' => $this->payment_id,

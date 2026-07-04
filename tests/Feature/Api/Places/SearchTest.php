@@ -86,12 +86,12 @@ function searchConfirmedBooking(Place $place, string $start, string $end): Booki
         'guests' => 2,
         'booking_price' => 100000,
         'quantity' => 2,
-        'booking_amount' => 200000,
+        'host_gross_amount' => 200000,
         'commission_rate' => 10,
-        'commission_amount' => 20000,
-        'vat_rate' => 15,
-        'vat_amount' => 30000,
-        'total' => 230000,
+        'commission_amount_ex_vat' => 20000,
+        'guest_vat_rate' => 15,
+        'guest_vat_amount' => 30000,
+        'guest_total' => 230000,
         'payout_status' => 'not_paid',
     ]);
 }

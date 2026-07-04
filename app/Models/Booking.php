@@ -68,12 +68,7 @@ class Booking extends Model
         'guests',
         'booking_price',
         'quantity',
-        'booking_amount',
         'commission_rate',
-        'commission_amount',
-        'vat_rate',
-        'vat_amount',
-        'total',
         'payment_id',
         'payment_url',
         'payment_method',
@@ -115,12 +110,7 @@ class Booking extends Model
             'guests' => 'integer',
             'booking_price' => 'integer',
             'quantity' => 'integer',
-            'booking_amount' => 'integer',
             'commission_rate' => 'float',
-            'commission_amount' => 'integer',
-            'vat_rate' => 'float',
-            'vat_amount' => 'integer',
-            'total' => 'integer',
             'checkout_next_day' => 'boolean',
             'payout_attempts' => 'integer',
             'booking_status' => BookingStatus::class,
@@ -152,16 +142,11 @@ class Booking extends Model
      * What the host is owed for this booking, in minor units (halalas):
      * the frozen host_payout_amount = host_gross − (commission + its VAT).
      * Historical rows were backfilled with commission VAT 0, so their payout
-     * is unchanged; the legacy fallback only covers rows created before the
-     * finance migration ran outside its backfill.
+     * never changed when the finance module landed.
      */
     public function hostNetMinor(): int
     {
-        if ((int) $this->host_gross_amount > 0) {
-            return (int) $this->host_payout_amount;
-        }
-
-        return (int) $this->booking_amount - (int) $this->commission_amount;
+        return (int) $this->host_payout_amount;
     }
 
     /**
@@ -212,7 +197,7 @@ class Booking extends Model
      * Reconstruct the per-night rate lines for this stay from the place's
      * per-weekday price columns (places store SAR; bookings snapshot halalas).
      * Only trustworthy while the recomputed sum still equals the snapshotted
-     * booking_amount — the host may have changed prices since the guest
+     * host_gross_amount — the host may have changed prices since the guest
      * booked. Returns null in that case so callers fall back to a
      * nights × average line instead of showing a made-up split.
      *
@@ -244,7 +229,7 @@ class Booking extends Model
             $sum += $priceMinor;
         }
 
-        return $sum === (int) $this->booking_amount ? $lines : null;
+        return $sum === (int) $this->host_gross_amount ? $lines : null;
     }
 
     public function place(): BelongsTo

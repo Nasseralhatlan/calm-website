@@ -207,13 +207,13 @@
     <div class="text-[14px] {{ $fa }}">
         <div style="{{ $row }}">
             <span class="text-[#717171]">{{ $isRtl ? 'قيمة الحجز' : 'Booking amount' }}</span>
-            <span class="font-semibold text-[#222] tabular-nums" dir="ltr">{{ $sar($booking->booking_amount) }} {{ $cur }}</span>
+            <span class="font-semibold text-[#222] tabular-nums" dir="ltr">{{ $sar($booking->host_gross_amount) }} {{ $cur }}</span>
         </div>
 
         @if($isHost)
             <div style="{{ $row }}">
                 <span class="text-[#717171]">{{ $isRtl ? 'عمولة كالم' : 'Calm commission' }} ({{ $rate($booking->commission_rate) }}%)</span>
-                <span class="font-semibold text-[#717171] tabular-nums" dir="ltr">− {{ $sar($booking->commission_amount) }} {{ $cur }}</span>
+                <span class="font-semibold text-[#717171] tabular-nums" dir="ltr">− {{ $sar($booking->commission_amount_ex_vat) }} {{ $cur }}</span>
             </div>
             @if($commissionVat > 0)
                 <div style="{{ $row }}">
@@ -226,23 +226,23 @@
                 <span class="font-bold text-[#10b981] tabular-nums" dir="ltr">{{ $sar($payout) }} {{ $cur }}</span>
             </div>
             <div style="{{ $row }}">
-                <span class="text-[#717171]">{{ $isRtl ? 'الضريبة المحصلة' : 'VAT collected' }} ({{ $rate($booking->vat_rate) }}%)</span>
-                <span class="text-[#717171] tabular-nums" dir="ltr">{{ $sar($booking->vat_amount) }} {{ $cur }}</span>
+                <span class="text-[#717171]">{{ $isRtl ? 'الضريبة المحصلة' : 'VAT collected' }} ({{ $rate($booking->guest_vat_rate) }}%)</span>
+                <span class="text-[#717171] tabular-nums" dir="ltr">{{ $sar($booking->guest_vat_amount) }} {{ $cur }}</span>
             </div>
         @else
             <div style="{{ $row }}">
-                <span class="text-[#717171]">{{ $isRtl ? 'ضريبة القيمة المضافة' : 'VAT' }} ({{ $rate($booking->vat_rate) }}%)</span>
-                <span class="font-semibold text-[#222] tabular-nums" dir="ltr">{{ $sar($booking->vat_amount) }} {{ $cur }}</span>
+                <span class="text-[#717171]">{{ $isRtl ? 'ضريبة القيمة المضافة' : 'VAT' }} ({{ $rate($booking->guest_vat_rate) }}%)</span>
+                <span class="font-semibold text-[#222] tabular-nums" dir="ltr">{{ $sar($booking->guest_vat_amount) }} {{ $cur }}</span>
             </div>
             @if($isAdmin)
                 <div style="{{ $row }}">
                     <span class="text-[#717171]">{{ $isRtl ? 'عمولة كالم' : 'Calm commission' }} ({{ $rate($booking->commission_rate) }}%)</span>
-                    <span class="text-[#717171] tabular-nums" dir="ltr">{{ $sar($booking->commission_amount) }} {{ $cur }}</span>
+                    <span class="text-[#717171] tabular-nums" dir="ltr">{{ $sar($booking->commission_amount_ex_vat) }} {{ $cur }}</span>
                 </div>
             @endif
             <div style="{{ $row }} border-top:1px solid #f0f0f0;margin-top:4px;">
                 <span class="font-bold text-[#222]">{{ $isRtl ? 'الإجمالي' : 'Total' }}</span>
-                <span class="font-bold text-[#222] tabular-nums" dir="ltr">{{ $sar($booking->total) }} {{ $cur }}</span>
+                <span class="font-bold text-[#222] tabular-nums" dir="ltr">{{ $sar($booking->guest_total) }} {{ $cur }}</span>
             </div>
             @if($isAdmin)
                 <div style="{{ $row }}">
