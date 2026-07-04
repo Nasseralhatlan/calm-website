@@ -47,8 +47,8 @@ function completedBooking(User $guest, Place $place, string $status = 'completed
         'booking_status' => $status, 'start_date' => '2026-06-10', 'end_date' => '2026-06-12',
         'check_in_time' => '15:00', 'check_out_time' => '12:00', 'guests' => 2,
         'nights' => 2, 'stay_amount' => 200000,
-        'commission_rate' => 10, 'commission_amount' => 20000, 'guest_vat_rate' => 15, 'guest_vat_amount' => 30000,
-        'guest_total' => 230000, 'payout_status' => 'not_paid',
+        'commission_rate' => 10, 'commission_amount' => 20000, 'vat_rate' => 15, 'vat_amount' => 30000,
+        'total_amount' => 230000, 'payout_status' => 'not_paid',
     ]);
 }
 

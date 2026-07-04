@@ -8,15 +8,16 @@
 
 ## Money model (per booking, all halalas, frozen at creation)
 
-One naming rule — components end `_amount` (always ex VAT), totals end `_total`,
-rates end `_rate` — across exactly three items, all derived from one stay value:
+The booking's own money first, then each party's cut. Components end `_amount`
+(always ex VAT), totals include VAT, rates end `_rate`:
 
-| Item | Fields | Meaning |
+| Level | Fields | Meaning |
 |---|---|---|
-| Stay | `nights`, `stay_amount` | The stay's value (sum of nightly prices, ex VAT) |
-| Guest | `guest_vat_rate/_amount`, `guest_total` | What the guest pays: stay + VAT |
-| Commission | `commission_rate`, `commission_amount`, `commission_vat_rate/_amount`, `commission_total` | Calm's cut of the stay, **VAT ON TOP** (historical rows carry commission VAT 0 so old payouts never changed) |
+| Booking | `nights`, `stay_amount`, `vat_rate`, `vat_amount`, `total_amount` | The stay's value (ex VAT), its VAT, and the total the guest is charged (`stay + vat`) |
+| Calm | `commission_rate`, `commission_amount`, `commission_vat_rate/_amount`, `commission_total` | Calm's cut of the stay, **VAT ON TOP** (historical rows carry commission VAT 0 so old payouts never changed) |
 | Host | `host_payout_amount` | `stay − commission_total` — THE payout number everywhere |
+
+Cross-check on every booking: `total_amount = host_payout_amount + commission_total + vat_amount`.
 
 `BookingPricingService` fills the derived fields at creation (also via a model
 `creating` hook, so seeders/tests/every path agree). `Booking::hostNetMinor()`

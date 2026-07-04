@@ -103,8 +103,8 @@ it('allows blocking a range that already has a booking (booking untouched)', fun
         'booking_status' => BookingStatus::Confirmed->value,
         'start_date' => '2026-07-15', 'end_date' => '2026-07-16',
         'guests' => 2, 'nights' => 1, 'stay_amount' => 100000,
-        'commission_rate' => 10, 'commission_amount' => 10000, 'guest_vat_rate' => 15, 'guest_vat_amount' => 15000,
-        'guest_total' => 115000, 'payout_status' => 'not_paid', 'confirmed_at' => now(),
+        'commission_rate' => 10, 'commission_amount' => 10000, 'vat_rate' => 15, 'vat_amount' => 15000,
+        'total_amount' => 115000, 'payout_status' => 'not_paid', 'confirmed_at' => now(),
     ]);
 
     $this->actingAs($host, 'api')

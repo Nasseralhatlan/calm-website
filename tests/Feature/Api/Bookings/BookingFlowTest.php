@@ -95,7 +95,7 @@ it('creates a pending booking and returns a Moyasar payment url', function (): v
     expect($booking->booking_status)->toBe(BookingStatus::PendingPayment);
     expect($booking->guest_user_id)->toBe($guest->id);
     expect($booking->host_user_id)->toBe($place->host_user_id);
-    expect($booking->guest_total)->toBe(230000);
+    expect($booking->total_amount)->toBe(230000);
     expect($booking->commission_amount)->toBe(20000); // 2000 × 10% seeded, host-side
     expect($booking->payment_id)->toBe('inv_test');
 });

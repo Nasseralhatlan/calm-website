@@ -88,7 +88,7 @@ final class QoyodSyncService
             'description' => "Accommodation booking {$booking->reference}",
             'quantity' => 1,
             'unit_price' => $this->sar((int) $booking->stay_amount),
-            'tax_percent' => (float) $booking->guest_vat_rate,
+            'tax_percent' => (float) $booking->vat_rate,
         ]];
 
         $this->pushInvoice($document, $contactId, "{$booking->reference}-G", $lineItems, $booking, [
@@ -187,7 +187,7 @@ final class QoyodSyncService
                 'description' => ($isGuest ? 'Refund' : 'Commission reversal')." — booking {$booking->reference}",
                 'quantity' => '1.0',
                 'unit_price' => $this->sar((int) $document->subtotal_amount),
-                'tax_percent' => $isGuest ? (string) $booking->guest_vat_rate : (string) $booking->commission_vat_rate,
+                'tax_percent' => $isGuest ? (string) $booking->vat_rate : (string) $booking->commission_vat_rate,
             ]],
         ]);
 

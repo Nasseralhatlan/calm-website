@@ -46,9 +46,9 @@ function refBooking(User $guest, Place $place): Booking
         'stay_amount' => 100000,
         'commission_rate' => 10,
         'commission_amount' => 10000,
-        'guest_vat_rate' => 15,
-        'guest_vat_amount' => 15000,
-        'guest_total' => 115000,
+        'vat_rate' => 15,
+        'vat_amount' => 15000,
+        'total_amount' => 115000,
         'payout_status' => 'not_paid',
     ]);
 }

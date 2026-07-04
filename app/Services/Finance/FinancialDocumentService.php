@@ -38,8 +38,8 @@ final class FinancialDocumentService
                 'status' => $this->initialTaxDocumentStatus(),
                 'is_tax_document' => true,
                 'subtotal_amount' => (int) $booking->stay_amount,
-                'vat_amount' => (int) $booking->guest_vat_amount,
-                'total_amount' => (int) $booking->guest_total,
+                'vat_amount' => (int) $booking->vat_amount,
+                'total_amount' => (int) $booking->total_amount,
                 'issued_at' => now(),
             ]);
 
@@ -48,9 +48,9 @@ final class FinancialDocumentService
                 'quantity' => 1,
                 'unit_amount' => (int) $booking->stay_amount,
                 'subtotal_amount' => (int) $booking->stay_amount,
-                'vat_rate' => (float) $booking->guest_vat_rate,
-                'vat_amount' => (int) $booking->guest_vat_amount,
-                'total_amount' => (int) $booking->guest_total,
+                'vat_rate' => (float) $booking->vat_rate,
+                'vat_amount' => (int) $booking->vat_amount,
+                'total_amount' => (int) $booking->total_amount,
                 'source_type' => 'booking',
                 'source_id' => $booking->id,
             ]);
@@ -162,8 +162,8 @@ final class FinancialDocumentService
                 'direction' => 'sales',
                 'status' => $this->initialTaxDocumentStatus(),
                 'is_tax_document' => true,
-                'subtotal_amount' => $amountMinor - $this->vatPortion($amountMinor, (float) $booking->guest_vat_rate),
-                'vat_amount' => $this->vatPortion($amountMinor, (float) $booking->guest_vat_rate),
+                'subtotal_amount' => $amountMinor - $this->vatPortion($amountMinor, (float) $booking->vat_rate),
+                'vat_amount' => $this->vatPortion($amountMinor, (float) $booking->vat_rate),
                 'total_amount' => $amountMinor,
                 'issued_at' => now(),
             ]);
@@ -173,7 +173,7 @@ final class FinancialDocumentService
                 'quantity' => 1,
                 'unit_amount' => $document->subtotal_amount,
                 'subtotal_amount' => $document->subtotal_amount,
-                'vat_rate' => (float) $booking->guest_vat_rate,
+                'vat_rate' => (float) $booking->vat_rate,
                 'vat_amount' => $document->vat_amount,
                 'total_amount' => $amountMinor,
                 'source_type' => 'booking',

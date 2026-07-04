@@ -55,8 +55,8 @@ it('serves bookings + manual blocks as all-day events with exclusive DTEND', fun
         'booking_status' => BookingStatus::Confirmed->value,
         'start_date' => '2026-07-20', 'end_date' => '2026-07-21',
         'guests' => 2, 'nights' => 1, 'stay_amount' => 100000,
-        'commission_rate' => 10, 'commission_amount' => 10000, 'guest_vat_rate' => 15, 'guest_vat_amount' => 15000,
-        'guest_total' => 115000, 'payout_status' => 'not_paid', 'confirmed_at' => now(),
+        'commission_rate' => 10, 'commission_amount' => 10000, 'vat_rate' => 15, 'vat_amount' => 15000,
+        'total_amount' => 115000, 'payout_status' => 'not_paid', 'confirmed_at' => now(),
     ]);
 
     $response = $this->get("/ical/places/{$place->id}/{$token}.ics")

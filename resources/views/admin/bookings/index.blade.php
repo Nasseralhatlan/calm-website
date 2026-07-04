@@ -113,7 +113,7 @@
                                   style="gap: 6px; padding: 5px 12px; border-radius: 999px; font-size: 11px; background-color: {{ $st->pill() }};">
                                 {{ $st->label($isRtl) }}
                             </span>
-                            <span class="font-bold text-[#222] text-[15px] tabular-nums" dir="ltr">SR {{ number_format($b->guest_total / 100, 2) }}</span>
+                            <span class="font-bold text-[#222] text-[15px] tabular-nums" dir="ltr">SR {{ number_format($b->total_amount / 100, 2) }}</span>
                         </span>
                     </div>
 

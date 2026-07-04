@@ -26,7 +26,7 @@ final class OwnerNotifier
             'Reference: '.$booking->reference,
             'Place: '.($booking->place?->title ?? '—'),
             'Dates: '.$booking->start_date?->toDateString().' → '.$booking->end_date?->toDateString(),
-            'Amount: SR '.number_format($booking->guest_total / 100, 2),
+            'Amount: SR '.number_format($booking->total_amount / 100, 2),
             'Guest: '.($booking->guest?->phone ?? '—'),
         ]);
     }
@@ -38,7 +38,7 @@ final class OwnerNotifier
             'A booking payment could not be started.',
             'Reference: '.$booking->reference,
             'Place: '.($booking->place?->title ?? '—'),
-            'Amount: SR '.number_format($booking->guest_total / 100, 2),
+            'Amount: SR '.number_format($booking->total_amount / 100, 2),
             'Guest: '.($booking->guest?->phone ?? '—'),
             'Error: '.$error,
         ]);

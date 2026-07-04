@@ -36,8 +36,8 @@ final class BookingPricingService
         $vatEnabled = (bool) config('finance.vat.enabled', true);
         $vatRate = $vatEnabled ? (float) config('finance.vat.rate', 15.0) : 0.0;
 
-        $guestVatAmount = (int) ($attributes['guest_vat_amount'] ?? 0);
-        $guestTotal = (int) ($attributes['guest_total'] ?? ($stayAmount + $guestVatAmount));
+        $guestVatAmount = (int) ($attributes['vat_amount'] ?? 0);
+        $guestTotal = (int) ($attributes['total_amount'] ?? ($stayAmount + $guestVatAmount));
 
         // Commission side: VAT charged ON TOP of the commission, deducted from
         // the host's payout. Falls back to the booking's commission_rate when
@@ -48,9 +48,9 @@ final class BookingPricingService
         $commissionTotal = $commissionAmount + $commissionVat;
 
         return [
-            'guest_vat_rate' => (float) ($attributes['guest_vat_rate'] ?? $vatRate),
-            'guest_vat_amount' => $guestVatAmount,
-            'guest_total' => $guestTotal,
+            'vat_rate' => (float) ($attributes['vat_rate'] ?? $vatRate),
+            'vat_amount' => $guestVatAmount,
+            'total_amount' => $guestTotal,
             'commission_amount' => $commissionAmount,
             'commission_vat_rate' => $vatRate,
             'commission_vat_amount' => $commissionVat,

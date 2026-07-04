@@ -98,7 +98,7 @@ final class BookingFinanceFinalizer
             'from_party_type' => 'guest',
             'from_party_id' => $booking->guest_user_id,
             'to_party_type' => 'calm',
-            'amount' => (int) $booking->guest_total,
+            'amount' => (int) $booking->total_amount,
             'provider' => 'moyasar',
             'provider_transaction_id' => $booking->payment_id,
             'status' => FinancialMovement::STATUS_SUCCEEDED,
@@ -146,7 +146,7 @@ final class BookingFinanceFinalizer
                 'from_party_type' => 'calm',
                 'to_party_type' => 'guest',
                 'to_party_id' => $booking->guest_user_id,
-                'amount' => (int) $booking->guest_total,
+                'amount' => (int) $booking->total_amount,
                 'provider' => 'moyasar',
                 'provider_transaction_id' => $booking->payment_id,
                 'status' => FinancialMovement::STATUS_SUCCEEDED,
@@ -157,14 +157,14 @@ final class BookingFinanceFinalizer
         }
 
         // Case C — documents exist; never edit them, credit them.
-        $this->documents->guestBookingCreditNote($booking, (int) $booking->guest_total);
+        $this->documents->guestBookingCreditNote($booking, (int) $booking->total_amount);
         $this->documents->hostCommissionCreditNote($booking);
 
         $this->movement($booking, FinancialMovement::GUEST_REFUND, [
             'from_party_type' => 'calm',
             'to_party_type' => 'guest',
             'to_party_id' => $booking->guest_user_id,
-            'amount' => (int) $booking->guest_total,
+            'amount' => (int) $booking->total_amount,
             'provider' => 'moyasar',
             'provider_transaction_id' => $booking->payment_id,
             'status' => FinancialMovement::STATUS_SUCCEEDED,

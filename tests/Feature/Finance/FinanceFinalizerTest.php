@@ -56,8 +56,8 @@ function fdocBooking(Place $place, User $guest, array $attrs = []): Booking
         'check_out_time' => '12:00',
         'checkout_next_day' => false,
         'guests' => 2, 'nights' => 2, 'stay_amount' => 200000,
-        'commission_rate' => 10, 'commission_amount' => 20000, 'guest_vat_rate' => 15, 'guest_vat_amount' => 30000,
-        'guest_total' => 230000, 'payout_status' => 'not_paid',
+        'commission_rate' => 10, 'commission_amount' => 20000, 'vat_rate' => 15, 'vat_amount' => 30000,
+        'total_amount' => 230000, 'payout_status' => 'not_paid',
         'payment_status' => 'paid', 'payment_id' => 'pay_TEST123', 'confirmed_at' => '2026-06-28 10:00:00',
     ], $attrs));
 }
@@ -66,8 +66,8 @@ it('freezes the full money snapshot at creation (commission VAT on top)', functi
     $booking = fdocBooking(fdocPlace($this->host), $this->guest);
 
     expect($booking->stay_amount)->toBe(200000)
-        ->and($booking->guest_vat_amount)->toBe(30000)
-        ->and($booking->guest_total)->toBe(230000)
+        ->and($booking->vat_amount)->toBe(30000)
+        ->and($booking->total_amount)->toBe(230000)
         ->and($booking->commission_amount)->toBe(20000)
         ->and($booking->commission_vat_amount)->toBe(3000)   // 15% on top of commission
         ->and($booking->commission_total)->toBe(23000)

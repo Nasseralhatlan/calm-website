@@ -89,10 +89,10 @@ class BookingResource extends JsonResource
             // snapshot columns (guest side of the money model).
             'pricing' => [
                 'subtotal' => $this->stay_amount / 100,
-                'vat_percentage' => $this->guest_vat_rate,
-                'vat' => $this->guest_vat_amount / 100,
-                'total' => $this->guest_total / 100,
-                'total_minor' => $this->guest_total,
+                'vat_percentage' => $this->vat_rate,
+                'vat' => $this->vat_amount / 100,
+                'total' => $this->total_amount / 100,
+                'total_minor' => $this->total_amount,
             ],
             'payment' => [
                 'id' => $this->payment_id,

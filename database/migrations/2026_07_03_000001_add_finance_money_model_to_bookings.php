@@ -10,14 +10,13 @@ use Illuminate\Support\Facades\Schema;
 /**
  * The finance money model, as ONE delta against the production schema.
  *
- * One naming rule — components end `_amount` (always ex VAT), totals `_total`,
- * rates `_rate` — across three items derived from a single stay value:
+ * The booking's money first, then each party's cut:
  *
- *   Stay        nights, stay_amount
- *   Guest       guest_vat_rate/_amount, guest_total   (= stay + VAT)
- *   Commission  commission_rate, commission_amount,
+ *   Booking     nights, stay_amount (ex VAT), vat_rate, vat_amount,
+ *               total_amount (= stay + VAT, charged to the guest)
+ *   Commission  commission_rate, commission_amount (ex VAT),
  *               commission_vat_rate/_amount, commission_total (VAT ON TOP)
- *   Host        host_payout_amount                    (= stay − commission_total)
+ *   Host        host_payout_amount (= stay − commission_total)
  *
  * The existing columns already held these numbers under older names, so this
  * is mostly renames. Commission VAT is NEW: existing rows keep 0 so their
@@ -30,13 +29,12 @@ return new class extends Migration
     {
         Schema::table('bookings', function (Blueprint $table): void {
             $table->renameColumn('booking_amount', 'stay_amount');
-            $table->renameColumn('vat_rate', 'guest_vat_rate');
-            $table->renameColumn('vat_amount', 'guest_vat_amount');
-            $table->renameColumn('total', 'guest_total');
+            $table->renameColumn('total', 'total_amount');
             $table->renameColumn('quantity', 'nights');
             $table->renameColumn('paid_out_at', 'payout_paid_at');
             $table->renameColumn('payment_status_check_attempts', 'payment_check_attempts');
-            // commission_amount keeps its name — it was always the ex-VAT figure.
+            // vat_rate, vat_amount and commission_amount keep their names —
+            // they were already the booking VAT and the ex-VAT commission.
         });
 
         Schema::table('bookings', function (Blueprint $table): void {
@@ -85,9 +83,7 @@ return new class extends Migration
 
         Schema::table('bookings', function (Blueprint $table): void {
             $table->renameColumn('stay_amount', 'booking_amount');
-            $table->renameColumn('guest_vat_rate', 'vat_rate');
-            $table->renameColumn('guest_vat_amount', 'vat_amount');
-            $table->renameColumn('guest_total', 'total');
+            $table->renameColumn('total_amount', 'total');
             $table->renameColumn('nights', 'quantity');
             $table->renameColumn('payout_paid_at', 'paid_out_at');
             $table->renameColumn('payment_check_attempts', 'payment_status_check_attempts');

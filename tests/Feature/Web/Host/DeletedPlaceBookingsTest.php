@@ -45,9 +45,9 @@ function confirmedBooking(User $guest, Place $place): Booking
         'stay_amount' => 200000,
         'commission_rate' => 15,
         'commission_amount' => 30000,
-        'guest_vat_rate' => 15,
-        'guest_vat_amount' => 30000,
-        'guest_total' => 230000,
+        'vat_rate' => 15,
+        'vat_amount' => 30000,
+        'total_amount' => 230000,
         'payout_status' => 'not_paid',
         'confirmed_at' => now(),
     ]);

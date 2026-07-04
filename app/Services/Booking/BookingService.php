@@ -100,9 +100,9 @@ final class BookingService
                 'stay_amount' => $pricing['subtotal_minor'],
                 'commission_rate' => $pricing['commission_rate'],
                 'commission_amount' => $pricing['commission_amount_minor'],
-                'guest_vat_rate' => $pricing['vat_rate'],
-                'guest_vat_amount' => $pricing['vat_amount_minor'],
-                'guest_total' => $pricing['total_minor'],
+                'vat_rate' => $pricing['vat_rate'],
+                'vat_amount' => $pricing['vat_amount_minor'],
+                'total_amount' => $pricing['total_minor'],
                 'payout_status' => 'not_paid',
                 'expires_at' => $holdExpiresAt,
             ]);
@@ -120,7 +120,7 @@ final class BookingService
 
         try {
             $invoice = $this->gateway->createInvoice(
-                amountMinor: $booking->guest_total,
+                amountMinor: $booking->total_amount,
                 description: 'Booking — '.$place->title,
                 callbackUrl: route('payments.moyasar.webhook'),
                 metadata: ['booking_id' => $booking->id],
@@ -719,10 +719,10 @@ final class BookingService
             $fresh->payment_check_attempts = $fresh->payment_check_attempts + 1;
 
             if ($invoice->isPaid()) {
-                if ($invoice->amount !== $fresh->guest_total) {
+                if ($invoice->amount !== $fresh->total_amount) {
                     // Paid amount doesn't match what we quoted — never confirm.
                     Log::warning('Moyasar paid amount mismatch', [
-                        'booking' => $fresh->id, 'expected' => $fresh->guest_total, 'paid' => $invoice->amount,
+                        'booking' => $fresh->id, 'expected' => $fresh->total_amount, 'paid' => $invoice->amount,
                     ]);
                     $fresh->booking_status = BookingStatus::Expired;
                     $transitionedTo = BookingStatus::Expired;
