@@ -166,6 +166,22 @@ it('requeues a bank-failed transfer with the reason and a fresh sequence for the
         ->and($sequences[1])->toBe(app(MoyasarPayouts::class)->sequenceNumberFor($booking->id, 1));
 });
 
+it('records a failure without calling Moyasar when the payout is below the SR 1 minimum', function (): void {
+    autoPayoutsOn();
+    Http::fake();
+    // SR 0.90 stay → payout 80 halalas, under Moyasar's 100-halala floor.
+    $booking = apoBooking($this->host, $this->guest, [
+        'stay_amount' => 90, 'commission_amount' => 9,
+        'vat_rate' => 15, 'vat_amount' => 14, 'total_amount' => 104,
+    ]);
+
+    (new ProcessDuePayouts)->handle(app(HostPayoutService::class));
+
+    Http::assertNothingSent();
+    expect($booking->refresh()->payout_status)->toBe('not_paid')
+        ->and($booking->payout_failure)->toContain('minimum');
+});
+
 it('records a failure without calling Moyasar when the host has no IBAN', function (): void {
     autoPayoutsOn();
     Http::fake();

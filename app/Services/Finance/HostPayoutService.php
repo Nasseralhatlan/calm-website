@@ -88,6 +88,14 @@ final class HostPayoutService
             return false;
         }
 
+        // Moyasar refuses transfers under 100 halalas (SR 1) — discovered
+        // live. Record a readable reason instead of burning an API call.
+        if ($booking->hostNetMinor() < 100) {
+            $booking->update(['payout_failure' => 'Payout below the Moyasar minimum of SR 1.00.']);
+
+            return false;
+        }
+
         try {
             $payout = $this->client->createPayout(
                 $booking->hostNetMinor(),
