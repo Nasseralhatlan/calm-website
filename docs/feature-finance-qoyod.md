@@ -111,6 +111,21 @@ executed + reconciled a real transfer). Field notes from the live API:
 the IPS channel rejects several enum-valid purposes (e.g. `expenses_services`)
 after creation.
 
+## Refunds (automatic, full only)
+
+Admin cancellation of a PAID booking refunds the guest IN FULL via Moyasar,
+automatically — and is only allowed until `refund_days_before_checkin` (Setting,
+default 4) days before check-in; after that the cancel is refused (422). No
+partial refunds by design. Order of operations: Moyasar refund FIRST
+(`MoyasarGateway::refundInvoice` — resolves the paid payment under the invoice,
+skips if already refunded, so a crashed cancel can be retried safely), and only
+on success the booking flips to cancelled + notifications + the Case B/C
+bookkeeping (refund movement; credit notes when invoices were already issued).
+A failed refund leaves the booking confirmed and untouched. Note: the window
+means the admin flow can never cancel after checkout — the post-invoicing
+credit-note path (Case C) remains as a defensive branch for future dispute
+tooling.
+
 ## One-time Qoyod setup (when going live)
 
 > **Live-verified 2026-07-04** end to end against the production Qoyod org + Moyasar

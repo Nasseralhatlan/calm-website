@@ -10,6 +10,7 @@ use App\Integrations\Payment\MoyasarInvoice;
 use App\Models\Booking;
 use App\Models\Place;
 use App\Models\PlaceReview;
+use App\Models\Setting;
 use App\Models\User;
 use App\Services\Finance\BookingFinanceFinalizer;
 use App\Services\Notification\NotificationService;
@@ -266,6 +267,26 @@ final class BookingService
             422,
             __('Only confirmed bookings can be cancelled.'),
         );
+
+        // Refund policy: cancelling a PAID booking refunds the guest IN FULL,
+        // and is only allowed until N days before check-in. The refund runs
+        // FIRST (outside any DB transaction) — if Moyasar refuses, the
+        // booking stays confirmed and nothing was recorded.
+        if ($booking->payment_status === 'paid' && $booking->payment_id !== null) {
+            $windowDays = (int) (Setting::query()->where('key', 'refund_days_before_checkin')->value('value') ?? 4);
+            $checkIn = $booking->checkInAt();
+
+            if ($checkIn === null || CarbonImmutable::now()->greaterThan($checkIn->subDays($windowDays))) {
+                abort(422, __('Refunds are only possible until :days days before check-in — this booking can no longer be cancelled with a refund.', ['days' => $windowDays]));
+            }
+
+            try {
+                $this->gateway->refundInvoice($booking->payment_id);
+            } catch (RuntimeException $e) {
+                Log::error('Booking cancel refund failed', ['booking' => $booking->id, 'error' => $e->getMessage()]);
+                abort(502, __('The Moyasar refund failed — the booking was NOT cancelled. Try again.'));
+            }
+        }
 
         $booking = DB::transaction(function () use ($booking, $as): Booking {
             $booking->update([

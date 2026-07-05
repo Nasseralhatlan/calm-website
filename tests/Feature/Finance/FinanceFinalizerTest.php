@@ -18,6 +18,8 @@ use App\Services\Booking\BookingService;
 use App\Services\Finance\BookingFinanceFinalizer;
 use App\Services\Finance\QoyodSyncService;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Http;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 beforeEach(function (): void {
     $this->seed();
@@ -155,13 +157,26 @@ it('records the guest payment movement idempotently', function (): void {
         ->and($movement->provider_transaction_id)->toBe('pay_TEST123');
 });
 
-it('cancellation before invoicing (Case B) records a refund movement only', function (): void {
+it('cancellation before invoicing (Case B) refunds via Moyasar and records the movement', function (): void {
+    Http::fake([
+        'api.moyasar.com/v1/invoices/*' => Http::response([
+            'id' => 'pay_TEST123', 'status' => 'paid', 'amount' => 230000,
+            'payments' => [['id' => 'pmt_1', 'status' => 'paid', 'amount' => 230000, 'refunded' => 0]],
+        ]),
+        'api.moyasar.com/v1/payments/*/refund' => Http::response([
+            'id' => 'pmt_1', 'status' => 'refunded', 'amount' => 230000, 'refunded' => 230000,
+        ]),
+    ]);
+
     $booking = fdocBooking(fdocPlace($this->host), $this->guest, [
-        'start_date' => '2026-07-10', 'end_date' => '2026-07-11', // future stay
+        'start_date' => '2026-07-10', 'end_date' => '2026-07-11', // 7 days out — inside the refund window
     ]);
 
     app(BookingService::class)
         ->cancelByAdmin($booking, BookingStatus::CanceledByAdmin);
+
+    // The real money went back first…
+    Http::assertSent(fn ($request) => str_ends_with($request->url(), '/payments/pmt_1/refund'));
 
     expect($booking->refresh()->booking_status)->toBe(BookingStatus::CanceledByAdmin)
         ->and($booking->financialDocuments()->count())->toBe(0);
@@ -170,12 +185,66 @@ it('cancellation before invoicing (Case B) records a refund movement only', func
     expect($refund->amount)->toBe(230000);
 });
 
+it('refuses to cancel a paid booking inside the refund window — zero HTTP', function (): void {
+    Http::fake();
+    // Check-in 2026-07-05 15:00; window closes 4 days before → already closed at test-now (07-03).
+    $booking = fdocBooking(fdocPlace($this->host), $this->guest, [
+        'start_date' => '2026-07-05', 'end_date' => '2026-07-06',
+    ]);
+
+    expect(fn () => app(BookingService::class)->cancelByAdmin($booking, BookingStatus::CanceledByAdmin))
+        ->toThrow(HttpException::class);
+
+    Http::assertNothingSent();
+    expect($booking->refresh()->booking_status)->toBe(BookingStatus::Confirmed)
+        ->and($booking->financialMovements()->count())->toBe(0);
+});
+
+it('leaves the booking confirmed when the Moyasar refund fails', function (): void {
+    Http::fake([
+        'api.moyasar.com/v1/invoices/*' => Http::response([
+            'payments' => [['id' => 'pmt_9', 'status' => 'paid', 'amount' => 230000, 'refunded' => 0]],
+        ]),
+        'api.moyasar.com/v1/payments/*/refund' => Http::response('nope', 500),
+    ]);
+
+    $booking = fdocBooking(fdocPlace($this->host), $this->guest, [
+        'start_date' => '2026-07-10', 'end_date' => '2026-07-11',
+    ]);
+
+    expect(fn () => app(BookingService::class)->cancelByAdmin($booking, BookingStatus::CanceledByAdmin))
+        ->toThrow(HttpException::class);
+
+    expect($booking->refresh()->booking_status)->toBe(BookingStatus::Confirmed)
+        ->and($booking->financialMovements()->count())->toBe(0);
+});
+
+it('skips the refund call when the payment was already refunded (crash-safe retry)', function (): void {
+    Http::fake([
+        'api.moyasar.com/v1/invoices/*' => Http::response([
+            'payments' => [['id' => 'pmt_2', 'status' => 'refunded', 'amount' => 230000, 'refunded' => 230000]],
+        ]),
+    ]);
+
+    $booking = fdocBooking(fdocPlace($this->host), $this->guest, [
+        'start_date' => '2026-07-10', 'end_date' => '2026-07-11',
+    ]);
+
+    app(BookingService::class)->cancelByAdmin($booking, BookingStatus::CanceledByAdmin);
+
+    // Only the invoice fetch — never a second refund.
+    Http::assertSentCount(1);
+    expect($booking->refresh()->booking_status)->toBe(BookingStatus::CanceledByAdmin);
+});
+
 it('cancellation after invoicing (Case C) credits both invoices', function (): void {
+    // The 4-day refund window means the admin flow can never cancel after
+    // checkout — Case C is kept as a defensive path (future dispute tooling),
+    // so it's exercised directly on the finalizer here.
     $booking = fdocBooking(fdocPlace($this->host), $this->guest);
     (new FinalizeBookingFinances)->handle(app(BookingFinanceFinalizer::class), app(QoyodSyncService::class));
 
-    app(BookingService::class)
-        ->cancelByAdmin($booking->refresh(), BookingStatus::CanceledByAdmin);
+    app(BookingFinanceFinalizer::class)->handleCancellation($booking->refresh());
 
     $docs = $booking->financialDocuments()->get()->keyBy('document_subtype');
     expect($docs)->toHaveCount(5); // 3 originals + 2 credit notes

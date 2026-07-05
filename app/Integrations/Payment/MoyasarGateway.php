@@ -102,6 +102,48 @@ final class MoyasarGateway
         return MoyasarInvoice::fromArray($response->json());
     }
 
+    /**
+     * Refund the PAID payment underneath a hosted invoice, in full. Refunds
+     * live on payments (not invoices), so this resolves the payment first.
+     * Idempotent: a payment that already carries a refunded amount is left
+     * alone, making a crash-and-retry cancellation safe.
+     *
+     * @return array<string, mixed> The (refunded or already-refunded) payment.
+     *
+     * @throws RuntimeException when no paid payment exists or Moyasar refuses.
+     */
+    public function refundInvoice(string $invoiceId): array
+    {
+        $response = $this->client()->get($this->baseUrl."invoices/{$invoiceId}");
+
+        if (! $response->successful()) {
+            Log::error('Moyasar invoice fetch for refund failed', ['invoice' => $invoiceId, 'status' => $response->status()]);
+
+            throw new RuntimeException('Moyasar invoice fetch failed ('.$response->status().').');
+        }
+
+        $payment = collect($response->json('payments') ?? [])
+            ->first(fn (array $p): bool => ($p['status'] ?? null) === 'paid' || (int) ($p['refunded'] ?? 0) > 0);
+
+        if ($payment === null) {
+            throw new RuntimeException('No paid payment found under invoice '.$invoiceId.'.');
+        }
+
+        if ((int) ($payment['refunded'] ?? 0) > 0) {
+            return $payment; // already refunded — nothing to do
+        }
+
+        $refund = $this->client()->post($this->baseUrl."payments/{$payment['id']}/refund");
+
+        if (! $refund->successful()) {
+            Log::error('Moyasar refund failed', ['payment' => $payment['id'], 'status' => $refund->status(), 'body' => $refund->body()]);
+
+            throw new RuntimeException('Moyasar refund failed ('.$refund->status().').');
+        }
+
+        return (array) $refund->json();
+    }
+
     private function client(): PendingRequest
     {
         return Http::withBasicAuth($this->secretKey, '')
