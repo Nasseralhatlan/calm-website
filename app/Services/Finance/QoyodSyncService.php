@@ -28,7 +28,10 @@ final class QoyodSyncService
 
     public function enabled(): bool
     {
-        return (bool) config('finance.qoyod.enabled') && config('finance.qoyod.api_key') !== null;
+        // filled() so an empty-string QOYOD_API_KEY counts as absent too —
+        // MUST stay in lockstep with FinancialDocumentService's initial-status
+        // gate, or documents are created pending_provider and never synced.
+        return (bool) config('finance.qoyod.enabled') && filled(config('finance.qoyod.api_key'));
     }
 
     /** Push every pending/failed tax document. Called by the finance sweep. */
@@ -152,6 +155,14 @@ final class QoyodSyncService
                 'external_response' => $response,
                 'external_status' => 'created',
             ]);
+
+            // A 2xx without an id means the invoice may exist in Qoyod with no
+            // local link. Fail loudly (doc goes `failed`, response is stored
+            // above for forensics) instead of flipping to issued with no
+            // receipt and silently leaving the retry set.
+            if ($document->external_document_id === null) {
+                throw new \RuntimeException("Qoyod created invoice {$reference} but returned no id — check the Qoyod books before retrying.");
+            }
         }
 
         // Both invoices are already settled in reality (guest paid via
@@ -171,35 +182,47 @@ final class QoyodSyncService
 
     private function syncCreditNote(Booking $booking, FinancialDocument $document): void
     {
-        $isGuest = $document->document_subtype === FinancialDocument::GUEST_BOOKING_CREDIT_NOTE;
-        $contactId = $isGuest
-            ? $this->ensureGuestCustomer($booking->guest)
-            : $this->ensureHostCustomer($booking, HostTaxProfile::query()->where('host_user_id', $booking->host_user_id)->first());
+        // Resume-safe, same rule as pushInvoice: if a previous attempt created
+        // the note in Qoyod but died before the local update, do NOT create a
+        // duplicate — just finish flipping the status.
+        if ($document->external_document_id === null) {
+            $isGuest = $document->document_subtype === FinancialDocument::GUEST_BOOKING_CREDIT_NOTE;
+            $contactId = $isGuest
+                ? $this->ensureGuestCustomer($booking->guest)
+                : $this->ensureHostCustomer($booking, HostTaxProfile::query()->where('host_user_id', $booking->host_user_id)->first());
 
-        $response = $this->client->createCreditNote([
-            'contact_id' => (int) $contactId,
-            'issue_date' => now()->toDateString(),
-            'status' => 'Approved',
-            'inventory_id' => (string) config('finance.qoyod.inventory_id', 1),
-            'notes' => "Reversal for booking {$booking->reference}",
-            'line_items' => [[
-                'product_id' => (int) ($isGuest ? config('finance.qoyod.product_stay_id') : config('finance.qoyod.product_commission_id')),
-                'description' => ($isGuest ? 'Refund' : 'Commission reversal')." — booking {$booking->reference}",
-                'quantity' => '1.0',
-                'unit_price' => $this->sar((int) $document->subtotal_amount),
-                'tax_percent' => $isGuest ? (string) $booking->vat_rate : (string) $booking->commission_vat_rate,
-            ]],
-        ]);
+            $response = $this->client->createCreditNote([
+                'contact_id' => (int) $contactId,
+                'issue_date' => now()->toDateString(),
+                'status' => 'Approved',
+                'inventory_id' => (string) config('finance.qoyod.inventory_id', 1),
+                'notes' => "Reversal for booking {$booking->reference}",
+                'line_items' => [[
+                    'product_id' => (int) ($isGuest ? config('finance.qoyod.product_stay_id') : config('finance.qoyod.product_commission_id')),
+                    'description' => ($isGuest ? 'Refund' : 'Commission reversal')." — booking {$booking->reference}",
+                    'quantity' => '1.0',
+                    'unit_price' => $this->sar((int) $document->subtotal_amount),
+                    'tax_percent' => $isGuest ? (string) $booking->vat_rate : (string) $booking->commission_vat_rate,
+                ]],
+            ]);
 
-        $document->update([
-            'external_provider' => 'qoyod',
-            'external_contact_id' => $contactId,
-            'external_document_id' => isset($response['id']) ? (string) $response['id'] : null,
-            'external_document_number' => $response['note_no'] ?? null,
-            'external_response' => $response,
-            'external_status' => 'created',
-            'status' => FinancialDocument::STATUS_ISSUED,
-        ]);
+            $document->update([
+                'external_provider' => 'qoyod',
+                'external_contact_id' => $contactId,
+                'external_document_id' => isset($response['id']) ? (string) $response['id'] : null,
+                'external_document_number' => $response['note_no'] ?? null,
+                'external_response' => $response,
+                'external_status' => 'created',
+            ]);
+
+            // Same no-id rule as pushInvoice: never mark issued on a response
+            // we can't link back to.
+            if ($document->external_document_id === null) {
+                throw new \RuntimeException("Qoyod created a credit note for booking {$booking->reference} but returned no id — check the Qoyod books before retrying.");
+            }
+        }
+
+        $document->update(['status' => FinancialDocument::STATUS_ISSUED]);
     }
 
     /** Fresh expiring PDF link for a synced tax document (Qoyod-hosted). */
@@ -246,16 +269,35 @@ final class QoyodSyncService
         }
 
         $host = $booking->host;
+
+        // The finalizer normally creates the profile first, but this sync path
+        // must not depend on that ordering: without a row to persist onto, the
+        // Qoyod contact id would be discarded and every sync would create a
+        // fresh duplicate customer. (Same defaults as the finalizer's
+        // ensureHostTaxProfile.)
+        $profile ??= HostTaxProfile::query()->firstOrCreate(
+            ['host_user_id' => $booking->host_user_id],
+            [
+                'host_type' => 'individual',
+                'legal_name' => (string) ($host?->name ?: 'Host '.$booking->host_user_id),
+            ],
+        );
+
+        // firstOrCreate may have found a row that already carries a contact id.
+        if ($profile->qoyod_customer_id !== null) {
+            return (string) $profile->qoyod_customer_id;
+        }
+
         $response = $this->client->createCustomer(array_filter([
-            'name' => (string) ($profile?->legal_name ?: $host?->name ?: 'Host '.$booking->host_user_id),
+            'name' => (string) ($profile->legal_name ?: $host?->name ?: 'Host '.$booking->host_user_id),
             'phone_number' => (string) ($host?->phone ?? ''),
             'email' => (string) ($host?->email ?? ''),
-            'tax_number' => (string) ($profile?->vat_number ?? ''),
+            'tax_number' => (string) ($profile->vat_number ?? ''),
             'status' => 'Active',
         ], fn ($value) => $value !== ''));
 
         $id = (string) ((array) ($response['contact'] ?? []))['id'];
-        $profile?->update(['qoyod_customer_id' => $id]);
+        $profile->update(['qoyod_customer_id' => $id]);
 
         return $id;
     }

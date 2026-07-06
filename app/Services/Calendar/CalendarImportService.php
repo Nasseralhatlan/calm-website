@@ -7,6 +7,7 @@ namespace App\Services\Calendar;
 use App\Models\Place;
 use App\Models\PlaceBlocking;
 use App\Models\PlaceCalendarFeed;
+use App\Services\Notification\NotificationService;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -31,6 +32,8 @@ use Throwable;
  */
 final class CalendarImportService
 {
+    public function __construct(private readonly NotificationService $notifications) {}
+
     /** Sync every feed of every place — the hourly scheduled sweep. */
     public function syncAll(): void
     {
@@ -163,6 +166,10 @@ final class CalendarImportService
     private function reconcile(PlaceCalendarFeed $feed, array $events): void
     {
         $now = now();
+        // Snapshot the UIDs we already mirror BEFORE the upsert, so we can
+        // tell genuinely new external events apart from re-synced ones (a
+        // conflict is alerted once, not on every hourly pass).
+        $knownUids = $feed->blockings()->pluck('external_uid')->all();
         // PlaceBlocking uses HasUuids — bulk upsert() bypasses the `creating`
         // event, so mint ids ourselves (same trick as PlaceService::syncAttributes).
         $stub = new PlaceBlocking;
@@ -197,5 +204,42 @@ final class CalendarImportService
                 );
             }
         });
+
+        $this->alertBookingConflicts($feed, array_diff_key($events, array_flip($knownUids)));
+    }
+
+    /**
+     * A newly-imported external event landing on dates an active Calm booking
+     * holds means the place is double-booked across platforms. The import
+     * itself stays (the dates really are taken externally) — but the host is
+     * told immediately instead of finding two families at the door.
+     *
+     * @param  array<string, array{start: string, end: string, summary: ?string}>  $newEvents
+     */
+    private function alertBookingConflicts(PlaceCalendarFeed $feed, array $newEvents): void
+    {
+        if ($newEvents === []) {
+            return;
+        }
+
+        try {
+            foreach ($newEvents as $event) {
+                $conflicting = $feed->place->bookings()
+                    ->activeHold()
+                    ->where('start_date', '<=', $event['end'])
+                    ->where('end_date', '>=', $event['start'])
+                    ->get();
+
+                foreach ($conflicting as $booking) {
+                    $this->notifications->calendarConflict($booking);
+                }
+            }
+        } catch (Throwable $e) {
+            // Alerting is best-effort — never let it break the sync itself.
+            Log::warning('calendar-sync: conflict alert failed', [
+                'feed_id' => $feed->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 }

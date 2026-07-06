@@ -22,10 +22,16 @@ Schedule::job(new ExpireStaleBookings)
     ->everyMinute()
     ->withoutOverlapping();
 
+// In local dev the whole booking→finance pipeline runs every minute, so a
+// test booking flows completed → invoiced → paid out in a few minutes instead
+// of across the relaxed production cadences below. Every job is idempotent
+// and no-ops when there is no work, so the tighter loop is harmless.
+$fast = app()->isLocal();
+
 // Flip confirmed bookings to completed once the guest's checkout has passed.
 // Not time-critical, so hourly is plenty — stateless, all state is in the DB.
 Schedule::job(new CompleteEndedBookings)
-    ->hourly()
+    ->cron($fast ? '* * * * *' : '0 * * * *')
     ->withoutOverlapping();
 
 // Permanently scrub PII on accounts soft-deleted past the retention window.
@@ -46,19 +52,19 @@ Schedule::job(new SyncExternalCalendars)
 // invoice, payout statement) once its checkout is more than N hours behind us
 // (finance.invoice.issue_after_checkout_hours). Idempotent per booking.
 Schedule::job(new FinalizeBookingFinances)
-    ->everyFifteenMinutes()
+    ->cron($fast ? '* * * * *' : '*/15 * * * *')
     ->withoutOverlapping();
 
 // Execute host payouts automatically via Moyasar Payouts once a completed
 // stay is invoiced and past its hold window (Setting payout_hold_hours).
 // No-op while MOYASAR_PAYOUTS_MODE=manual.
 Schedule::job(new ProcessDuePayouts)
-    ->everyFifteenMinutes()
+    ->cron($fast ? '* * * * *' : '*/15 * * * *')
     ->withoutOverlapping();
 
 // Poll in-flight Moyasar transfers: paid → settle (movements + audit trail),
 // failed/returned → back to the queue with the bank's reason. No-op when
 // nothing is processing.
 Schedule::job(new ReconcileMoyasarPayouts)
-    ->everyTenMinutes()
+    ->cron($fast ? '* * * * *' : '*/10 * * * *')
     ->withoutOverlapping();

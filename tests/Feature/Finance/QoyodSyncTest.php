@@ -215,3 +215,108 @@ it('returns a fresh expiring pdf link for a synced document', function (): void 
         ->where('document_subtype', FinancialDocument::HOST_PAYOUT_STATEMENT)->sole();
     expect(app(QoyodSyncService::class)->pdfUrl($statement))->toBeNull();
 });
+
+it('creates documents locally issued when qoyod is enabled but the api key is missing', function (): void {
+    qoyodOn();
+    config()->set('finance.qoyod.api_key', ''); // flag on, key absent — misconfig
+    Http::fake();
+
+    $booking = qsyncBooking($this->host, $this->guest);
+    (new FinalizeBookingFinances)->handle(app(BookingFinanceFinalizer::class), app(QoyodSyncService::class));
+
+    Http::assertNothingSent();
+    // Never stranded pending_provider: without a key the sync (rightly) won't
+    // run, so documents must fall back to local issuance.
+    expect($booking->financialDocuments()->where('status', FinancialDocument::STATUS_ISSUED)->count())->toBe(3)
+        ->and($booking->financialDocuments()->where('status', FinancialDocument::STATUS_PENDING_PROVIDER)->count())->toBe(0);
+});
+
+it('fails the document instead of issuing when qoyod responds without an invoice id', function (): void {
+    qoyodOn();
+    Http::fake([
+        'api.qoyod.test/2.0/customers' => Http::response(['contact' => ['id' => 77]], 201),
+        'api.qoyod.test/2.0/invoices' => Http::response(['invoice' => ['reference' => 'G']], 201), // 2xx, no id
+        'api.qoyod.test/2.0/invoice_payments' => Http::response(['id' => 9], 200),
+    ]);
+
+    $booking = qsyncBooking($this->host, $this->guest);
+    (new FinalizeBookingFinances)->handle(app(BookingFinanceFinalizer::class), app(QoyodSyncService::class));
+
+    $guestDoc = $booking->financialDocuments()
+        ->where('document_subtype', FinancialDocument::GUEST_BOOKING_INVOICE)->sole();
+    expect($guestDoc->status)->toBe(FinancialDocument::STATUS_FAILED)
+        ->and($guestDoc->external_status)->toContain('no id');
+
+    // Never a payment against an invoice we can't link, never silently issued.
+    Http::assertNotSent(fn ($request): bool => str_contains($request->url(), 'invoice_payments'));
+});
+
+it('never duplicates a credit note when re-syncing a doc that already has a qoyod id', function (): void {
+    qoyodOn();
+    Http::fake([
+        'api.qoyod.test/2.0/customers' => Http::response(['contact' => ['id' => 77]], 201),
+        'api.qoyod.test/2.0/invoices' => Http::sequence()
+            ->push(['invoice' => ['id' => 801, 'reference' => 'G']], 201)
+            ->push(['invoice' => ['id' => 802, 'reference' => 'C']], 201),
+        'api.qoyod.test/2.0/invoice_payments' => Http::response(['id' => 9], 200),
+        'api.qoyod.test/2.0/credit_notes' => Http::sequence()
+            ->push(['id' => 901, 'note_no' => 'CN-1'], 201)
+            ->push(['id' => 902, 'note_no' => 'CN-2'], 201),
+    ]);
+
+    $booking = qsyncBooking($this->host, $this->guest);
+    (new FinalizeBookingFinances)->handle(app(BookingFinanceFinalizer::class), app(QoyodSyncService::class));
+
+    app(BookingFinanceFinalizer::class)->handleCancellation($booking->refresh());
+    app(QoyodSyncService::class)->syncPendingDocuments();
+
+    $guestNote = $booking->financialDocuments()
+        ->where('document_subtype', FinancialDocument::GUEST_BOOKING_CREDIT_NOTE)->sole();
+    expect($guestNote->status)->toBe(FinancialDocument::STATUS_ISSUED)
+        ->and($guestNote->external_document_id)->toBe('901');
+
+    // Simulate a crash AFTER Qoyod created the note but BEFORE the status
+    // flip: the id survived, the doc re-enters the retry set.
+    $guestNote->update(['status' => FinancialDocument::STATUS_FAILED]);
+    app(QoyodSyncService::class)->syncPendingDocuments();
+
+    expect($guestNote->fresh()->status)->toBe(FinancialDocument::STATUS_ISSUED)
+        ->and($guestNote->fresh()->external_document_id)->toBe('901');
+
+    // Exactly one credit_notes POST per note — none for the resume pass.
+    $creditCalls = collect(Http::recorded())
+        ->filter(fn ($pair): bool => str_contains($pair[0]->url(), 'credit_notes'))
+        ->count();
+    expect($creditCalls)->toBe(2);
+});
+
+it('persists the qoyod host contact even when no tax profile row exists yet', function (): void {
+    qoyodOn();
+    Http::fake([
+        'api.qoyod.test/2.0/customers' => Http::sequence()
+            ->push(['contact' => ['id' => 77]], 201)  // guest
+            ->push(['contact' => ['id' => 78]], 201), // host — must be created ONCE
+        'api.qoyod.test/2.0/invoices' => Http::sequence()
+            ->push(['invoice' => ['id' => 811, 'reference' => 'G']], 201)
+            ->push(['invoice' => ['id' => 812, 'reference' => 'C']], 201),
+        'api.qoyod.test/2.0/invoice_payments' => Http::response(['id' => 9], 200),
+    ]);
+
+    $booking = qsyncBooking($this->host, $this->guest);
+    // Documents exist but the finalizer's profile row does not — the sync
+    // path must not depend on that ordering.
+    app(BookingFinanceFinalizer::class)->finalize($booking);
+    HostTaxProfile::query()->delete();
+
+    app(QoyodSyncService::class)->syncPendingDocuments();
+
+    // Contact id landed on a (re)created profile instead of being discarded —
+    // no duplicate host customer on every future sync.
+    $profile = HostTaxProfile::query()->where('host_user_id', $this->host->id)->sole();
+    expect($profile->qoyod_customer_id)->toBe('78');
+
+    $customerCalls = collect(Http::recorded())
+        ->filter(fn ($pair): bool => str_ends_with($pair[0]->url(), '/customers'))
+        ->count();
+    expect($customerCalls)->toBe(2);
+});

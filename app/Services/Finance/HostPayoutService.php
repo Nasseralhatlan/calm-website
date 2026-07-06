@@ -185,6 +185,14 @@ final class HostPayoutService
      */
     public function retry(Booking $booking): bool
     {
+        // Same gate as the sweep: in manual mode execute() would fire at
+        // Moyasar with an empty source account and just record a new failure.
+        if (! $this->autoModeEnabled()) {
+            throw ValidationException::withMessages([
+                'payout' => __('Automatic payouts are disabled — configure Moyasar payouts (mode + account) before retrying.'),
+            ]);
+        }
+
         if (! $booking->isPayable()) {
             throw ValidationException::withMessages([
                 'payout' => __('This booking is not payable right now — it must be completed, invoiced, unpaid and past its hold window.'),

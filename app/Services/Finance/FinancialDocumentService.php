@@ -263,7 +263,11 @@ final class FinancialDocumentService
 
     private function initialTaxDocumentStatus(): string
     {
-        return config('finance.qoyod.enabled')
+        // Mirror QoyodSyncService::enabled() EXACTLY (flag + a non-empty API
+        // key): enabled-but-keyless would otherwise create documents as
+        // pending_provider that the sync (correctly) never picks up — stuck
+        // forever with no PDF.
+        return config('finance.qoyod.enabled') && filled(config('finance.qoyod.api_key'))
             ? FinancialDocument::STATUS_PENDING_PROVIDER
             : FinancialDocument::STATUS_ISSUED;
     }

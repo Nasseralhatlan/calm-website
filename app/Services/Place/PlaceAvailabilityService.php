@@ -101,7 +101,7 @@ final class PlaceAvailabilityService
      * @param  string  $checkIn  Inclusive first day (Y-m-d).
      * @param  string  $checkOut  Inclusive last day (Y-m-d).
      * @param  int|null  $guests  Party size; when given, checked against max_guests.
-     * @return array{place_id: string, check_in: string, check_out: string, days: int, guests: int|null, max_guests: int|null, currency: string, dates_available: bool, guests_ok: bool, bookable: bool, unavailable_dates: list<string>, breakdown: list<array{date: string, weekday: string, price: int, available: bool}>, pricing: array{subtotal: float, subtotal_minor: int, commission_rate: float, commission_amount: float, commission_amount_minor: int, vat_rate: float, vat_amount: float, vat_amount_minor: int, total: float, total_minor: int}}|null
+     * @return array{place_id: string, check_in: string, check_out: string, days: int, guests: int|null, max_guests: int|null, currency: string, dates_available: bool, guests_ok: bool, price_ok: bool, bookable: bool, unavailable_dates: list<string>, breakdown: list<array{date: string, weekday: string, price: int, available: bool}>, pricing: array{subtotal: float, subtotal_minor: int, commission_rate: float, commission_amount: float, commission_amount_minor: int, vat_rate: float, vat_amount: float, vat_amount_minor: int, total: float, total_minor: int}}|null
      */
     public function quote(Place $place, string $checkIn, string $checkOut, ?int $guests = null): ?array
     {
@@ -143,8 +143,14 @@ final class PlaceAvailabilityService
         }
 
         $maxGuests = $place->max_guests;
-        $guestsOk = $guests === null || $maxGuests === null || $guests <= $maxGuests;
+        // Fail closed on a null capacity: publish/update forms require 1-50,
+        // so a live place without one is misconfigured data — don't treat it
+        // as "unlimited".
+        $guestsOk = $guests === null || ($maxGuests !== null && $guests <= $maxGuests);
         $datesAvailable = $unavailable === [];
+        // Every night resolved to 0 (weekday columns AND base price unset) —
+        // the stay would total SR 0, which the gateway rejects anyway.
+        $priceOk = $subtotal > 0;
 
         return [
             'place_id' => $place->id,
@@ -156,7 +162,8 @@ final class PlaceAvailabilityService
             'currency' => 'SAR',
             'dates_available' => $datesAvailable,
             'guests_ok' => $guestsOk,
-            'bookable' => $datesAvailable && $guestsOk,
+            'price_ok' => $priceOk,
+            'bookable' => $datesAvailable && $guestsOk && $priceOk,
             'unavailable_dates' => $unavailable,
             'breakdown' => $breakdown,
             'pricing' => $this->computePricing($subtotal),
@@ -298,11 +305,25 @@ final class PlaceAvailabilityService
      * Block an inclusive [start_date, end_date] range on the place (host marks
      * the place unavailable). Overlaps with existing blockings are harmless —
      * the read API de-duplicates days when it expands them for the calendar.
+     * Overlaps with active bookings are refused: blocking doesn't cancel the
+     * stay, it would only hide a real conflict.
      *
      * @param  array{start_date: string, end_date: string, reason?: string|null}  $data
      */
     public function block(Place $place, array $data): PlaceBlocking
     {
+        $bookingConflict = $place->bookings()
+            ->activeHold()
+            ->where('start_date', '<=', $data['end_date'])
+            ->where('end_date', '>=', $data['start_date'])
+            ->exists();
+
+        if ($bookingConflict) {
+            throw ValidationException::withMessages([
+                'start_date' => __('Those dates include a confirmed or pending booking. Blocking them would not cancel it — contact support to cancel a booking.'),
+            ]);
+        }
+
         return $place->blockings()->create([
             'start_date' => $data['start_date'],
             'end_date' => $data['end_date'],

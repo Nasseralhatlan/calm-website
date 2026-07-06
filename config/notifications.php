@@ -52,6 +52,17 @@ return [
         ],
     ],
 
+    // A connected external calendar (Airbnb/Gathern) imported an event over
+    // dates an active Calm booking already holds — likely double-booked.
+    'calendar_conflict' => [
+        'host' => [
+            'title_ar' => 'تعارض في التقويم',
+            'title_en' => 'Calendar conflict',
+            'body_ar' => 'حجز من تقويم خارجي مرتبط يتداخل مع حجزك {ref} بتاريخ {dates}. يرجى التحقق لتجنب الحجز المزدوج.',
+            'body_en' => 'An external calendar event overlaps your booking {ref} for {dates}. Please check to avoid a double booking.',
+        ],
+    ],
+
     'booking_canceled_by_host' => [
         'guest' => [
             'title_ar' => 'تم إلغاء حجزك',

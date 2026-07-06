@@ -160,6 +160,19 @@ final class NotificationService
         ));
     }
 
+    /**
+     * An imported external-calendar event landed on dates this active booking
+     * holds — the place is double-booked across platforms. Sent once per new
+     * external event (the calendar sync dedups re-imports).
+     */
+    public function calendarConflict(Booking $booking): void
+    {
+        $this->notify($booking->host, $this->compose(
+            'calendar_conflict', 'host', $this->bookingVars($booking),
+            ['booking_id' => $booking->id, 'place_id' => $booking->place_id],
+        ));
+    }
+
     public function placeApproved(Place $place): void
     {
         $this->notify($place->host, $this->compose(

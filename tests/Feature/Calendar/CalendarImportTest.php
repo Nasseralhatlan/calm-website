@@ -2,15 +2,18 @@
 
 declare(strict_types=1);
 
+use App\Enums\BookingStatus;
 use App\Enums\PlaceReviewStatus;
 use App\Enums\PlaceStatus;
 use App\Jobs\SyncExternalCalendars;
+use App\Models\Booking;
 use App\Models\CityArea;
 use App\Models\Place;
 use App\Models\PlaceBlocking;
 use App\Models\PlaceCalendarFeed;
 use App\Models\PlaceType;
 use App\Models\User;
+use App\Models\UserNotification;
 use App\Services\Calendar\CalendarImportService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
@@ -204,4 +207,56 @@ it('rejects non-http(s) urls without fetching', function (): void {
 
     expect($feed->fresh()->last_status)->toBe('error')
         ->and($feed->fresh()->last_error)->toContain('http');
+});
+
+it('alerts the host once when a new imported event overlaps an active booking', function (): void {
+    $host = User::factory()->create(['phone' => '515200008']);
+    $guest = User::factory()->create(['phone' => '515200009']);
+    $place = calImportPlace($host);
+    $feed = calImportFeed($place);
+    $service = app(CalendarImportService::class);
+
+    $booking = Booking::query()->create([
+        'place_id' => $place->id, 'guest_user_id' => $guest->id, 'host_user_id' => $host->id,
+        'booking_status' => BookingStatus::Confirmed->value,
+        'start_date' => '2026-07-15', 'end_date' => '2026-07-16',
+        'guests' => 2, 'nights' => 1, 'stay_amount' => 100000,
+        'commission_rate' => 10, 'commission_amount' => 10000, 'vat_rate' => 15, 'vat_amount' => 15000,
+        'total_amount' => 115000, 'payout_status' => 'not_paid', 'confirmed_at' => now(),
+    ]);
+
+    // External event lands exactly on the booked dates → double-booked.
+    Http::fake(['feeds.test/*' => Http::response(airbnbIcs([
+        ['uid' => 'res-x@airbnb.com', 'start' => '20260715', 'end' => '20260717'],
+    ]))]);
+
+    $service->syncFeed($feed);
+
+    // Import still happens (the dates ARE taken externally)…
+    expect(PlaceBlocking::query()->where('calendar_feed_id', $feed->id)->count())->toBe(1);
+
+    // …and the host is alerted, referencing the conflicting booking.
+    $alerts = UserNotification::query()->where('user_id', $host->id)->where('type', 'calendar_conflict')->get();
+    expect($alerts)->toHaveCount(1)
+        ->and($alerts->first()->data['booking_id'])->toBe($booking->id)
+        ->and($alerts->first()->body_en)->toContain($booking->reference);
+
+    // Hourly re-syncs of the SAME event must not re-alert.
+    $service->syncFeed($feed);
+    expect(UserNotification::query()->where('type', 'calendar_conflict')->count())->toBe(1);
+});
+
+it('does not alert for imported events that overlap nothing', function (): void {
+    $host = User::factory()->create(['phone' => '515200010']);
+    $place = calImportPlace($host);
+    $feed = calImportFeed($place);
+
+    Http::fake(['feeds.test/*' => Http::response(airbnbIcs([
+        ['uid' => 'res-y@airbnb.com', 'start' => '20260720', 'end' => '20260722'],
+    ]))]);
+
+    app(CalendarImportService::class)->syncFeed($feed);
+
+    expect(PlaceBlocking::query()->where('calendar_feed_id', $feed->id)->count())->toBe(1)
+        ->and(UserNotification::query()->where('type', 'calendar_conflict')->count())->toBe(0);
 });

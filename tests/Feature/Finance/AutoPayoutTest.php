@@ -21,6 +21,7 @@ use App\Services\Finance\HostPayoutService;
 use App\Services\Finance\QoyodSyncService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Validation\ValidationException;
 
 beforeEach(function (): void {
     $this->seed();
@@ -251,4 +252,20 @@ it('shows the payout state and failures with a retry action on the admin booking
     expect($failed->refresh()->payout_status)->toBe('processing')
         ->and($failed->payout_id)->toBe('po_56')
         ->and($failed->payout_failure)->toBeNull();
+});
+
+it('refuses an admin retry while payouts are in manual mode', function (): void {
+    // Manual mode: execute() would fire at Moyasar with an empty source
+    // account and just record a fresh failure — refuse up front instead.
+    config()->set('moyasar.payouts_mode', 'manual');
+    config()->set('moyasar.payout_account_id', '');
+    Http::fake();
+
+    $booking = apoBooking($this->host, $this->guest, ['payout_failure' => 'Host has no IBAN on file.']);
+
+    expect(fn () => app(HostPayoutService::class)->retry($booking))
+        ->toThrow(ValidationException::class);
+
+    Http::assertNothingSent();
+    expect($booking->refresh()->payout_failure)->toBe('Host has no IBAN on file.');
 });

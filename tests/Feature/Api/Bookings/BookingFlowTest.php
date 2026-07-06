@@ -58,12 +58,15 @@ function fakeMoyasar(string $fetchStatus = 'initiated', int $fetchAmount = 0): v
             'id' => 'inv_test', 'status' => $fetchStatus, 'amount' => $fetchAmount,
             'url' => 'https://checkout.moyasar.com/invoices/inv_test', 'metadata' => [],
             'payments' => $fetchStatus === 'paid'
-                ? [['status' => 'paid', 'amount' => $fetchAmount, 'source' => ['type' => 'creditcard']]]
+                ? [['id' => 'pay_test', 'status' => 'paid', 'amount' => $fetchAmount, 'refunded' => 0, 'source' => ['type' => 'creditcard']]]
                 : [],
         ]),
         'api.moyasar.com/v1/invoices' => Http::response([
             'id' => 'inv_test', 'status' => 'initiated', 'amount' => 0,
             'url' => 'https://checkout.moyasar.com/invoices/inv_test', 'metadata' => [],
+        ]),
+        'api.moyasar.com/v1/payments/*/refund' => Http::response([
+            'id' => 'pay_test', 'status' => 'refunded', 'amount' => $fetchAmount, 'refunded' => $fetchAmount,
         ]),
     ]);
 }
@@ -163,6 +166,58 @@ it('never confirms when the paid amount does not match the quote', function (): 
         ->assertOk();
 
     expect($booking->refresh()->booking_status)->toBe(BookingStatus::Expired);
+
+    // Money we never agreed to take is returned in full, automatically.
+    Http::assertSent(fn ($request): bool => str_contains($request->url(), 'payments/pay_test/refund'));
+});
+
+it('does not let a host book their own place', function (): void {
+    fakeMoyasar();
+    $place = bookingPlace();
+    [$in, $out] = twoNightDates();
+
+    $this->actingAs($place->host, 'api')
+        ->postJson("/api/places/{$place->id}/bookings", ['check_in' => $in, 'check_out' => $out, 'guests' => 2])
+        ->assertStatus(422);
+
+    expect(Booking::query()->count())->toBe(0);
+    Http::assertNothingSent();
+});
+
+it('fails closed when a live place has no max_guests configured', function (): void {
+    fakeMoyasar();
+    $place = bookingPlace(['max_guests' => null]); // forms require 1-50 — corrupt data
+    [$in, $out] = twoNightDates();
+
+    $this->getJson("/api/places/{$place->id}/quote?check_in={$in}&check_out={$out}&guests=2")
+        ->assertOk()
+        ->assertJsonPath('data.guests_ok', false)
+        ->assertJsonPath('data.bookable', false);
+
+    $this->actingAs(bookingGuest(), 'api')
+        ->postJson("/api/places/{$place->id}/bookings", ['check_in' => $in, 'check_out' => $out, 'guests' => 2])
+        ->assertStatus(422);
+
+    expect(Booking::query()->count())->toBe(0);
+});
+
+it('refuses a booking whose stay would total zero instead of failing at the gateway', function (): void {
+    fakeMoyasar();
+    $place = bookingPlace(['price' => 0]); // weekday columns default 0 → every night resolves to 0
+    [$in, $out] = twoNightDates();
+
+    $this->getJson("/api/places/{$place->id}/quote?check_in={$in}&check_out={$out}&guests=2")
+        ->assertOk()
+        ->assertJsonPath('data.price_ok', false)
+        ->assertJsonPath('data.bookable', false);
+
+    $this->actingAs(bookingGuest(), 'api')
+        ->postJson("/api/places/{$place->id}/bookings", ['check_in' => $in, 'check_out' => $out, 'guests' => 2])
+        ->assertStatus(422);
+
+    // No junk creation_failed row, no Moyasar invoice attempt.
+    expect(Booking::query()->count())->toBe(0);
+    Http::assertNothingSent();
 });
 
 it('forbids polling another guest\'s booking', function (): void {

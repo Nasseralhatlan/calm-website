@@ -72,15 +72,28 @@ final class BookingService
                 abort(404, 'Place not found.');
             }
 
+            // Self-dealing guard: a host booking their own listing would let
+            // them fabricate stays, commissions, payouts and self-reviews.
+            if ($locked->host_user_id === $user->id) {
+                abort(422, 'You cannot book your own place.');
+            }
+
             $quote = $this->availability->quote($locked, $checkIn, $checkOut, $guests);
             if ($quote === null) {
                 abort(404, 'Place not found.');
             }
             if (! $quote['guests_ok']) {
-                abort(422, 'This place allows at most '.$quote['max_guests'].' guests.');
+                abort(422, $quote['max_guests'] !== null
+                    ? 'This place allows at most '.$quote['max_guests'].' guests.'
+                    : 'This place has no guest capacity configured — contact support.');
             }
             if (! $quote['dates_available']) {
                 abort(422, 'Those dates are no longer available.');
+            }
+            if (! $quote['price_ok']) {
+                // A zero total would only fail later at the gateway, leaving a
+                // junk creation_failed row — refuse before creating anything.
+                abort(422, 'This place has no nightly price set.');
             }
 
             $pricing = $quote['pricing'];
@@ -583,6 +596,10 @@ final class BookingService
             if (! is_string($secret) || ! hash_equals((string) $expected, $secret)) {
                 abort(401, 'Invalid webhook secret.');
             }
+        } elseif (app()->isProduction()) {
+            // Safe (the body is never trusted — we re-fetch from Moyasar), but
+            // production should still authenticate its webhooks.
+            Log::warning('Moyasar webhook signature verification is DISABLED — set MOYASAR_WEBHOOK_SECRET.');
         }
 
         $bookingId = data_get($payload, 'data.metadata.booking_id') ?? data_get($payload, 'metadata.booking_id');
@@ -727,8 +744,9 @@ final class BookingService
     private function applyInvoice(Booking $booking, MoyasarInvoice $invoice): Booking
     {
         $transitionedTo = null;
+        $refundMismatch = false;
 
-        $result = DB::transaction(function () use ($booking, $invoice, &$transitionedTo): Booking {
+        $result = DB::transaction(function () use ($booking, $invoice, &$transitionedTo, &$refundMismatch): Booking {
             $fresh = Booking::query()->whereKey($booking->id)->lockForUpdate()->first();
 
             if ($fresh === null || $fresh->booking_status !== BookingStatus::PendingPayment) {
@@ -741,12 +759,14 @@ final class BookingService
 
             if ($invoice->isPaid()) {
                 if ($invoice->amount !== $fresh->total_amount) {
-                    // Paid amount doesn't match what we quoted — never confirm.
+                    // Paid amount doesn't match what we quoted — never confirm,
+                    // and give the captured money back (outside this lock).
                     Log::warning('Moyasar paid amount mismatch', [
                         'booking' => $fresh->id, 'expected' => $fresh->total_amount, 'paid' => $invoice->amount,
                     ]);
                     $fresh->booking_status = BookingStatus::Expired;
                     $transitionedTo = BookingStatus::Expired;
+                    $refundMismatch = true;
                 } else {
                     $fresh->booking_status = BookingStatus::Confirmed;
                     $fresh->payment_method = $invoice->paymentMethod();
@@ -765,6 +785,21 @@ final class BookingService
 
             return $fresh;
         });
+
+        // A mismatched capture is money we never agreed to take — refund it in
+        // full. AFTER the transaction (no HTTP under a row lock), and this
+        // transition only happens once (the booking has left pending_payment),
+        // so a refund failure here needs manual follow-up from the dashboard.
+        if ($refundMismatch && $result->payment_id !== null) {
+            try {
+                $this->gateway->refundInvoice($result->payment_id);
+                Log::warning('Moyasar mismatch payment auto-refunded', ['booking' => $result->id]);
+            } catch (RuntimeException $e) {
+                Log::error('Moyasar mismatch refund FAILED — refund manually from the Moyasar dashboard', [
+                    'booking' => $result->id, 'invoice' => $result->payment_id, 'error' => $e->getMessage(),
+                ]);
+            }
+        }
 
         $this->fireBookingNotification($result, $transitionedTo);
 
