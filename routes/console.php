@@ -45,7 +45,7 @@ Schedule::job(new PurgeDeletedAccounts)
 // place_blockings so cross-platform bookings block dates here. Hourly matches
 // how the platforms poll each other; hosts can also "Sync now" on demand.
 Schedule::job(new SyncExternalCalendars)
-    ->hourly()
+    ->cron($fast ? '* * * * *' : '0 * * * *')
     ->withoutOverlapping();
 
 // Issue each paid stay's financial documents (guest invoice, host commission
