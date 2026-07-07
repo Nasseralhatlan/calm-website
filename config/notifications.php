@@ -52,6 +52,17 @@ return [
         ],
     ],
 
+    // A payout is due but the host has no bank IBAN on file. Nudged at most
+    // once per day until they add it (then the payout fires automatically).
+    'host_iban_needed' => [
+        'host' => [
+            'title_ar' => 'أضف الآيبان لاستلام أرباحك',
+            'title_en' => 'Add your IBAN to get paid',
+            'body_ar' => 'لديك دفعة بقيمة {amount} ر.س بانتظارك عن الحجز {ref}. أضف رقم الآيبان البنكي في تطبيق كالم لاستلامها تلقائياً.',
+            'body_en' => 'A payout of SR {amount} for booking {ref} is waiting. Add your bank IBAN in the Calm app to receive it automatically.',
+        ],
+    ],
+
     // A connected external calendar (Airbnb/Gathern) imported an event over
     // dates an active Calm booking already holds — likely double-booked.
     'calendar_conflict' => [

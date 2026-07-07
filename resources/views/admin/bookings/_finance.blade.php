@@ -97,6 +97,12 @@
             <span class="inline-flex items-center text-[13px] font-semibold text-[#b45309]" style="gap: 6px; background: #fffbeb; padding: 6px 14px; border-radius: 999px;">
                 ⏸ {{ $isRtl ? 'فترة الحجز حتى' : 'In hold until' }} <span class="tabular-nums" dir="ltr">{{ $payableAt->isoFormat('D MMM, h:mm A') }}</span>
             </span>
+        @elseif(! $booking->host?->bank_account)
+            {{-- Wait state, not a failure: the sweep skips it and nudges the
+                 host daily; the payout fires itself once the IBAN is added. --}}
+            <span class="inline-flex items-center text-[13px] font-semibold text-[#b45309]" style="gap: 6px; background: #fffbeb; padding: 6px 14px; border-radius: 999px;">
+                🏦 {{ $isRtl ? 'بانتظار بيانات المضيف البنكية — تم إشعاره، ويتم التحويل تلقائياً فور إضافتها' : 'Waiting for the host to add bank details — host notified; transfers automatically once added' }}
+            </span>
         @else
             <span class="inline-flex items-center text-[13px] font-semibold text-[#b45309]" style="gap: 6px; background: #fffbeb; padding: 6px 14px; border-radius: 999px;">
                 {{ $isRtl ? 'في قائمة التحويل — الدورة القادمة تنفذه تلقائياً' : 'Queued — the next automatic sweep transfers it' }}

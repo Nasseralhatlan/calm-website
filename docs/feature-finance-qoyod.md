@@ -83,6 +83,14 @@ movement provider `moyasar`, payable → succeeded); `failed/returned/canceled` 
 `not_paid` with the bank's reason in `payout_failure` (the sweep deliberately skips
 failed rows — they wait for an explicit admin Retry).
 
+Missing IBAN is a WAIT state, not a failure: the sweep skips the row without
+setting `payout_failure` (the check is first, so re-checking costs nothing),
+sends the host one "add your IBAN to receive SR X" notification per day
+(`host_iban_needed`, deduped in `NotificationService::hostIbanNeeded`), and the
+payout fires automatically on the first sweep after the host saves their IBAN —
+no admin involvement. The admin finance panel shows "Waiting for the host to add
+bank details". Only a missing host ACCOUNT (deleted user) records a failure.
+
 Admin surface is BOOKING-CENTRIC (`/admin/bookings/{id}`): a finance panel shows the
 payout state (upcoming / awaiting invoices / in hold until … / queued / processing /
 paid / failed + **Retry**, which re-fires the automatic transfer with a fresh

@@ -7,6 +7,7 @@ namespace App\Services\Finance;
 use App\Enums\BookingStatus;
 use App\Integrations\Payment\MoyasarPayouts;
 use App\Models\Booking;
+use App\Services\Notification\NotificationService;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use Throwable;
@@ -19,18 +20,23 @@ use Throwable;
  * runs until the flag flips (manual mode = payouts paused; there is no manual
  * settlement path).
  *
- * Failure model: a create-time error (bad IBAN, API down) records
+ * Failure model: a create-time error (Moyasar rejection, API down) records
  * payout_failure and leaves the row not_paid — visible in the admin queue
  * with a Retry button; the sweep skips it until an admin retries, so a broken
- * IBAN isn't hammered every 15 minutes. A bank-level failure discovered by
+ * transfer isn't hammered every 15 minutes. A bank-level failure discovered by
  * reconciliation (failed/returned/canceled) also advances payout_attempts,
  * because that sequence_number was consumed without moving money.
+ *
+ * A missing IBAN is NOT a failure — it's a wait state the HOST resolves: the
+ * sweep skips the row (no payout_failure), nudges the host once a day to add
+ * their bank details, and pays automatically on the first sweep after they do.
  */
 final class HostPayoutService
 {
     public function __construct(
         private readonly MoyasarPayouts $client,
         private readonly BookingFinanceFinalizer $finalizer,
+        private readonly NotificationService $notifications,
     ) {}
 
     /** Auto mode = flag on + a registered payout (source) account. */
@@ -80,10 +86,22 @@ final class HostPayoutService
     public function execute(Booking $booking): bool
     {
         $host = $booking->host;
-        $iban = strtoupper(str_replace(' ', '', (string) ($host?->bank_account ?? '')));
+
+        if ($host === null) {
+            // A deleted host account can't add bank details — real failure.
+            $booking->update(['payout_failure' => 'Host account missing.']);
+
+            return false;
+        }
+
+        $iban = strtoupper(str_replace(' ', '', (string) ($host->bank_account ?? '')));
 
         if ($iban === '') {
-            $booking->update(['payout_failure' => 'Host has no IBAN on file.']);
+            // Wait state, not a failure: leave payout_failure NULL so every
+            // sweep re-checks for free (this branch costs no HTTP), nudge the
+            // host to add their IBAN (deduped to once a day), and the payout
+            // fires automatically on the first sweep after they do.
+            $this->notifications->hostIbanNeeded($booking);
 
             return false;
         }

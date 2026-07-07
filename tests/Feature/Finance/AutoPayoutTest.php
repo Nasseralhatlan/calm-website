@@ -16,6 +16,7 @@ use App\Models\FinancialMovement;
 use App\Models\Place;
 use App\Models\PlaceType;
 use App\Models\User;
+use App\Models\UserNotification;
 use App\Services\Finance\BookingFinanceFinalizer;
 use App\Services\Finance\HostPayoutService;
 use App\Services\Finance\QoyodSyncService;
@@ -183,7 +184,7 @@ it('records a failure without calling Moyasar when the payout is below the SR 1 
         ->and($booking->payout_failure)->toContain('minimum');
 });
 
-it('records a failure without calling Moyasar when the host has no IBAN', function (): void {
+it('holds a no-IBAN payout, nudges the host once a day, and pays itself once the IBAN lands', function (): void {
     autoPayoutsOn();
     Http::fake();
     $noBankHost = User::factory()->create(['phone' => '516300002', 'bank_account' => null]);
@@ -191,9 +192,34 @@ it('records a failure without calling Moyasar when the host has no IBAN', functi
 
     (new ProcessDuePayouts)->handle(app(HostPayoutService::class));
 
+    // Wait state, not a failure: no HTTP, no payout_failure (so the sweep
+    // keeps re-checking), and the host got exactly one "add your IBAN" nudge.
     Http::assertNothingSent();
     expect($booking->refresh()->payout_status)->toBe('not_paid')
-        ->and($booking->payout_failure)->toBe('Host has no IBAN on file.');
+        ->and($booking->payout_failure)->toBeNull();
+
+    $nudges = UserNotification::query()
+        ->where('user_id', $noBankHost->id)->where('type', 'host_iban_needed');
+    expect($nudges->count())->toBe(1)
+        ->and($nudges->first()->body_en)->toContain($booking->reference)
+        ->and($nudges->first()->body_en)->toContain('1,770.00'); // host net SR
+
+    // Same-day sweeps do NOT spam a second nudge.
+    (new ProcessDuePayouts)->handle(app(HostPayoutService::class));
+    expect($nudges->count())->toBe(1);
+
+    // The next day (still no IBAN) the reminder repeats.
+    Carbon::setTestNow('2026-07-04 12:30:00');
+    (new ProcessDuePayouts)->handle(app(HostPayoutService::class));
+    expect($nudges->count())->toBe(2);
+
+    // Host adds the IBAN in the app → the very next sweep pays, no admin.
+    $noBankHost->update(['bank_account' => 'SA4420000001234567891234']);
+    (new ProcessDuePayouts)->handle(app(HostPayoutService::class));
+
+    expect($booking->refresh()->payout_status)->toBe('processing');
+    Http::assertSent(fn ($request): bool => str_ends_with($request->url(), '/payouts')
+        && $request['destination']['iban'] === 'SA4420000001234567891234');
 });
 
 it('respects the hold window and the documents-before-money rule', function (): void {
@@ -261,11 +287,11 @@ it('refuses an admin retry while payouts are in manual mode', function (): void 
     config()->set('moyasar.payout_account_id', '');
     Http::fake();
 
-    $booking = apoBooking($this->host, $this->guest, ['payout_failure' => 'Host has no IBAN on file.']);
+    $booking = apoBooking($this->host, $this->guest, ['payout_failure' => 'Moyasar payout failed (bank rejected).']);
 
     expect(fn () => app(HostPayoutService::class)->retry($booking))
         ->toThrow(ValidationException::class);
 
     Http::assertNothingSent();
-    expect($booking->refresh()->payout_failure)->toBe('Host has no IBAN on file.');
+    expect($booking->refresh()->payout_failure)->toBe('Moyasar payout failed (bank rejected).');
 });

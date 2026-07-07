@@ -173,6 +173,40 @@ final class NotificationService
         ));
     }
 
+    /**
+     * A payout is due but the host has no IBAN on file. The payout sweep runs
+     * every 15 minutes and calls this each pass, so dedup here: at most ONE
+     * nudge per host per day (covers several due bookings with one SMS, and
+     * keeps reminding daily until the IBAN lands).
+     */
+    public function hostIbanNeeded(Booking $booking): void
+    {
+        $host = $booking->host;
+        if ($host === null) {
+            return;
+        }
+
+        $alreadyNudged = UserNotification::query()
+            ->where('user_id', $host->id)
+            ->where('type', 'host_iban_needed')
+            ->where('created_at', '>=', now()->subDay())
+            ->exists();
+
+        if ($alreadyNudged) {
+            return;
+        }
+
+        $amount = number_format($booking->hostNetMinor() / 100, 2);
+        $vars = $this->bookingVars($booking);
+        $vars['ar']['{amount}'] = $amount;
+        $vars['en']['{amount}'] = $amount;
+
+        $this->notify($host, $this->compose(
+            'host_iban_needed', 'host', $vars,
+            ['booking_id' => $booking->id, 'place_id' => $booking->place_id],
+        ));
+    }
+
     public function placeApproved(Place $place): void
     {
         $this->notify($place->host, $this->compose(
