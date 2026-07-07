@@ -101,6 +101,12 @@ it('creates a pending booking and returns a Moyasar payment url', function (): v
     expect($booking->total_amount)->toBe(230000);
     expect($booking->commission_amount)->toBe(20000); // 2000 × 10% seeded, host-side
     expect($booking->payment_id)->toBe('inv_test');
+
+    // The Moyasar invoice carries BOTH ids — UUID for machines, CB-ref for
+    // humans searching the dashboard. (Form-encoded as metadata[key] pairs.)
+    Http::assertSent(fn ($request): bool => str_ends_with($request->url(), '/invoices')
+        && data_get($request->data(), 'metadata[booking_id]') === $booking->id
+        && data_get($request->data(), 'metadata[booking_reference]') === $booking->reference);
 });
 
 it('holds the dates so the place is no longer bookable for an overlapping stay', function (): void {

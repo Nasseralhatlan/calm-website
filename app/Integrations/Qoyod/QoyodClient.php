@@ -41,6 +41,17 @@ final class QoyodClient
         return $this->post('/credit_notes', ['credit_note' => $creditNote]);
     }
 
+    /**
+     * Standalone receipt: kind `received` = سند قبض, kind `paid` = سند صرف
+     * (money out — used to mirror settled host payouts).
+     *
+     * @param  array<string, mixed>  $receipt
+     */
+    public function createReceipt(array $receipt): array
+    {
+        return $this->post('/receipts', ['receipt' => $receipt]);
+    }
+
     /** Fresh, EXPIRING pdf link for an invoice — fetched per view, never stored long-term. */
     public function invoicePdf(string $qoyodInvoiceId): array
     {

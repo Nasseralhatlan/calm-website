@@ -35,13 +35,15 @@ final class MoyasarPayouts
      * (id, status: queued|initiated|paid|failed|canceled|returned, ...).
      *
      * @param  array<string, string>  $destination  {type: bank, iban, name, mobile?, country, city}
+     * @param  array<string, string>  $metadata  String key-values Moyasar stores on the payout —
+     *                                           searchable in the dashboard and echoed in webhooks.
      * @return array<string, mixed>
      *
      * @throws RuntimeException when Moyasar rejects the request.
      */
-    public function createPayout(int $amountMinor, array $destination, string $sequenceNumber, string $comment): array
+    public function createPayout(int $amountMinor, array $destination, string $sequenceNumber, string $comment, array $metadata = []): array
     {
-        $response = $this->client()->post($this->baseUrl.'payouts', [
+        $response = $this->client()->post($this->baseUrl.'payouts', array_filter([
             'source_id' => (string) config('moyasar.payout_account_id'),
             'amount' => $amountMinor,
             'currency' => 'SAR',
@@ -49,7 +51,8 @@ final class MoyasarPayouts
             'sequence_number' => $sequenceNumber,
             'comment' => $comment,
             'destination' => $destination,
-        ]);
+            'metadata' => $metadata,
+        ], fn ($value): bool => $value !== []));
 
         if (! $response->successful()) {
             Log::error('Moyasar payout creation failed', ['status' => $response->status(), 'body' => $response->body()]);

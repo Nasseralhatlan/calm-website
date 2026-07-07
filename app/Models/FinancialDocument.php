@@ -29,6 +29,8 @@ class FinancialDocument extends Model
 
     public const TYPE_SETTLEMENT_STATEMENT = 'settlement_statement';
 
+    public const TYPE_VOUCHER = 'voucher';
+
     // document_subtype (v1 set)
     public const GUEST_BOOKING_INVOICE = 'guest_booking_invoice';
 
@@ -39,6 +41,10 @@ class FinancialDocument extends Model
     public const GUEST_BOOKING_CREDIT_NOTE = 'guest_booking_credit_note';
 
     public const HOST_COMMISSION_CREDIT_NOTE = 'host_commission_credit_note';
+
+    // سند صرف: mirrors the settled bank transfer to the host into Qoyod, so
+    // the Moyasar clearing account reconciles (money out = payout paid).
+    public const HOST_PAYOUT_VOUCHER = 'host_payout_voucher';
 
     // status
     public const STATUS_DRAFT = 'draft';

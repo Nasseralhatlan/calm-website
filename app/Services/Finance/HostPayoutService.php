@@ -120,13 +120,19 @@ final class HostPayoutService
                 array_filter([
                     'type' => 'bank',
                     'iban' => $iban,
-                    'name' => (string) ($host?->name ?? ''),
-                    'mobile' => $this->mobile((string) ($host?->phone ?? '')),
+                    'name' => (string) ($host->name ?? ''),
+                    'mobile' => $this->mobile((string) ($host->phone ?? '')),
                     'country' => 'SA',
                     'city' => (string) config('moyasar.payout_default_city', 'Riyadh'),
                 ], fn (string $value): bool => $value !== ''),
                 $this->client->sequenceNumberFor($booking->id, (int) $booking->payout_attempts),
                 "Calm host payout {$booking->reference}",
+                // Searchable in the Moyasar dashboard + echoed in webhooks.
+                [
+                    'booking_id' => (string) $booking->id,
+                    'booking_reference' => (string) $booking->reference,
+                    'attempt' => (string) $booking->payout_attempts,
+                ],
             );
         } catch (Throwable $e) {
             // Ambiguous by design: the payout may or may not exist at Moyasar

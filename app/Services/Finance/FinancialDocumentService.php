@@ -35,7 +35,7 @@ final class FinancialDocumentService
                 'buyer_type' => 'guest',
                 'buyer_id' => $booking->guest_user_id,
                 'direction' => 'sales',
-                'status' => $this->initialTaxDocumentStatus(),
+                'status' => $this->initialProviderStatus(),
                 'is_tax_document' => true,
                 'subtotal_amount' => (int) $booking->stay_amount,
                 'vat_amount' => (int) $booking->vat_amount,
@@ -72,7 +72,7 @@ final class FinancialDocumentService
                 'buyer_type' => 'host',
                 'buyer_id' => $booking->host_user_id,
                 'direction' => 'sales',
-                'status' => $this->initialTaxDocumentStatus(),
+                'status' => $this->initialProviderStatus(),
                 'is_tax_document' => true,
                 'subtotal_amount' => (int) $booking->commission_amount,
                 'vat_amount' => (int) $booking->commission_vat_amount,
@@ -147,6 +147,34 @@ final class FinancialDocumentService
         });
     }
 
+    /**
+     * سند صرف — mirrors the SETTLED bank transfer to the host into Qoyod, so
+     * the Moyasar clearing account reconciles (guest money in, host share
+     * out). Created only after the payout is confirmed paid; pushed by the
+     * sync sweep as a kind=paid receipt. Not a tax document.
+     */
+    public function hostPayoutVoucher(Booking $booking): FinancialDocument
+    {
+        return $this->idempotent($booking, FinancialDocument::HOST_PAYOUT_VOUCHER, function () use ($booking): FinancialDocument {
+            return FinancialDocument::query()->create([
+                'source_type' => 'booking',
+                'source_id' => $booking->id,
+                'document_type' => FinancialDocument::TYPE_VOUCHER,
+                'document_subtype' => FinancialDocument::HOST_PAYOUT_VOUCHER,
+                'seller_type' => 'calm',
+                'buyer_type' => 'host',
+                'buyer_id' => $booking->host_user_id,
+                'direction' => 'outbound',
+                'status' => $this->initialProviderStatus(),
+                'is_tax_document' => false,
+                'subtotal_amount' => $booking->hostNetMinor(),
+                'vat_amount' => 0,
+                'total_amount' => $booking->hostNetMinor(),
+                'issued_at' => now(),
+            ]);
+        });
+    }
+
     /** Credit note against the guest invoice (Case C refunds, brief §14). */
     public function guestBookingCreditNote(Booking $booking, int $amountMinor): FinancialDocument
     {
@@ -160,7 +188,7 @@ final class FinancialDocumentService
                 'buyer_type' => 'guest',
                 'buyer_id' => $booking->guest_user_id,
                 'direction' => 'sales',
-                'status' => $this->initialTaxDocumentStatus(),
+                'status' => $this->initialProviderStatus(),
                 'is_tax_document' => true,
                 'subtotal_amount' => $amountMinor - $this->vatPortion($amountMinor, (float) $booking->vat_rate),
                 'vat_amount' => $this->vatPortion($amountMinor, (float) $booking->vat_rate),
@@ -202,7 +230,7 @@ final class FinancialDocumentService
                 'buyer_type' => 'host',
                 'buyer_id' => $booking->host_user_id,
                 'direction' => 'sales',
-                'status' => $this->initialTaxDocumentStatus(),
+                'status' => $this->initialProviderStatus(),
                 'is_tax_document' => true,
                 'subtotal_amount' => (int) $booking->commission_amount,
                 'vat_amount' => (int) $booking->commission_vat_amount,
@@ -261,7 +289,7 @@ final class FinancialDocumentService
         return DB::transaction($create);
     }
 
-    private function initialTaxDocumentStatus(): string
+    private function initialProviderStatus(): string
     {
         // Mirror QoyodSyncService::enabled() EXACTLY (flag + a non-empty API
         // key): enabled-but-keyless would otherwise create documents as

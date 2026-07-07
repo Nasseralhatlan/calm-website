@@ -126,6 +126,10 @@ final class BookingFinanceFinalizer
             ->where('movement_type', FinancialMovement::HOST_PAYOUT_PAYABLE)
             ->where('status', FinancialMovement::STATUS_PENDING)
             ->update(['status' => FinancialMovement::STATUS_SUCCEEDED, 'occurred_at' => now()]);
+
+        // سند صرف: the bank transfer out, mirrored to Qoyod by the sync sweep
+        // so the Moyasar clearing account reconciles. Idempotent per booking.
+        $this->documents->hostPayoutVoucher($booking);
     }
 
     /**

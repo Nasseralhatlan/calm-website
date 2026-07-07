@@ -34,7 +34,20 @@ final class QoyodSyncService
         return (bool) config('finance.qoyod.enabled') && filled(config('finance.qoyod.api_key'));
     }
 
-    /** Push every pending/failed tax document. Called by the finance sweep. */
+    /**
+     * The document subtypes that get mirrored into Qoyod: the two tax
+     * invoices, their credit notes, and the host payout voucher (سند صرف).
+     * The settlement statement stays internal.
+     */
+    private const SYNCED_SUBTYPES = [
+        FinancialDocument::GUEST_BOOKING_INVOICE,
+        FinancialDocument::HOST_COMMISSION_INVOICE,
+        FinancialDocument::GUEST_BOOKING_CREDIT_NOTE,
+        FinancialDocument::HOST_COMMISSION_CREDIT_NOTE,
+        FinancialDocument::HOST_PAYOUT_VOUCHER,
+    ];
+
+    /** Push every pending/failed syncable document. Called by the finance sweep. */
     public function syncPendingDocuments(): void
     {
         if (! $this->enabled()) {
@@ -42,7 +55,7 @@ final class QoyodSyncService
         }
 
         FinancialDocument::query()
-            ->where('is_tax_document', true)
+            ->whereIn('document_subtype', self::SYNCED_SUBTYPES)
             ->whereIn('status', [FinancialDocument::STATUS_PENDING_PROVIDER, FinancialDocument::STATUS_FAILED])
             ->where('source_type', 'booking')
             ->with('source')
@@ -78,8 +91,55 @@ final class QoyodSyncService
             FinancialDocument::HOST_COMMISSION_INVOICE => $this->syncCommissionInvoice($booking, $document),
             FinancialDocument::GUEST_BOOKING_CREDIT_NOTE,
             FinancialDocument::HOST_COMMISSION_CREDIT_NOTE => $this->syncCreditNote($booking, $document),
+            FinancialDocument::HOST_PAYOUT_VOUCHER => $this->syncPayoutVoucher($booking, $document),
             default => null,
         };
+    }
+
+    /**
+     * سند صرف: a kind=paid receipt out of the Moyasar clearing account to the
+     * host contact, matching the settled bank transfer — so the account's
+     * balance in Qoyod reconciles against the real Moyasar balance.
+     */
+    private function syncPayoutVoucher(Booking $booking, FinancialDocument $document): void
+    {
+        // Resume-safe, same rule as invoices: never create a second voucher
+        // for a document that already carries a Qoyod id.
+        if ($document->external_document_id === null) {
+            $contactId = $this->ensureHostCustomer($booking, HostTaxProfile::query()->where('host_user_id', $booking->host_user_id)->first());
+
+            $payload = [
+                'contact_id' => (int) $contactId,
+                'reference' => "{$booking->reference}-PAYOUT",
+                'kind' => 'paid',
+                'account_id' => (int) config('finance.qoyod.moyasar_account_id'),
+                'amount' => $this->sar((int) $document->total_amount),
+                'description' => "Calm host payout {$booking->reference}"
+                    .($booking->payout_reference ? " — bank ref {$booking->payout_reference}" : ''),
+                'date' => now()->toDateString(),
+            ];
+
+            $response = $this->client->createReceipt($payload);
+            $receipt = (array) ($response['receipt'] ?? $response);
+
+            $document->update([
+                'external_provider' => 'qoyod',
+                'external_contact_id' => $contactId,
+                'external_document_id' => isset($receipt['id']) ? (string) $receipt['id'] : null,
+                'external_document_number' => $receipt['reference'] ?? "{$booking->reference}-PAYOUT",
+                'external_payload' => $payload,
+                'external_response' => $response,
+                'external_status' => 'created',
+            ]);
+
+            // Same no-id rule as invoices: never mark issued on a response we
+            // can't link back to.
+            if ($document->external_document_id === null) {
+                throw new \RuntimeException("Qoyod created payout voucher {$booking->reference}-PAYOUT but returned no id — check the Qoyod books before retrying.");
+            }
+        }
+
+        $document->update(['status' => FinancialDocument::STATUS_ISSUED]);
     }
 
     private function syncGuestInvoice(Booking $booking, FinancialDocument $document): void
@@ -228,7 +288,13 @@ final class QoyodSyncService
     /** Fresh expiring PDF link for a synced tax document (Qoyod-hosted). */
     public function pdfUrl(FinancialDocument $document): ?string
     {
-        if (! $this->enabled() || $document->external_document_id === null || $document->document_type === FinancialDocument::TYPE_SETTLEMENT_STATEMENT) {
+        // Statements are internal; payout vouchers are Qoyod receipts, which
+        // have no invoice-PDF endpoint — neither ever links out.
+        if (
+            ! $this->enabled()
+            || $document->external_document_id === null
+            || in_array($document->document_type, [FinancialDocument::TYPE_SETTLEMENT_STATEMENT, FinancialDocument::TYPE_VOUCHER], true)
+        ) {
             return null;
         }
 

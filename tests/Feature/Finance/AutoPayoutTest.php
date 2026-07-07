@@ -12,6 +12,7 @@ use App\Jobs\ProcessDuePayouts;
 use App\Jobs\ReconcileMoyasarPayouts;
 use App\Models\Booking;
 use App\Models\CityArea;
+use App\Models\FinancialDocument;
 use App\Models\FinancialMovement;
 use App\Models\Place;
 use App\Models\PlaceType;
@@ -105,7 +106,11 @@ it('transfers the host net with IBAN + deterministic sequence, then settles on r
         && $request['destination']['iban'] === 'SA4420000001234567891234'
         && $request['destination']['name'] === 'Payout Host'
         && $request['destination']['mobile'] === '+966516300001'
-        && $request['destination']['country'] === 'SA');
+        && $request['destination']['country'] === 'SA'
+        // Dashboard-searchable identifiers on the transfer itself.
+        && $request['metadata']['booking_id'] === $booking->id
+        && $request['metadata']['booking_reference'] === $booking->reference
+        && $request['metadata']['attempt'] === '0');
 
     $booking->refresh();
     expect($booking->payout_status)->toBe('processing')
@@ -127,6 +132,14 @@ it('transfers the host net with IBAN + deterministic sequence, then settles on r
         ->and($payout->status)->toBe('succeeded');
     expect($booking->financialMovements()->where('movement_type', FinancialMovement::HOST_PAYOUT_PAYABLE)->sole()->status)
         ->toBe('succeeded');
+
+    // سند صرف: settlement minted the payout voucher for the money out. Qoyod
+    // is off in tests, so it's issued locally (the sweep pushes it when on).
+    $voucher = $booking->financialDocuments()
+        ->where('document_subtype', FinancialDocument::HOST_PAYOUT_VOUCHER)->sole();
+    expect($voucher->status)->toBe(FinancialDocument::STATUS_ISSUED)
+        ->and($voucher->total_amount)->toBe(177000)
+        ->and((bool) $voucher->is_tax_document)->toBeFalse();
 });
 
 it('requeues a bank-failed transfer with the reason and a fresh sequence for the retry', function (): void {

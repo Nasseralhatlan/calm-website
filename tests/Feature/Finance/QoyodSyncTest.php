@@ -320,3 +320,54 @@ it('persists the qoyod host contact even when no tax profile row exists yet', fu
         ->count();
     expect($customerCalls)->toBe(2);
 });
+
+it('mirrors the settled host payout as a kind=paid receipt — سند صرف', function (): void {
+    qoyodOn();
+    Http::fake([
+        'api.qoyod.test/2.0/customers' => Http::response(['contact' => ['id' => 77]], 201),
+        'api.qoyod.test/2.0/invoices' => Http::sequence()
+            ->push(['invoice' => ['id' => 821, 'reference' => 'G']], 201)
+            ->push(['invoice' => ['id' => 822, 'reference' => 'C']], 201),
+        'api.qoyod.test/2.0/invoice_payments' => Http::response(['id' => 9], 200),
+        'api.qoyod.test/2.0/receipts' => Http::response(['receipt' => ['id' => 55, 'reference' => 'V-PAYOUT']], 201),
+    ]);
+
+    $booking = qsyncBooking($this->host, $this->guest);
+    (new FinalizeBookingFinances)->handle(app(BookingFinanceFinalizer::class), app(QoyodSyncService::class));
+
+    // The bank transfer settled → settlement records the payout + mints the voucher.
+    $booking->refresh()->forceFill([
+        'payout_status' => 'paid', 'payout_id' => 'po_q1',
+        'payout_reference' => '1234567890123456', 'payout_paid_at' => now(),
+    ])->save();
+    app(BookingFinanceFinalizer::class)->recordPayoutPaid($booking->refresh(), 'moyasar');
+
+    $voucher = $booking->financialDocuments()
+        ->where('document_subtype', FinancialDocument::HOST_PAYOUT_VOUCHER)->sole();
+    expect($voucher->status)->toBe(FinancialDocument::STATUS_PENDING_PROVIDER);
+
+    app(QoyodSyncService::class)->syncPendingDocuments();
+
+    expect($voucher->fresh()->status)->toBe(FinancialDocument::STATUS_ISSUED)
+        ->and($voucher->fresh()->external_document_id)->toBe('55');
+
+    // Money OUT of the Moyasar clearing account, to the host contact, with
+    // the bank reference in the description — SAR decimals at the boundary.
+    Http::assertSent(fn ($request): bool => str_ends_with($request->url(), '/receipts')
+        && $request['receipt']['kind'] === 'paid'
+        && $request['receipt']['account_id'] === 7
+        && $request['receipt']['contact_id'] === 77
+        && $request['receipt']['amount'] === '1770.00'
+        && str_contains((string) $request['receipt']['description'], '1234567890123456'));
+
+    // Resume-safety: a crash after Qoyod created the receipt (id kept, status
+    // back in the retry set) must NOT create a duplicate on the next sweep.
+    $voucher->fresh()->update(['status' => FinancialDocument::STATUS_FAILED]);
+    app(QoyodSyncService::class)->syncPendingDocuments();
+
+    expect($voucher->fresh()->status)->toBe(FinancialDocument::STATUS_ISSUED);
+    $receiptCalls = collect(Http::recorded())
+        ->filter(fn ($pair): bool => str_ends_with($pair[0]->url(), '/receipts'))
+        ->count();
+    expect($receiptCalls)->toBe(1);
+});

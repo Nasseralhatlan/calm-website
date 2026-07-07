@@ -45,14 +45,27 @@ were removed rather than left as zero-filled inconsistencies.
 
 ## Qoyod sync (flag `QOYOD_ENABLED`, default off)
 
-When enabled, tax documents are created as `pending_provider` and every sweep pushes
-pending/failed ones: customer create/reuse (guests → `users.qoyod_customer_id`, hosts →
-`host_tax_profiles.qoyod_customer_id`), `POST /2.0/invoices` (SAR decimal strings,
-`tax_percent` from the booking snapshot — 0 pre-VAT-registration, 15 after),
+When enabled, syncable documents are created as `pending_provider` and every sweep
+pushes pending/failed ones: customer create/reuse (guests → `users.qoyod_customer_id`,
+hosts → `host_tax_profiles.qoyod_customer_id`), `POST /2.0/invoices` (SAR decimal
+strings, `tax_percent` from the booking snapshot — 0 pre-VAT-registration, 15 after),
 `POST /2.0/invoice_payments` (guest → Moyasar clearing account, commission → settlement
 offset account), credit notes on cancellation. Failures mark the document `failed` and
 retry next sweep — an outage delays, never loses. PDF links come from
 `GET /2.0/invoices/{id}/pdf` (expiring) — fetched fresh per request, never stored.
+
+**سند صرف (payout voucher):** when a host payout SETTLES, `recordPayoutPaid` mints a
+`host_payout_voucher` document, and the sweep mirrors it as `POST /2.0/receipts` with
+`kind=paid` — money OUT of the Moyasar clearing account to the host contact, amount =
+`host_payout_amount`, reference `{CB-ref}-PAYOUT`, bank ref in the description. This is
+what makes the Moyasar clearing account reconcile in Qoyod (guest total in, host share
+out, commission offset). Receipts have no PDF endpoint (`pdfUrl` returns null). Qoyod
+`kind` accepts only `received` (سند قبض) / `paid` (سند صرف); receipts delete via
+`DELETE /2.0/receipts/{id}` during cleanup.
+
+**Moyasar identifiers:** invoices carry `metadata.booking_id` + `metadata.booking_reference`;
+payouts carry `metadata` {booking_id, booking_reference, attempt} plus the CB-ref in
+`comment` — both searchable in the Moyasar dashboard and echoed in webhooks.
 
 ## API (mobile)
 
