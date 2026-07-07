@@ -160,9 +160,12 @@ final class BookingFinanceFinalizer
             return;
         }
 
-        // Case C — documents exist; never edit them, credit them.
+        // Case C — documents exist; never edit them, credit them. The refund
+        // cash leaving the Moyasar account also gets its سند صرف so the
+        // clearing account still reconciles after the reversal.
         $this->documents->guestBookingCreditNote($booking, (int) $booking->total_amount);
         $this->documents->hostCommissionCreditNote($booking);
+        $this->documents->guestRefundVoucher($booking, (int) $booking->total_amount);
 
         $this->movement($booking, FinancialMovement::GUEST_REFUND, [
             'from_party_type' => 'calm',

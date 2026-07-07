@@ -45,6 +45,7 @@ final class QoyodSyncService
         FinancialDocument::GUEST_BOOKING_CREDIT_NOTE,
         FinancialDocument::HOST_COMMISSION_CREDIT_NOTE,
         FinancialDocument::HOST_PAYOUT_VOUCHER,
+        FinancialDocument::GUEST_REFUND_VOUCHER,
     ];
 
     /** Push every pending/failed syncable document. Called by the finance sweep. */
@@ -92,6 +93,7 @@ final class QoyodSyncService
             FinancialDocument::GUEST_BOOKING_CREDIT_NOTE,
             FinancialDocument::HOST_COMMISSION_CREDIT_NOTE => $this->syncCreditNote($booking, $document),
             FinancialDocument::HOST_PAYOUT_VOUCHER => $this->syncPayoutVoucher($booking, $document),
+            FinancialDocument::GUEST_REFUND_VOUCHER => $this->syncRefundVoucher($booking, $document),
             default => null,
         };
     }
@@ -103,19 +105,51 @@ final class QoyodSyncService
      */
     private function syncPayoutVoucher(Booking $booking, FinancialDocument $document): void
     {
-        // Resume-safe, same rule as invoices: never create a second voucher
-        // for a document that already carries a Qoyod id.
-        if ($document->external_document_id === null) {
-            $contactId = $this->ensureHostCustomer($booking, HostTaxProfile::query()->where('host_user_id', $booking->host_user_id)->first());
+        $contactId = $this->ensureHostCustomer($booking, HostTaxProfile::query()->where('host_user_id', $booking->host_user_id)->first());
 
+        $this->pushPaidReceipt(
+            $document,
+            $contactId,
+            "{$booking->reference}-PAYOUT",
+            "Calm host payout {$booking->reference}"
+                .($booking->payout_reference ? " — bank ref {$booking->payout_reference}" : ''),
+        );
+    }
+
+    /**
+     * سند صرف for a Case C refund: the money returned to the guest leaves the
+     * Moyasar clearing account — mirrors the Moyasar refund so the account
+     * still reconciles after an invoiced-then-cancelled booking.
+     */
+    private function syncRefundVoucher(Booking $booking, FinancialDocument $document): void
+    {
+        $contactId = $this->ensureGuestCustomer($booking->guest);
+
+        $this->pushPaidReceipt(
+            $document,
+            $contactId,
+            "{$booking->reference}-REFUND",
+            "Calm refund to guest for booking {$booking->reference}"
+                .($booking->payment_id ? " — Moyasar {$booking->payment_id}" : ''),
+        );
+    }
+
+    /**
+     * Shared money-out push: a kind=paid receipt from the Moyasar clearing
+     * account for the document's total. Resume-safe (never creates a second
+     * receipt for a document that already carries a Qoyod id) and fails
+     * loudly on a response with no id, same rules as invoices.
+     */
+    private function pushPaidReceipt(FinancialDocument $document, string $contactId, string $reference, string $description): void
+    {
+        if ($document->external_document_id === null) {
             $payload = [
                 'contact_id' => (int) $contactId,
-                'reference' => "{$booking->reference}-PAYOUT",
+                'reference' => $reference,
                 'kind' => 'paid',
                 'account_id' => (int) config('finance.qoyod.moyasar_account_id'),
                 'amount' => $this->sar((int) $document->total_amount),
-                'description' => "Calm host payout {$booking->reference}"
-                    .($booking->payout_reference ? " — bank ref {$booking->payout_reference}" : ''),
+                'description' => $description,
                 'date' => now()->toDateString(),
             ];
 
@@ -126,16 +160,14 @@ final class QoyodSyncService
                 'external_provider' => 'qoyod',
                 'external_contact_id' => $contactId,
                 'external_document_id' => isset($receipt['id']) ? (string) $receipt['id'] : null,
-                'external_document_number' => $receipt['reference'] ?? "{$booking->reference}-PAYOUT",
+                'external_document_number' => $receipt['reference'] ?? $reference,
                 'external_payload' => $payload,
                 'external_response' => $response,
                 'external_status' => 'created',
             ]);
 
-            // Same no-id rule as invoices: never mark issued on a response we
-            // can't link back to.
             if ($document->external_document_id === null) {
-                throw new \RuntimeException("Qoyod created payout voucher {$booking->reference}-PAYOUT but returned no id — check the Qoyod books before retrying.");
+                throw new \RuntimeException("Qoyod created voucher {$reference} but returned no id — check the Qoyod books before retrying.");
             }
         }
 

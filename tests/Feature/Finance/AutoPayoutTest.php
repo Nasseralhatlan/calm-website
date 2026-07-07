@@ -140,6 +140,12 @@ it('transfers the host net with IBAN + deterministic sequence, then settles on r
     expect($voucher->status)->toBe(FinancialDocument::STATUS_ISSUED)
         ->and($voucher->total_amount)->toBe(177000)
         ->and((bool) $voucher->is_tax_document)->toBeFalse();
+
+    // The money moved — the host is told (amount + booking ref).
+    $paidNote = UserNotification::query()
+        ->where('user_id', $this->host->id)->where('type', 'host_payout_paid')->sole();
+    expect($paidNote->body_en)->toContain('1,770.00')
+        ->and($paidNote->body_en)->toContain($booking->reference);
 });
 
 it('requeues a bank-failed transfer with the reason and a fresh sequence for the retry', function (): void {

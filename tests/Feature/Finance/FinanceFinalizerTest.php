@@ -247,10 +247,13 @@ it('cancellation after invoicing (Case C) credits both invoices', function (): v
     app(BookingFinanceFinalizer::class)->handleCancellation($booking->refresh());
 
     $docs = $booking->financialDocuments()->get()->keyBy('document_subtype');
-    expect($docs)->toHaveCount(5); // 3 originals + 2 credit notes
+    expect($docs)->toHaveCount(6); // 3 originals + 2 credit notes + refund voucher
 
     expect($docs[FinancialDocument::GUEST_BOOKING_CREDIT_NOTE]->total_amount)->toBe(230000)
         ->and($docs[FinancialDocument::HOST_COMMISSION_CREDIT_NOTE]->total_amount)->toBe(23000)
+        // The refund cash-out (سند صرف) matches the full refunded amount.
+        ->and($docs[FinancialDocument::GUEST_REFUND_VOUCHER]->total_amount)->toBe(230000)
+        ->and((bool) $docs[FinancialDocument::GUEST_REFUND_VOUCHER]->is_tax_document)->toBeFalse()
         // Originals are never edited — only flipped to credited.
         ->and($docs[FinancialDocument::GUEST_BOOKING_INVOICE]->status)->toBe(FinancialDocument::STATUS_CREDITED)
         ->and($docs[FinancialDocument::HOST_COMMISSION_INVOICE]->status)->toBe(FinancialDocument::STATUS_CREDITED);

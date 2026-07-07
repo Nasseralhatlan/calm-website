@@ -175,6 +175,33 @@ final class FinancialDocumentService
         });
     }
 
+    /**
+     * سند صرف for a Case C refund: the cash going back to the guest out of
+     * the Moyasar clearing account. Only minted when tax documents existed
+     * (post-invoicing) — a Case B refund has no Qoyod footprint to balance.
+     */
+    public function guestRefundVoucher(Booking $booking, int $amountMinor): FinancialDocument
+    {
+        return $this->idempotent($booking, FinancialDocument::GUEST_REFUND_VOUCHER, function () use ($booking, $amountMinor): FinancialDocument {
+            return FinancialDocument::query()->create([
+                'source_type' => 'booking',
+                'source_id' => $booking->id,
+                'document_type' => FinancialDocument::TYPE_VOUCHER,
+                'document_subtype' => FinancialDocument::GUEST_REFUND_VOUCHER,
+                'seller_type' => 'calm',
+                'buyer_type' => 'guest',
+                'buyer_id' => $booking->guest_user_id,
+                'direction' => 'outbound',
+                'status' => $this->initialProviderStatus(),
+                'is_tax_document' => false,
+                'subtotal_amount' => $amountMinor,
+                'vat_amount' => 0,
+                'total_amount' => $amountMinor,
+                'issued_at' => now(),
+            ]);
+        });
+    }
+
     /** Credit note against the guest invoice (Case C refunds, brief §14). */
     public function guestBookingCreditNote(Booking $booking, int $amountMinor): FinancialDocument
     {

@@ -173,6 +173,20 @@ final class NotificationService
         ));
     }
 
+    /** The host's payout settled at the bank — the money actually moved. */
+    public function hostPayoutPaid(Booking $booking): void
+    {
+        $amount = number_format($booking->hostNetMinor() / 100, 2);
+        $vars = $this->bookingVars($booking);
+        $vars['ar']['{amount}'] = $amount;
+        $vars['en']['{amount}'] = $amount;
+
+        $this->notify($booking->host, $this->compose(
+            'host_payout_paid', 'host', $vars,
+            ['booking_id' => $booking->id, 'place_id' => $booking->place_id],
+        ));
+    }
+
     /**
      * A payout is due but the host has no IBAN on file. The payout sweep runs
      * every 15 minutes and calls this each pass, so dedup here: at most ONE

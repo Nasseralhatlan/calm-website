@@ -262,6 +262,7 @@ it('never duplicates a credit note when re-syncing a doc that already has a qoyo
         'api.qoyod.test/2.0/credit_notes' => Http::sequence()
             ->push(['id' => 901, 'note_no' => 'CN-1'], 201)
             ->push(['id' => 902, 'note_no' => 'CN-2'], 201),
+        'api.qoyod.test/2.0/receipts' => Http::response(['receipt' => ['id' => 903, 'reference' => 'R-REFUND']], 201),
     ]);
 
     $booking = qsyncBooking($this->host, $this->guest);
@@ -274,6 +275,18 @@ it('never duplicates a credit note when re-syncing a doc that already has a qoyo
         ->where('document_subtype', FinancialDocument::GUEST_BOOKING_CREDIT_NOTE)->sole();
     expect($guestNote->status)->toBe(FinancialDocument::STATUS_ISSUED)
         ->and($guestNote->external_document_id)->toBe('901');
+
+    // The refund cash-out (سند صرف) went out too: kind=paid, to the GUEST
+    // contact, full refunded amount out of the Moyasar clearing account.
+    $refundVoucher = $booking->financialDocuments()
+        ->where('document_subtype', FinancialDocument::GUEST_REFUND_VOUCHER)->sole();
+    expect($refundVoucher->status)->toBe(FinancialDocument::STATUS_ISSUED)
+        ->and($refundVoucher->external_document_id)->toBe('903');
+    Http::assertSent(fn ($request): bool => str_ends_with($request->url(), '/receipts')
+        && $request['receipt']['kind'] === 'paid'
+        && $request['receipt']['contact_id'] === 77
+        && $request['receipt']['amount'] === '2300.00'
+        && str_ends_with((string) $request['receipt']['reference'], '-REFUND'));
 
     // Simulate a crash AFTER Qoyod created the note but BEFORE the status
     // flip: the id survived, the doc re-enters the retry set.

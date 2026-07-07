@@ -244,6 +244,9 @@ final class HostPayoutService
         ]);
 
         $this->finalizer->recordPayoutPaid($booking->refresh(), 'moyasar');
+
+        // The money actually moved — tell the host.
+        $this->notifications->hostPayoutPaid($booking);
     }
 
     /** Local Saudi mobile (stored without the leading 0) → +966 E.164. */

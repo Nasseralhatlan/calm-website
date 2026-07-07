@@ -46,6 +46,11 @@ class FinancialDocument extends Model
     // the Moyasar clearing account reconciles (money out = payout paid).
     public const HOST_PAYOUT_VOUCHER = 'host_payout_voucher';
 
+    // سند صرف for a post-invoicing (Case C) refund: the money returned to the
+    // guest leaves the Moyasar clearing account — without this the refunded
+    // cash would sit on the Qoyod books forever.
+    public const GUEST_REFUND_VOUCHER = 'guest_refund_voucher';
+
     // status
     public const STATUS_DRAFT = 'draft';
 

@@ -52,6 +52,16 @@ return [
         ],
     ],
 
+    // The host's payout settled at the bank — tell them the money moved.
+    'host_payout_paid' => [
+        'host' => [
+            'title_ar' => 'تم تحويل أرباحك',
+            'title_en' => 'Your payout was sent',
+            'body_ar' => 'تم تحويل {amount} ر.س عن الحجز {ref} إلى حسابك البنكي.',
+            'body_en' => 'SR {amount} for booking {ref} was transferred to your bank account.',
+        ],
+    ],
+
     // A payout is due but the host has no bank IBAN on file. Nudged at most
     // once per day until they add it (then the payout fires automatically).
     'host_iban_needed' => [
