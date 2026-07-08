@@ -191,3 +191,42 @@ it('paginates the bookings list', function (): void {
 it('requires authentication to list bookings', function (): void {
     $this->getJson('/api/bookings')->assertStatus(401);
 });
+
+it('exposes the refund block only on cancelled PAID bookings', function (): void {
+    $guest = User::factory()->create(['phone' => '514100031']);
+    $place = listPlace(User::factory()->create(['phone' => '514100032']));
+
+    $refunded = listBooking($place, $guest, [
+        'booking_status' => BookingStatus::CanceledByAdmin->value,
+        'payment_status' => 'paid',
+        'canceled_at' => now(),
+    ]);
+    $cancelledUnpaid = listBooking($place, $guest, [
+        'booking_status' => BookingStatus::CanceledByHost->value,
+        'payment_status' => 'initiated',
+        'canceled_at' => now(),
+        'start_date' => now()->addDays(10)->toDateString(),
+        'end_date' => now()->addDays(11)->toDateString(),
+    ]);
+    $confirmedPaid = listBooking($place, $guest, [
+        'payment_status' => 'paid',
+        'start_date' => now()->addDays(20)->toDateString(),
+        'end_date' => now()->addDays(21)->toDateString(),
+    ]);
+
+    $items = $this->actingAs($guest, 'api')
+        ->getJson('/api/bookings')
+        ->assertOk()
+        ->json('data.items');
+
+    $byId = collect($items)->keyBy('id');
+
+    // Cancelled + paid → full-refund policy: refunded = the guest's total.
+    // (JSON round-trips whole floats as ints, hence loose equality.)
+    expect($byId[$refunded->id]['refund'])->toEqual([
+        'refunded' => true, 'amount' => 2300, 'amount_minor' => 230000,
+    ]);
+    // Cancelled but never paid / still confirmed → no refund key at all.
+    expect($byId[$cancelledUnpaid->id])->not->toHaveKey('refund')
+        ->and($byId[$confirmedPaid->id])->not->toHaveKey('refund');
+});

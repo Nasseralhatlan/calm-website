@@ -73,10 +73,15 @@ payouts carry `metadata` {booking_id, booking_reference, attempt} plus the CB-re
 - `GET /api/finance-documents` — the viewer's OWN documents (guest: booking invoices /
   credit notes; host: commission invoices + payout statements), paginated
   (`items` + `pagination`). Fields incl. `document_subtype`, amounts, `booking_reference`,
-  `has_pdf`.
+  `has_pdf`. Optional `?booking_id={uuid}` scopes to one booking — powers the
+  "View invoice" button on the booking detail screen (someone else's booking id
+  → empty list, never a leak).
 - `GET /api/finance-documents/{id}/pdf-url` → `{url}` — fresh expiring Qoyod link.
   Someone else's document → **404** (existence never leaks; admin allowed).
   Not synced / statement → **409**.
+- Booking payloads: a cancelled PAID booking carries
+  `refund: {refunded, amount, amount_minor}` (full-refund policy — equals the
+  guest total) so the app can show "SR X was refunded to your card".
 
 ## Automatic host payouts (Moyasar Payouts)
 

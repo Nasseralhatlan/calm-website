@@ -86,6 +86,8 @@ so there is NOTHING to reverse in Qoyod.
 - bookings: `canceled_by_admin`/`canceled_by_host`, `canceled_at` set; dates free.
 - Documents: none. Movements: `guest_refund` ✓succeeded (full total).
 - Notifications: guest + host cancellation SMS.
+- Guest API: the booking now carries `refund: {refunded: true, amount, amount_minor}`
+  — the app shows "SR X was refunded to your card".
 - Moyasar: refund (full) on the payment — verify in the dashboard. Qoyod: nothing.
 
 ## 10. Cancel attempt < 4 days before check-in

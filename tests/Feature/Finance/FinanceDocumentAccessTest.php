@@ -119,3 +119,50 @@ it('409s when the pdf is not available yet', function (): void {
 it('requires authentication', function (): void {
     $this->getJson('/api/finance-documents')->assertStatus(401);
 });
+
+it('scopes the list to one booking with ?booking_id', function (): void {
+    // A second booking for the same guest, also finalized.
+    $second = Booking::query()->create([
+        'place_id' => $this->booking->place_id,
+        'guest_user_id' => $this->guest->id,
+        'host_user_id' => $this->host->id,
+        'booking_status' => BookingStatus::Completed->value,
+        'start_date' => '2026-06-20', 'end_date' => '2026-06-21',
+        'check_in_time' => '15:00', 'check_out_time' => '12:00', 'checkout_next_day' => false,
+        'guests' => 2, 'nights' => 2, 'stay_amount' => 100000,
+        'commission_rate' => 10, 'commission_amount' => 10000, 'vat_rate' => 15, 'vat_amount' => 15000,
+        'total_amount' => 115000, 'payout_status' => 'not_paid',
+        'payment_status' => 'paid', 'payment_id' => 'pay_DOCS2',
+    ]);
+    (new FinalizeBookingFinances)->handle(app(BookingFinanceFinalizer::class), app(QoyodSyncService::class));
+
+    // Unfiltered: both bookings' guest invoices. Filtered: only the second's.
+    $this->actingAs($this->guest, 'api')
+        ->getJson('/api/finance-documents')
+        ->assertOk()
+        ->assertJsonPath('data.pagination.total', 2);
+
+    $this->actingAs($this->guest, 'api')
+        ->getJson("/api/finance-documents?booking_id={$second->id}")
+        ->assertOk()
+        ->assertJsonPath('data.pagination.total', 1)
+        ->assertJsonPath('data.items.0.total_amount', 115000)
+        ->assertJsonPath('data.items.0.booking_reference', $second->reference);
+});
+
+it('returns an empty list for someone else\'s booking id — never leaks', function (): void {
+    // The HOST's commission docs exist on this booking, but the GUEST filter
+    // still only sees their own buyer-scoped documents; a stranger sees none.
+    $stranger = User::factory()->create(['phone' => '517700099']);
+
+    $this->actingAs($stranger, 'api')
+        ->getJson("/api/finance-documents?booking_id={$this->booking->id}")
+        ->assertOk()
+        ->assertJsonPath('data.pagination.total', 0);
+});
+
+it('rejects a malformed booking_id', function (): void {
+    $this->actingAs($this->guest, 'api')
+        ->getJson('/api/finance-documents?booking_id=not-a-uuid')
+        ->assertStatus(422);
+});

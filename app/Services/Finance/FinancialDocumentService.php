@@ -290,10 +290,15 @@ final class FinancialDocumentService
      *
      * @return LengthAwarePaginator<int, FinancialDocument>
      */
-    public function forUser(User $user, ?int $perPage = null): LengthAwarePaginator
+    public function forUser(User $user, ?string $bookingId = null, ?int $perPage = null): LengthAwarePaginator
     {
         return FinancialDocument::query()
             ->where('buyer_id', $user->id)
+            // Booking scoping stays INSIDE the buyer scope: someone else's
+            // booking id yields an empty list, never leaking existence.
+            ->when($bookingId !== null, fn ($query) => $query
+                ->where('source_type', 'booking')
+                ->where('source_id', $bookingId))
             ->with('source')
             ->latest('issued_at')
             ->paginate($perPage ?? config('pagination.per_page'))

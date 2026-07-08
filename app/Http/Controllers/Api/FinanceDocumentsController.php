@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\FinanceDocumentsIndexRequest;
 use App\Http\Resources\Api\FinanceDocumentResource;
 use App\Http\Responses\ApiResponse;
 use App\Models\FinancialDocument;
@@ -28,10 +29,10 @@ class FinanceDocumentsController extends Controller
         private readonly QoyodSyncService $qoyod,
     ) {}
 
-    /** The viewer's documents, newest first, paginated. */
-    public function index(Request $request): JsonResponse
+    /** The viewer's documents, newest first, paginated; ?booking_id scopes to one booking. */
+    public function index(FinanceDocumentsIndexRequest $request): JsonResponse
     {
-        $paginator = $this->documents->forUser($request->user());
+        $paginator = $this->documents->forUser($request->user(), $request->bookingId());
 
         return ApiResponse::success(
             data: [
