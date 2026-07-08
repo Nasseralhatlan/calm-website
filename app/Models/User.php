@@ -38,6 +38,7 @@ class User extends Authenticatable implements JWTSubject
         'country_id',
         'bank',
         'bank_account',
+        'bank_account_name',
         'role',
         'password',
     ];

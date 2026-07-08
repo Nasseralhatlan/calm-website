@@ -124,7 +124,11 @@ final class HostPayoutService
                 array_filter([
                     'type' => 'bank',
                     'iban' => $iban,
-                    'name' => (string) ($host->name ?? ''),
+                    // Beneficiary = the name as written at the BANK when the
+                    // host provided it; profile name otherwise. Banks screen
+                    // the name at their own discretion (Moyasar documents no
+                    // matching rule) — accuracy here avoids returned transfers.
+                    'name' => (string) ($host->bank_account_name ?: $host->name ?? ''),
                     'mobile' => $this->mobile((string) ($host->phone ?? '')),
                     'country' => 'SA',
                     'city' => (string) config('moyasar.payout_default_city', 'Riyadh'),

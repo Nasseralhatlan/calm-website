@@ -375,3 +375,17 @@ it('refuses manual mark-paid while a Moyasar transfer is in flight or before inv
         ->and($failed->payout_failure)->toBeNull()
         ->and($failed->payout_reference)->toBe('REF-3');
 });
+
+it('prefers the bank account holder name over the profile name as beneficiary', function (): void {
+    autoPayoutsOn();
+    // Profile name says "Payout Host"; the bank record says something else.
+    $this->host->update(['bank_account_name' => 'MOHAMMED ABDULLAH ALQAHTANI']);
+    $booking = apoBooking($this->host, $this->guest);
+
+    Http::fake(['api.moyasar.com/v1/payouts' => Http::response(['id' => 'po_n1', 'status' => 'queued'], 201)]);
+    (new ProcessDuePayouts)->handle(app(HostPayoutService::class));
+
+    Http::assertSent(fn ($request): bool => str_ends_with($request->url(), '/payouts')
+        && $request['destination']['name'] === 'MOHAMMED ABDULLAH ALQAHTANI');
+    // The golden-path test covers the fallback: no holder name → profile name.
+});

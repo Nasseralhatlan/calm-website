@@ -22,6 +22,10 @@ include VAT, `_rate` columns are percentages. Invariant on every paid booking:
 
 **Trigger:** guest registers, picks dates, pays with the test card; checkout
 passes (backdate if needed); scheduler does everything else.
+**Host bank details:** IBAN (`SA` + 22 digits) + optional **account-holder
+name** — the transfer's beneficiary name uses the holder name when set,
+otherwise the profile name (Moyasar documents no name-vs-IBAN rule; accuracy
+avoids bank-side returns).
 
 | Stage | bookings row | financial_documents | financial_movements | Notifications | Moyasar | Qoyod |
 |---|---|---|---|---|---|---|

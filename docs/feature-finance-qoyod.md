@@ -100,7 +100,10 @@ failure). The automatic queue/Retry behavior is unchanged.
 
 Flow (auto mode): `ProcessDuePayouts` (15 min) → `HostPayoutService::executeDuePayouts`
 → `POST /v1/payouts` (amount = `host_payout_amount` halalas, destination = host IBAN
-`users.bank_account` + name + mobile, city `MOYASAR_PAYOUT_DEFAULT_CITY`) → row goes
+`users.bank_account` + beneficiary name (`users.bank_account_name` — the name as
+written at the bank — falling back to the profile name; Moyasar documents NO
+name-vs-IBAN rule, receiving banks screen at their own discretion) + mobile,
+city `MOYASAR_PAYOUT_DEFAULT_CITY`) → row goes
 `payout_status=processing` with `payout_id`. `ReconcileMoyasarPayouts` (10 min) polls:
 `paid` → settle (paid_out_at, `payout_reference` = sequence number, `host_payout`
 movement provider `moyasar`, payable → succeeded); `failed/returned/canceled` → back to

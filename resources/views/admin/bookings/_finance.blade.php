@@ -111,7 +111,7 @@
 
         @if($booking->host?->bank_account)
             <span class="block text-[12px] text-[#717171] tabular-nums" dir="ltr" style="margin-top: 8px;">
-                {{ $booking->host->bank ? $booking->host->bank.' · ' : '' }}{{ $booking->host->bank_account }}
+                {{ $booking->host->bank ? $booking->host->bank.' · ' : '' }}{{ $booking->host->bank_account }}{{ $booking->host->bank_account_name ? ' · '.$booking->host->bank_account_name : '' }}
             </span>
         @else
             <span class="inline-flex items-center text-[12px] font-semibold text-[#b45309]" style="gap: 5px; margin-top: 8px; background: #fffbeb; padding: 3px 10px; border-radius: 999px;">
