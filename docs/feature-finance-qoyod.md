@@ -37,9 +37,10 @@ were removed rather than left as zero-filled inconsistencies.
    - movements `commission_withheld` (succeeded) + `host_payout_payable` (pending);
    - stamps `*_issued_at` + `financial_completed_at`. Unique
      `(source, subtype)` makes double-issuing impossible.
-3. **Moyasar payout settles** (automatic — see below) → movement `host_payout`
-   (provider `moyasar`, sequence ref); payable → succeeded. There is NO manual
-   mark-paid path. **Cancellations** (§14): before payment = nothing; paid-but-not-
+3. **Payout settles** → movement `host_payout` (provider `moyasar` + sequence
+   ref when automatic; provider `bank` + the entered transfer ref when the
+   admin marks it paid manually); payable → succeeded; سند صرف + host SMS in
+   both paths. **Cancellations** (§14): before payment = nothing; paid-but-not-
    invoiced = `guest_refund` movement; after invoicing = credit notes for both invoices
    (originals flip to `credited`, never edited) + refund movement + reversals.
 
@@ -79,13 +80,23 @@ payouts carry `metadata` {booking_id, booking_reference, attempt} plus the CB-re
 
 ## Automatic host payouts (Moyasar Payouts)
 
-Payouts are FULLY AUTOMATIC — there is no manual settlement path anywhere. Mode flag:
-`MOYASAR_PAYOUTS_MODE` (`manual` default / `auto`); `manual` simply PAUSES transfers
+Payouts are automatic by default. Mode flag: `MOYASAR_PAYOUTS_MODE` (`manual`
+default / `auto`); `manual` simply PAUSES the sweep — payouts queue safely
 until Moyasar Payouts is activated in production. The rule is **documents before
 money** — a booking is *payable* (`Booking::isPayable()`) only when: completed +
 `payout_status=not_paid` + `financial_completed_at` set (invoices issued) + past
 `checkoutAt + payout_hold_hours` (Setting, default 24h — the dispute window,
 admin-editable, not exposed to the app).
+
+**Manual settlement fallback** (Moyasar Payouts requires the company source
+account at a supported bank — e.g. Al Rajhi; if ours isn't, or while activation
+is pending): the admin transfers from the real company bank, then on the
+booking page enters the bank reference and clicks **Mark paid manually**
+(`HostPayoutService::markPaidManually`). Same trail as an automatic settle —
+`host_payout` movement (provider `bank`), سند صرف voucher, host SMS. Guards:
+completed + invoiced + `not_paid`; refused while a Moyasar transfer is
+`processing` (double-pay protection). Allowed on failed rows (clears the
+failure). The automatic queue/Retry behavior is unchanged.
 
 Flow (auto mode): `ProcessDuePayouts` (15 min) → `HostPayoutService::executeDuePayouts`
 → `POST /v1/payouts` (amount = `host_payout_amount` halalas, destination = host IBAN
@@ -119,18 +130,55 @@ advances only on a CONFIRMED bank failure (that sequence was consumed without mo
 money), never on ambiguous timeouts. If a failure message ever says "duplicate
 sequence", the payout likely exists at Moyasar — check the dashboard before retrying.
 
-Go-live checklist: (1) Moyasar activates Payouts on the account; (2) company bank
-account at Al Rajhi or SNB with bank API credentials; (3) one-time
-`POST /v1/payout_accounts` to register it → id into `MOYASAR_PAYOUT_ACCOUNT_ID`
-(needs `account_type=bank`, `properties.iban`, and `credentials` with a 6–15 digit
-`company_code` + X509 `cert` + RSA/EC `key` in PEM); (4) optionally adjust
-`payout_hold_hours` in admin settings; (5) set `MOYASAR_PAYOUTS_MODE=auto` +
-`php artisan optimize:clear`. Sandbox works with `sk_test_` keys for end-to-end
-rehearsal (**live-verified 2026-07-04**: registered a sandbox payout account,
-executed + reconciled a real transfer). Field notes from the live API:
-`destination.mobile` is required, and the purpose must be `payment_to_merchant` —
-the IPS channel rejects several enum-valid purposes (e.g. `expenses_services`)
-after creation.
+## Production go-live runbook (full launch, in order)
+
+**Money in — Moyasar live**
+1. Live `MOYASAR_SECRET_KEY` (+ live publishable key in the apps).
+2. Set `MOYASAR_WEBHOOK_SECRET` and register the prod webhook URL
+   (`/api/payments/moyasar/webhook`) in the Moyasar dashboard. The code logs a
+   production warning if the secret is missing.
+
+**Money out — Moyasar Payouts live**
+3. Moyasar activates Payouts on the LIVE account (business approval), with the
+   company source account at a SUPPORTED bank (e.g. Al Rajhi) — then one-time
+   `POST /v1/payout_accounts` to register it → id into `MOYASAR_PAYOUT_ACCOUNT_ID`
+   (`account_type=bank`, `properties.iban`, `credentials` = 6–15 digit
+   `company_code` + X509 `cert` + RSA/EC `key` in PEM) → `MOYASAR_PAYOUTS_MODE=auto`.
+   **Until then ship `manual`** — payouts queue safely and admins settle by
+   hand via *Mark paid manually* (see fallback above). Field notes from the
+   live API (**verified 2026-07-04**, sandbox transfer executed + reconciled):
+   `destination.mobile` is required; purpose must be `payment_to_merchant`
+   (IPS rejects several enum-valid purposes, e.g. `expenses_services`, after
+   creation).
+
+**Books — Qoyod**
+4. Rotate the Qoyod API key (dev one was exposed during development) → prod env only.
+5. Create the two products ONCE in the prod org (CALM-STAY / CALM-COMM) → ids
+   into `QOYOD_PRODUCT_STAY_ID` / `QOYOD_PRODUCT_COMMISSION_ID`. Never delete
+   them (Qoyod never reuses ids; a deleted product breaks every future invoice
+   until reconfigured). Set the four account-mapping ids, `QOYOD_ENABLED=true`.
+6. Accountant sign-offs before ZATCA onboarding: (a) tax-point timing —
+   invoice at stay completion vs at payment (advance-receipt rule); (b) the
+   commission offset-account treatment; (c) once ZATCA e-invoicing is live,
+   approved invoices LOCK (credit notes only) — the flows already assume this.
+
+**Comms**
+7. `SMS_DRIVER` → real provider (creds already in env); the mock OTP `111111`
+   disappears with the mock driver. `SMS_MOCK_PHONES` can keep a store-review
+   account on the fixed OTP.
+
+**Deploy infrastructure**
+8. Prod `.env` from scratch — never copy the dev one. `APP_ENV=production`
+   restores real job cadences; leave `FINANCE_INVOICE_ISSUE_HOURS` unset
+   (defaults 4h); seeding gives `payout_hold_hours=24`.
+   `QUEUE_CONNECTION=database` + supervised `queue:work` (notifications are
+   queued jobs — sync would send SMS inline in requests), cron
+   `* * * * * php artisan schedule:run`, and every deploy must restart
+   queue/scheduler workers + `config:cache` (long-lived workers keep the env
+   they booted with — hard-learned).
+9. Merge to master, `php artisan migrate` (one prod-delta migration), then a
+   real SR 1 smoke test: book → pay → webhook confirm + SMS → admin cancel
+   (≥4 days out) → verify the real refund in the Moyasar dashboard.
 
 ## Refunds (automatic, full only)
 

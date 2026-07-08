@@ -314,3 +314,64 @@ it('refuses an admin retry while payouts are in manual mode', function (): void 
     Http::assertNothingSent();
     expect($booking->refresh()->payout_failure)->toBe('Moyasar payout failed (bank rejected).');
 });
+
+it('records a manual bank-transfer payout with the full finance trail', function (): void {
+    // Company bank not supported by Moyasar Payouts → mode stays manual and
+    // the admin settles by hand. The trail must match an automatic settle.
+    config()->set('moyasar.payouts_mode', 'manual');
+    Http::fake();
+
+    $admin = User::factory()->create(['role' => UserRole::Admin->value, 'phone' => '598300002']);
+    $booking = apoBooking($this->host, $this->guest);
+    // Real documents + payable movement from the finalizer.
+    $booking->forceFill(['financial_completed_at' => null])->save();
+    (new FinalizeBookingFinances)->handle(app(BookingFinanceFinalizer::class), app(QoyodSyncService::class));
+
+    $this->actingAs($admin, 'api')
+        ->post("/admin/bookings/{$booking->id}/payout/mark-paid", ['bank_reference' => 'ALINMA-20260708-991'])
+        ->assertRedirect("/admin/bookings/{$booking->id}");
+
+    $booking->refresh();
+    expect($booking->payout_status)->toBe('paid')
+        ->and($booking->payout_reference)->toBe('ALINMA-20260708-991')
+        ->and($booking->payout_paid_at)->not->toBeNull();
+
+    // Movement carries provider `bank` (not moyasar), payable settled.
+    $mov = $booking->financialMovements()->where('movement_type', FinancialMovement::HOST_PAYOUT)->sole();
+    expect($mov->provider)->toBe('bank')
+        ->and($mov->amount)->toBe(177000)
+        ->and($mov->provider_reference)->toBe('ALINMA-20260708-991');
+    expect($booking->financialMovements()->where('movement_type', FinancialMovement::HOST_PAYOUT_PAYABLE)->sole()->status)
+        ->toBe('succeeded');
+
+    // سند صرف minted (Qoyod off in tests → issued locally) + host notified.
+    expect($booking->financialDocuments()->where('document_subtype', FinancialDocument::HOST_PAYOUT_VOUCHER)->count())->toBe(1);
+    expect(UserNotification::query()->where('user_id', $this->host->id)->where('type', 'host_payout_paid')->count())->toBe(1);
+
+    // No Moyasar API call was ever made.
+    Http::assertNothingSent();
+});
+
+it('refuses manual mark-paid while a Moyasar transfer is in flight or before invoicing', function (): void {
+    Http::fake();
+    $service = app(HostPayoutService::class);
+
+    // In-flight transfer: settling both would pay the host twice.
+    $processing = apoBooking($this->host, $this->guest, ['payout_status' => 'processing', 'payout_id' => 'po_88']);
+    expect(fn () => $service->markPaidManually($processing, 'REF-1'))
+        ->toThrow(ValidationException::class);
+    expect($processing->refresh()->payout_status)->toBe('processing');
+
+    // Documents-before-money holds for manual settlements too.
+    $noDocs = apoBooking($this->host, $this->guest, ['financial_completed_at' => null]);
+    expect(fn () => $service->markPaidManually($noDocs, 'REF-2'))
+        ->toThrow(ValidationException::class);
+    expect($noDocs->refresh()->payout_status)->toBe('not_paid');
+
+    // A failed row CAN be marked paid manually (the escape hatch).
+    $failed = apoBooking($this->host, $this->guest, ['payout_failure' => 'Moyasar payout failed (bank rejected).']);
+    $service->markPaidManually($failed, 'REF-3');
+    expect($failed->refresh()->payout_status)->toBe('paid')
+        ->and($failed->payout_failure)->toBeNull()
+        ->and($failed->payout_reference)->toBe('REF-3');
+});

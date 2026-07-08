@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\CancelBookingRequest;
+use App\Http\Requests\Admin\MarkPayoutPaidRequest;
 use App\Models\Booking;
 use App\Services\Booking\BookingService;
 use App\Services\Finance\HostPayoutService;
@@ -44,8 +45,7 @@ class BookingsController extends Controller
     }
 
     /**
-     * Re-fire a failed automatic Moyasar transfer. Payouts have no manual
-     * path — this re-runs the same automatic transfer with a fresh sequence.
+     * Re-fire a failed automatic Moyasar transfer with a fresh sequence.
      */
     public function retryPayout(Booking $booking, HostPayoutService $payouts): RedirectResponse
     {
@@ -56,6 +56,19 @@ class BookingsController extends Controller
             ->with('status', $started
                 ? __('Transfer for booking :ref started via Moyasar.', ['ref' => $booking->reference])
                 : __('Transfer for booking :ref failed again — the reason is shown on this page.', ['ref' => $booking->reference]));
+    }
+
+    /**
+     * The admin transferred the payout from the company bank by hand and
+     * records it here — full finance trail fires (movement, سند صرف, host SMS).
+     */
+    public function markPayoutPaid(MarkPayoutPaidRequest $request, Booking $booking, HostPayoutService $payouts): RedirectResponse
+    {
+        $payouts->markPaidManually($booking, $request->bankReference());
+
+        return redirect()
+            ->route('admin.bookings.show', $booking)
+            ->with('status', __('Payout for booking :ref recorded as paid manually.', ['ref' => $booking->reference]));
     }
 
     public function cancel(CancelBookingRequest $request, Booking $booking): RedirectResponse

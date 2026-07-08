@@ -17,8 +17,12 @@ use Throwable;
  * documents-before-money rule (Booking::isPayable): completed stay, financial
  * documents issued, payout hold window passed. MOYASAR_PAYOUTS_MODE stays
  * 'manual' until the Moyasar product + bank account are live, so nothing here
- * runs until the flag flips (manual mode = payouts paused; there is no manual
- * settlement path).
+ * runs until the flag flips (manual mode = the sweep pauses and payouts queue).
+ *
+ * Manual settlement: while automatic payouts can't run (e.g. the company bank
+ * isn't supported as a Moyasar payout source), an admin transfers from the
+ * real bank and records it via markPaidManually() — same finance trail as an
+ * automatic settle (movement provider 'bank', سند صرف, host SMS).
  *
  * Failure model: a create-time error (Moyasar rejection, API down) records
  * payout_failure and leaves the row not_paid — visible in the admin queue
@@ -226,6 +230,45 @@ final class HostPayoutService
         $booking->update(['payout_failure' => null]);
 
         return $this->execute($booking->refresh());
+    }
+
+    /**
+     * Admin paid the host by hand (bank transfer from the company account,
+     * outside Moyasar) and records it here with the bank's reference. Same
+     * finance trail as an automatic settle — movement (provider 'bank'),
+     * payout voucher (سند صرف), host notification. Works in manual mode and
+     * on failed rows; the automatic queue/Retry behavior is untouched.
+     */
+    public function markPaidManually(Booking $booking, string $bankReference): void
+    {
+        // Never while a Moyasar transfer is in flight — settling both would
+        // pay the host twice. The reconciler owns `processing` rows.
+        if ($booking->payout_status === 'processing') {
+            throw ValidationException::withMessages([
+                'payout' => __('A Moyasar transfer is already in progress for this booking — wait for it to settle or fail before marking manually.'),
+            ]);
+        }
+
+        if (
+            $booking->booking_status !== BookingStatus::Completed
+            || $booking->financial_completed_at === null
+            || $booking->payout_status !== 'not_paid'
+        ) {
+            throw ValidationException::withMessages([
+                'payout' => __('Only completed, invoiced, unpaid bookings can be marked as paid.'),
+            ]);
+        }
+
+        $booking->update([
+            'payout_status' => 'paid',
+            'payout_paid_at' => now(),
+            'payout_reference' => $bankReference,
+            'payout_failure' => null,
+        ]);
+
+        $this->finalizer->recordPayoutPaid($booking->refresh(), 'bank');
+
+        $this->notifications->hostPayoutPaid($booking);
     }
 
     /**

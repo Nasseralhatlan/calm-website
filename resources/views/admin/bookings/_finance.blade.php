@@ -118,6 +118,26 @@
                 ⚠ {{ $isRtl ? 'لا يوجد آيبان مسجل للمضيف' : 'Host has no IBAN on file' }}
             </span>
         @endif
+
+        {{-- Manual settlement: the admin transferred from the company bank
+             (outside Moyasar) and records it here. Available on any unpaid,
+             invoiced booking — but never while a Moyasar transfer is in
+             flight (the server refuses that anyway). --}}
+        @if($booking->payout_status === 'not_paid' && $booking->financial_completed_at !== null && $booking->booking_status === BookingStatus::Completed)
+            <form method="POST" action="{{ route('admin.bookings.payout.mark-paid', $booking) }}"
+                  class="flex flex-wrap items-center" style="gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px dashed #e5e7eb;"
+                  onsubmit="return confirm('{{ $isRtl ? 'تسجيل التحويل كمدفوع يدوياً؟ سيتم إشعار المضيف وتسجيل السند.' : 'Record this payout as paid manually? The host will be notified and the voucher recorded.' }}');">
+                @csrf
+                <input type="text" name="bank_reference" required maxlength="100" dir="ltr"
+                       placeholder="{{ $isRtl ? 'مرجع التحويل البنكي' : 'Bank transfer reference' }}"
+                       class="text-[13px] tabular-nums"
+                       style="padding: 8px 12px; border: 1px solid #e5e7eb; border-radius: 10px; min-width: 220px;">
+                <button type="submit" class="font-semibold text-[#065f46] bg-[#ecfdf5] hover:bg-[#d1fae5] {{ $fa }}"
+                        style="padding: 8px 14px; border-radius: 10px; font-size: 13px; white-space: nowrap;">
+                    {{ $isRtl ? 'تسجيل كمدفوع يدوياً' : 'Mark paid manually' }}
+                </button>
+            </form>
+        @endif
     </div>
 </div>
 

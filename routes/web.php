@@ -167,9 +167,11 @@ Route::middleware(['auth:api', 'admin'])
         Route::get('/bookings/{booking}', [BookingsController::class, 'show'])->name('bookings.show');
         Route::post('/bookings/{booking}/cancel', [BookingsController::class, 'cancel'])->name('bookings.cancel');
 
-        // Payouts are fully automatic (Moyasar). The only human action is
-        // retrying a transfer the bank rejected, from the booking's page.
+        // Payouts are automatic (Moyasar). Human actions, from the booking's
+        // page: retry a bank-rejected transfer, or record a hand-made bank
+        // transfer while automatic payouts aren't available.
         Route::post('/bookings/{booking}/payout/retry', [BookingsController::class, 'retryPayout'])->name('bookings.payout.retry');
+        Route::post('/bookings/{booking}/payout/mark-paid', [BookingsController::class, 'markPayoutPaid'])->name('bookings.payout.mark-paid');
         // Fresh expiring Qoyod PDF for a tax document (admin support view).
         Route::get('/finance-documents/{document}/pdf', FinanceDocumentPdfController::class)->name('finance-documents.pdf');
 
