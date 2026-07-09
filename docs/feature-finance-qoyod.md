@@ -71,9 +71,10 @@ payouts carry `metadata` {booking_id, booking_reference, attempt} plus the CB-re
 ## API (mobile)
 
 - `GET /api/finance-documents` — the viewer's OWN documents (guest: booking invoices /
-  credit notes; host: commission invoices + payout statements), paginated
-  (`items` + `pagination`). Fields incl. `document_subtype`, amounts, `booking_reference`,
-  `has_pdf`. Optional `?booking_id={uuid}` scopes to one booking — powers the
+  credit notes; host: commission invoices + credit notes + payout statements),
+  paginated (`items` + `pagination`). Fields incl. `document_subtype`, amounts,
+  `booking_reference`, `has_pdf`. Voucher-type documents (سند صرف/قبض cash
+  mirrors) are NEVER listed — internal bookkeeping only. Optional `?booking_id={uuid}` scopes to one booking — powers the
   "View invoice" button on the booking detail screen (someone else's booking id
   → empty list, never a leak).
 - `GET /api/finance-documents/{id}/pdf-url` → `{url}` — fresh expiring Qoyod link.

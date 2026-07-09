@@ -14,6 +14,7 @@ use App\Models\Place;
 use App\Models\PlaceType;
 use App\Models\User;
 use App\Services\Finance\BookingFinanceFinalizer;
+use App\Services\Finance\FinancialDocumentService;
 use App\Services\Finance\QoyodSyncService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
@@ -165,4 +166,24 @@ it('rejects a malformed booking_id', function (): void {
     $this->actingAs($this->guest, 'api')
         ->getJson('/api/finance-documents?booking_id=not-a-uuid')
         ->assertStatus(422);
+});
+
+it('never lists voucher documents — internal cash mirrors stay internal', function (): void {
+    // Both vouchers exist and are buyer-scoped to guest/host respectively…
+    app(FinancialDocumentService::class)->hostPayoutVoucher($this->booking);
+    app(FinancialDocumentService::class)->guestRefundVoucher($this->booking, 230000);
+
+    // …but the mobile lists show only user-meaningful paper.
+    $guestSubtypes = collect($this->actingAs($this->guest, 'api')
+        ->getJson('/api/finance-documents')->assertOk()
+        ->json('data.items'))->pluck('document_subtype');
+    expect($guestSubtypes->all())->toBe([FinancialDocument::GUEST_BOOKING_INVOICE]);
+
+    $hostSubtypes = collect($this->actingAs($this->host, 'api')
+        ->getJson('/api/finance-documents')->assertOk()
+        ->json('data.items'))->pluck('document_subtype')->sort()->values();
+    expect($hostSubtypes->all())->toBe([
+        FinancialDocument::HOST_COMMISSION_INVOICE,
+        FinancialDocument::HOST_PAYOUT_STATEMENT,
+    ]);
 });

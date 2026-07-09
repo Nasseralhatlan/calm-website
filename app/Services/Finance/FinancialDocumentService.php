@@ -294,6 +294,11 @@ final class FinancialDocumentService
     {
         return FinancialDocument::query()
             ->where('buyer_id', $user->id)
+            // Users see only documents that MEAN something to them: invoices,
+            // credit notes, statements. Vouchers (سند صرف/قبض) are internal
+            // Qoyod cash mirrors — the credit note / payout statement already
+            // tell the human story, so vouchers never reach the mobile list.
+            ->where('document_type', '!=', FinancialDocument::TYPE_VOUCHER)
             // Booking scoping stays INSIDE the buyer scope: someone else's
             // booking id yields an empty list, never leaking existence.
             ->when($bookingId !== null, fn ($query) => $query
