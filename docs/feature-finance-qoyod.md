@@ -67,9 +67,11 @@ out, commission offset). Receipts have no PDF endpoint (`pdfUrl` returns null). 
 `kind` accepts only `received` (سند قبض) / `paid` (سند صرف); receipts delete via
 `DELETE /2.0/receipts/{id}` during cleanup.
 
-**Moyasar identifiers:** invoices carry `metadata.booking_id` + `metadata.booking_reference`;
-payouts carry `metadata` {booking_id, booking_reference, attempt} plus the CB-ref in
-`comment` — both searchable in the Moyasar dashboard and echoed in webhooks.
+**Moyasar identifiers:** every object we CREATE at Moyasar carries the full
+metadata identity set — `booking_id`, `booking_reference`, `guest_id`,
+`host_id` (payouts add `attempt`), plus the CB-ref in the payout `comment` —
+searchable in the Moyasar dashboard and echoed in webhooks. Cancel/refund/fetch
+endpoints take no metadata by API design; refunds trace via payment → invoice.
 
 ## API (mobile)
 

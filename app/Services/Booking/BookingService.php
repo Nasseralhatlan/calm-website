@@ -137,9 +137,14 @@ final class BookingService
                 amountMinor: $booking->total_amount,
                 description: 'Booking — '.$place->title,
                 callbackUrl: route('payments.moyasar.webhook'),
-                // booking_reference = the human CB-ref, so dashboard searches
-                // work without knowing the UUID.
-                metadata: ['booking_id' => $booking->id, 'booking_reference' => (string) $booking->reference],
+                // Every Moyasar object we create carries the full identity
+                // set — searchable in the dashboard, echoed in webhooks.
+                metadata: [
+                    'booking_id' => (string) $booking->id,
+                    'booking_reference' => (string) $booking->reference,
+                    'guest_id' => (string) $booking->guest_user_id,
+                    'host_id' => (string) $booking->host_user_id,
+                ],
                 expiredAt: $invoiceExpiresAt,
             );
         } catch (RuntimeException $e) {

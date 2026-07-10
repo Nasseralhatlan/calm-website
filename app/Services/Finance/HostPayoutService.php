@@ -135,10 +135,13 @@ final class HostPayoutService
                 ], fn (string $value): bool => $value !== ''),
                 $this->client->sequenceNumberFor($booking->id, (int) $booking->payout_attempts),
                 "Calm host payout {$booking->reference}",
-                // Searchable in the Moyasar dashboard + echoed in webhooks.
+                // Every Moyasar object we create carries the full identity
+                // set — searchable in the dashboard, echoed in webhooks.
                 [
                     'booking_id' => (string) $booking->id,
                     'booking_reference' => (string) $booking->reference,
+                    'guest_id' => (string) $booking->guest_user_id,
+                    'host_id' => (string) $booking->host_user_id,
                     'attempt' => (string) $booking->payout_attempts,
                 ],
             );

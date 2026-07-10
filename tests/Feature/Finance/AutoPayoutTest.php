@@ -107,9 +107,11 @@ it('transfers the host net with IBAN + deterministic sequence, then settles on r
         && $request['destination']['name'] === 'Payout Host'
         && $request['destination']['mobile'] === '+966516300001'
         && $request['destination']['country'] === 'SA'
-        // Dashboard-searchable identifiers on the transfer itself.
+        // The full identity set, searchable on the transfer itself.
         && $request['metadata']['booking_id'] === $booking->id
         && $request['metadata']['booking_reference'] === $booking->reference
+        && $request['metadata']['guest_id'] === $booking->guest_user_id
+        && $request['metadata']['host_id'] === $booking->host_user_id
         && $request['metadata']['attempt'] === '0');
 
     $booking->refresh();
