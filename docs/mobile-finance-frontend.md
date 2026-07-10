@@ -69,12 +69,23 @@ Paginated ledger, newest checkout first. Optional filter:
   "payout_state": "paid",
   "payout_paid_at": "2026-07-06T18:47:06+00:00",
   "payout_reference": "8362513285481670",
-  "expected_at": null
+  "expected_at": null,
+  "documents": [
+    { "id": "uuid", "document_type": "invoice", "number": "CB-8ZFXEJ-C",
+      "total_amount": 5750, "has_pdf": true, "issued_at": "2026-07-05T16:00:00+00:00" },
+    { "id": "uuid", "document_type": "settlement_statement", "number": null,
+      "total_amount": 44250, "has_pdf": false, "issued_at": "2026-07-05T16:00:00+00:00" }
+  ]
 }
 ```
 
-Collapsed row: place title + dates, **net** (headline), state chip.
-Expanded row: gross − commission = net breakdown, plus per state below.
+Collapsed row: place title + dates, **net** (headline), state chip — badge the
+row when `documents` contains an `invoice` with `has_pdf`.
+Expanded row: gross − commission = net breakdown, per-state extras below, and
+the `documents` list — opening an operation needs NO extra request. Only the
+host's own paper appears (`total_amount` in halalas); the expiring PDF link is
+still fetched per tap via `GET /api/finance-documents/{id}/pdf-url`. Empty
+array until the stay is invoiced.
 
 **State → UI:**
 | `payout_state` | Chip (suggested) | Expanded extra |

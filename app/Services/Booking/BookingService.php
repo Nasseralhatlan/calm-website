@@ -8,6 +8,7 @@ use App\Enums\BookingStatus;
 use App\Integrations\Payment\MoyasarGateway;
 use App\Integrations\Payment\MoyasarInvoice;
 use App\Models\Booking;
+use App\Models\FinancialDocument;
 use App\Models\Place;
 use App\Models\PlaceReview;
 use App\Models\Setting;
@@ -563,7 +564,16 @@ final class BookingService
                 // without one nothing is plain "upcoming" — one of the two
                 // filters always yields the empty set.
                 ->whereRaw($state === 'upcoming' ? ($hasIban ? '1 = 1' : '1 = 0') : ($hasIban ? '1 = 0' : '1 = 1')))
-            ->with(['place', 'host'])
+            ->with([
+                'place', 'host',
+                // The row embeds the HOST's paper (commission invoice,
+                // statement, credit note) so opening it costs no extra
+                // request. Strictly buyer-scoped — the guest's invoice and
+                // internal vouchers never ride along.
+                'financialDocuments' => fn ($query) => $query
+                    ->where('buyer_id', $host->id)
+                    ->where('document_type', '!=', FinancialDocument::TYPE_VOUCHER),
+            ])
             ->orderByDesc('end_date')
             ->orderByDesc('created_at')
             ->paginate($perPage ?? config('pagination.per_page'))

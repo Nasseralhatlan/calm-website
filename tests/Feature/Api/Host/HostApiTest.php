@@ -8,9 +8,11 @@ use App\Enums\PlaceStatus;
 use App\Enums\UserRole;
 use App\Models\Booking;
 use App\Models\CityArea;
+use App\Models\FinancialDocument;
 use App\Models\Place;
 use App\Models\PlaceType;
 use App\Models\User;
+use App\Services\Finance\FinancialDocumentService;
 
 beforeEach(function (): void {
     $this->seed();
@@ -313,4 +315,37 @@ it('lists the transfers ledger with breakdown, states and filter', function (): 
 
 it('requires auth for the payouts ledger', function (): void {
     $this->getJson('/api/host/payouts')->assertStatus(401);
+});
+
+it('embeds the host\'s documents on each payouts row — never the guest\'s paper', function (): void {
+    $host = User::factory()->create(['phone' => '54000060', 'bank_account' => 'SA4420000001234567891234']);
+    $guest = User::factory()->create(['phone' => '54000061']);
+    $booking = hostApiBooking(hostApiPlace($host), $guest, [
+        'payment_status' => 'paid',
+        'booking_status' => BookingStatus::Completed->value,
+        'financial_completed_at' => now(),
+    ]);
+
+    // Real paper: host commission invoice + statement, the GUEST's invoice,
+    // and an internal voucher — only the first two may appear on the row.
+    $documents = app(FinancialDocumentService::class);
+    $documents->guestBookingInvoice($booking);
+    $commission = $documents->hostCommissionInvoice($booking);
+    $documents->hostPayoutStatement($booking);
+    $documents->hostPayoutVoucher($booking);
+
+    $row = collect($this->actingAs($host, 'api')
+        ->getJson('/api/host/payouts')
+        ->assertOk()
+        ->json('data.items'))->firstWhere('booking_id', $booking->id);
+
+    $docs = collect($row['documents']);
+    expect($docs)->toHaveCount(2)
+        ->and($docs->pluck('document_type')->sort()->values()->all())
+        ->toBe([FinancialDocument::TYPE_INVOICE, FinancialDocument::TYPE_SETTLEMENT_STATEMENT]);
+
+    $invoiceDoc = $docs->firstWhere('id', $commission->id);
+    expect($invoiceDoc['total_amount'])->toBe(23000)
+        ->and($invoiceDoc['has_pdf'])->toBeFalse() // not Qoyod-synced in tests
+        ->and($invoiceDoc)->toHaveKeys(['id', 'document_type', 'number', 'total_amount', 'has_pdf', 'issued_at']);
 });

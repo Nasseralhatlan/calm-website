@@ -43,6 +43,18 @@ class HostPayoutItemResource extends JsonResource
             'payout_paid_at' => $this->payout_paid_at?->toIso8601String(),
             'payout_reference' => $this->payout_reference,
             'expected_at' => $state === 'paid' ? null : $this->payableAt()?->toIso8601String(),
+            // The host's paper for this booking, embedded so opening a row
+            // needs no extra request (and rows can badge "invoice available").
+            // The expiring PDF link is still minted per tap via
+            // GET /finance-documents/{id}/pdf-url.
+            'documents' => $this->financialDocuments->map(fn ($document): array => [
+                'id' => $document->id,
+                'document_type' => $document->document_type,
+                'number' => $document->external_document_number,
+                'total_amount' => (int) $document->total_amount,
+                'has_pdf' => $document->external_document_id !== null,
+                'issued_at' => $document->issued_at?->toIso8601String(),
+            ])->values()->all(),
         ];
     }
 }
