@@ -178,11 +178,25 @@ it('cancellation before invoicing (Case B) refunds via Moyasar and records the m
     // The real money went back first…
     Http::assertSent(fn ($request) => str_ends_with($request->url(), '/payments/pmt_1/refund'));
 
-    expect($booking->refresh()->booking_status)->toBe(BookingStatus::CanceledByAdmin)
-        ->and($booking->financialDocuments()->count())->toBe(0);
+    expect($booking->refresh()->booking_status)->toBe(BookingStatus::CanceledByAdmin);
 
     $refund = $booking->financialMovements()->where('movement_type', FinancialMovement::GUEST_REFUND)->sole();
     expect($refund->amount)->toBe(230000);
+
+    // No tax documents — but BOTH cash legs are mirrored for reconciliation:
+    // سند قبض for the payment that landed, سند صرف for the refund out.
+    $docs = $booking->financialDocuments()->get()->keyBy('document_subtype');
+    expect($docs)->toHaveCount(2)
+        ->and($docs[FinancialDocument::GUEST_PAYMENT_RECEIPT]->total_amount)->toBe(230000)
+        ->and($docs[FinancialDocument::GUEST_PAYMENT_RECEIPT]->document_type)->toBe(FinancialDocument::TYPE_VOUCHER)
+        ->and($docs[FinancialDocument::GUEST_REFUND_VOUCHER]->total_amount)->toBe(230000)
+        ->and($docs[FinancialDocument::GUEST_REFUND_VOUCHER]->document_type)->toBe(FinancialDocument::TYPE_VOUCHER);
+
+    // Vouchers are internal — the guest's mobile document list stays empty.
+    $this->actingAs($this->guest, 'api')
+        ->getJson('/api/finance-documents')
+        ->assertOk()
+        ->assertJsonPath('data.pagination.total', 0);
 });
 
 it('refuses to cancel a paid booking inside the refund window — zero HTTP', function (): void {

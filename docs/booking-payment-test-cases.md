@@ -84,11 +84,16 @@ Only ever 1 booking + 1 Moyasar invoice for the winner.
 **Logic:** full refund fires BEFORE the cancel commits; nothing was invoiced,
 so there is NOTHING to reverse in Qoyod.
 - bookings: `canceled_by_admin`/`canceled_by_host`, `canceled_at` set; dates free.
-- Documents: none. Movements: `guest_refund` ✓succeeded (full total).
+- Documents: 2 internal vouchers — `guest_payment_receipt` + `guest_refund_voucher`
+  (never shown on mobile). Movements: `guest_refund` ✓succeeded (full total).
 - Notifications: guest + host cancellation SMS.
 - Guest API: the booking now carries `refund: {refunded: true, amount, amount_minor}`
   — the app shows "SR X was refunded to your card".
-- Moyasar: refund (full) on the payment — verify in the dashboard. Qoyod: nothing.
+- Moyasar: refund (full) on the payment — verify in the dashboard.
+- Qoyod: NO tax documents (correct — no tax point), but BOTH cash legs are
+  mirrored on the guest contact: **سند قبض** (payment in) + **سند صرف** (refund
+  out), same amount, Moyasar clearing account → nets to zero, and the account
+  matches the bank statement line-by-line.
 
 ## 10. Cancel attempt < 4 days before check-in
 **Trigger:** paid booking, check-in ≤ 3 days away → admin cancel card.

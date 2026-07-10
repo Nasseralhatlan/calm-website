@@ -46,6 +46,7 @@ final class QoyodSyncService
         FinancialDocument::HOST_COMMISSION_CREDIT_NOTE,
         FinancialDocument::HOST_PAYOUT_VOUCHER,
         FinancialDocument::GUEST_REFUND_VOUCHER,
+        FinancialDocument::GUEST_PAYMENT_RECEIPT,
     ];
 
     /** Push every pending/failed syncable document. Called by the finance sweep. */
@@ -94,8 +95,28 @@ final class QoyodSyncService
             FinancialDocument::HOST_COMMISSION_CREDIT_NOTE => $this->syncCreditNote($booking, $document),
             FinancialDocument::HOST_PAYOUT_VOUCHER => $this->syncPayoutVoucher($booking, $document),
             FinancialDocument::GUEST_REFUND_VOUCHER => $this->syncRefundVoucher($booking, $document),
+            FinancialDocument::GUEST_PAYMENT_RECEIPT => $this->syncPaymentReceipt($booking, $document),
             default => null,
         };
+    }
+
+    /**
+     * سند قبض for a Case B cancellation: the guest's payment that DID land on
+     * the Moyasar clearing account before being refunded. Pairs with the
+     * refund voucher — the cancelled booking nets to zero in the books.
+     */
+    private function syncPaymentReceipt(Booking $booking, FinancialDocument $document): void
+    {
+        $contactId = $this->ensureGuestCustomer($booking->guest);
+
+        $this->pushCashReceipt(
+            $document,
+            $contactId,
+            "{$booking->reference}-PAYMENT",
+            "Guest payment for cancelled booking {$booking->reference}"
+                .($booking->payment_id ? " — Moyasar {$booking->payment_id}" : ''),
+            'received',
+        );
     }
 
     /**
@@ -107,12 +128,13 @@ final class QoyodSyncService
     {
         $contactId = $this->ensureHostCustomer($booking, HostTaxProfile::query()->where('host_user_id', $booking->host_user_id)->first());
 
-        $this->pushPaidReceipt(
+        $this->pushCashReceipt(
             $document,
             $contactId,
             "{$booking->reference}-PAYOUT",
             "Calm host payout {$booking->reference}"
                 .($booking->payout_reference ? " — bank ref {$booking->payout_reference}" : ''),
+            'paid',
         );
     }
 
@@ -125,28 +147,31 @@ final class QoyodSyncService
     {
         $contactId = $this->ensureGuestCustomer($booking->guest);
 
-        $this->pushPaidReceipt(
+        $this->pushCashReceipt(
             $document,
             $contactId,
             "{$booking->reference}-REFUND",
             "Calm refund to guest for booking {$booking->reference}"
                 .($booking->payment_id ? " — Moyasar {$booking->payment_id}" : ''),
+            'paid',
         );
     }
 
     /**
-     * Shared money-out push: a kind=paid receipt from the Moyasar clearing
-     * account for the document's total. Resume-safe (never creates a second
-     * receipt for a document that already carries a Qoyod id) and fails
-     * loudly on a response with no id, same rules as invoices.
+     * Shared cash push: a standalone receipt on the Moyasar clearing account
+     * for the document's total — kind `paid` (سند صرف, money out) or
+     * `received` (سند قبض, money in; the official Qoyod enum). Resume-safe
+     * (never creates a second receipt for a document that already carries a
+     * Qoyod id) and fails loudly on a response with no id, same rules as
+     * invoices.
      */
-    private function pushPaidReceipt(FinancialDocument $document, string $contactId, string $reference, string $description): void
+    private function pushCashReceipt(FinancialDocument $document, string $contactId, string $reference, string $description, string $kind): void
     {
         if ($document->external_document_id === null) {
             $payload = [
                 'contact_id' => (int) $contactId,
                 'reference' => $reference,
-                'kind' => 'paid',
+                'kind' => $kind,
                 'account_id' => (int) config('finance.qoyod.moyasar_account_id'),
                 'amount' => $this->sar((int) $document->total_amount),
                 'description' => $description,

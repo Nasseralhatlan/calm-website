@@ -41,8 +41,11 @@ were removed rather than left as zero-filled inconsistencies.
    ref when automatic; provider `bank` + the entered transfer ref when the
    admin marks it paid manually); payable → succeeded; سند صرف + host SMS in
    both paths. **Cancellations** (§14): before payment = nothing; paid-but-not-
-   invoiced = `guest_refund` movement; after invoicing = credit notes for both invoices
-   (originals flip to `credited`, never edited) + refund movement + reversals.
+   invoiced (Case B) = `guest_refund` movement + BOTH cash legs mirrored to
+   Qoyod (سند قبض for the payment in + سند صرف for the refund out, guest
+   contact, Moyasar clearing account — nets to zero, statement-complete);
+   after invoicing (Case C) = credit notes for both invoices (originals flip
+   to `credited`, never edited) + refund movement + refund سند صرف + reversals.
 
 ## Qoyod sync (flag `QOYOD_ENABLED`, default off)
 

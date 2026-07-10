@@ -145,7 +145,11 @@ final class BookingFinanceFinalizer
         }
 
         if ($booking->financial_completed_at === null) {
-            // Case B.
+            // Case B: no tax documents ever existed (and never will — the
+            // finalizer skips cancelled bookings), but the CASH was real:
+            // payment in, refund out. Mirror both legs into Qoyod as a
+            // سند قبض + سند صرف pair so the Moyasar clearing account matches
+            // the bank statement line-by-line (net zero for this booking).
             $this->movement($booking, FinancialMovement::GUEST_REFUND, [
                 'from_party_type' => 'calm',
                 'to_party_type' => 'guest',
@@ -156,6 +160,9 @@ final class BookingFinanceFinalizer
                 'status' => FinancialMovement::STATUS_SUCCEEDED,
                 'occurred_at' => now(),
             ]);
+
+            $this->documents->guestPaymentReceipt($booking);
+            $this->documents->guestRefundVoucher($booking, (int) $booking->total_amount);
 
             return;
         }

@@ -176,9 +176,37 @@ final class FinancialDocumentService
     }
 
     /**
-     * سند صرف for a Case C refund: the cash going back to the guest out of
-     * the Moyasar clearing account. Only minted when tax documents existed
-     * (post-invoicing) — a Case B refund has no Qoyod footprint to balance.
+     * سند قبض for a Case B cancellation: records the guest payment that DID
+     * land on the Moyasar account before the refund. Pairs with the refund
+     * voucher so the cancelled booking nets to zero in Qoyod instead of both
+     * cash legs being invisible to reconciliation.
+     */
+    public function guestPaymentReceipt(Booking $booking): FinancialDocument
+    {
+        return $this->idempotent($booking, FinancialDocument::GUEST_PAYMENT_RECEIPT, function () use ($booking): FinancialDocument {
+            return FinancialDocument::query()->create([
+                'source_type' => 'booking',
+                'source_id' => $booking->id,
+                'document_type' => FinancialDocument::TYPE_VOUCHER,
+                'document_subtype' => FinancialDocument::GUEST_PAYMENT_RECEIPT,
+                'seller_type' => 'calm',
+                'buyer_type' => 'guest',
+                'buyer_id' => $booking->guest_user_id,
+                'direction' => 'inbound',
+                'status' => $this->initialProviderStatus(),
+                'is_tax_document' => false,
+                'subtotal_amount' => (int) $booking->total_amount,
+                'vat_amount' => 0,
+                'total_amount' => (int) $booking->total_amount,
+                'issued_at' => now(),
+            ]);
+        });
+    }
+
+    /**
+     * سند صرف for a refund: the cash going back to the guest out of the
+     * Moyasar clearing account. Minted on Case B (paired with the payment
+     * receipt) and Case C (next to the credit notes) cancellations.
      */
     public function guestRefundVoucher(Booking $booking, int $amountMinor): FinancialDocument
     {

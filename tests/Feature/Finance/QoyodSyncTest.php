@@ -384,3 +384,37 @@ it('mirrors the settled host payout as a kind=paid receipt — سند صرف', f
         ->count();
     expect($receiptCalls)->toBe(1);
 });
+
+it('mirrors BOTH cash legs of a Case B cancellation — سند قبض + سند صرف, net zero', function (): void {
+    qoyodOn();
+    Http::fake([
+        'api.qoyod.test/2.0/customers' => Http::response(['contact' => ['id' => 77]], 201),
+        'api.qoyod.test/2.0/receipts' => Http::sequence()
+            ->push(['receipt' => ['id' => 61, 'reference' => 'R-PAYMENT']], 201)
+            ->push(['receipt' => ['id' => 62, 'reference' => 'R-REFUND']], 201),
+    ]);
+
+    // Paid, never invoiced (financial_completed_at null) → Case B.
+    $booking = qsyncBooking($this->host, $this->guest);
+    app(BookingFinanceFinalizer::class)->handleCancellation($booking);
+    app(QoyodSyncService::class)->syncPendingDocuments();
+
+    $docs = $booking->financialDocuments()->get()->keyBy('document_subtype');
+    expect($docs)->toHaveCount(2)
+        ->and($docs[FinancialDocument::GUEST_PAYMENT_RECEIPT]->status)->toBe(FinancialDocument::STATUS_ISSUED)
+        ->and($docs[FinancialDocument::GUEST_PAYMENT_RECEIPT]->external_document_id)->toBe('61')
+        ->and($docs[FinancialDocument::GUEST_REFUND_VOUCHER]->status)->toBe(FinancialDocument::STATUS_ISSUED)
+        ->and($docs[FinancialDocument::GUEST_REFUND_VOUCHER]->external_document_id)->toBe('62');
+
+    // Money in, then money out — same amount, same guest contact, clearing acct.
+    Http::assertSent(fn ($request): bool => str_ends_with($request->url(), '/receipts')
+        && $request['receipt']['kind'] === 'received'
+        && $request['receipt']['contact_id'] === 77
+        && $request['receipt']['amount'] === '2300.00'
+        && str_ends_with((string) $request['receipt']['reference'], '-PAYMENT'));
+    Http::assertSent(fn ($request): bool => str_ends_with($request->url(), '/receipts')
+        && $request['receipt']['kind'] === 'paid'
+        && $request['receipt']['contact_id'] === 77
+        && $request['receipt']['amount'] === '2300.00'
+        && str_ends_with((string) $request['receipt']['reference'], '-REFUND'));
+});

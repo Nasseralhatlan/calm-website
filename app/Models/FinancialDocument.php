@@ -46,10 +46,16 @@ class FinancialDocument extends Model
     // the Moyasar clearing account reconciles (money out = payout paid).
     public const HOST_PAYOUT_VOUCHER = 'host_payout_voucher';
 
-    // سند صرف for a post-invoicing (Case C) refund: the money returned to the
-    // guest leaves the Moyasar clearing account — without this the refunded
-    // cash would sit on the Qoyod books forever.
+    // سند صرف for a refund: the money returned to the guest leaves the
+    // Moyasar clearing account — without this the refunded cash would sit on
+    // the Qoyod books forever. Minted on Case B AND Case C cancellations.
     public const GUEST_REFUND_VOUCHER = 'guest_refund_voucher';
+
+    // سند قبض for a Case B cancellation: the guest's payment DID hit the
+    // Moyasar account even though no invoice was ever issued. Paired with the
+    // refund voucher it nets to zero — the clearing account then matches the
+    // bank statement line-by-line. (Case C gets this leg via invoice_payments.)
+    public const GUEST_PAYMENT_RECEIPT = 'guest_payment_receipt';
 
     // status
     public const STATUS_DRAFT = 'draft';
