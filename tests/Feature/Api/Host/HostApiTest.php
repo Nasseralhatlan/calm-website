@@ -290,6 +290,12 @@ it('lists the transfers ledger with breakdown, states and filter', function (): 
         ->and($paidRow['gross_minor'])->toBe(200000)
         ->and($paidRow['commission_minor'])->toBe(23000)
         ->and($paidRow['net_minor'])->toBe(177000)
+        // Server-computed VAT breakdown from the frozen snapshot: guest-side
+        // VAT (inside the booking total) + VAT on Calm's commission.
+        ->and($paidRow['booking_vat_minor'])->toBe(30000)
+        ->and($paidRow['booking_vat'])->toBe(300)
+        ->and($paidRow['commission_vat_minor'])->toBe(3000)
+        ->and($paidRow['commission_vat'])->toBe(30)
         ->and($paidRow['payout_reference'])->toBe('1234567890123456')
         ->and($paidRow['expected_at'])->toBeNull()
         ->and($paidRow['place_title'])->not->toBeNull();

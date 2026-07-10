@@ -39,6 +39,14 @@ class HostPayoutItemResource extends JsonResource
             'commission_minor' => (int) $this->commission_total,
             'net' => $this->host_payout_amount / 100,
             'net_minor' => (int) $this->host_payout_amount,
+            // VAT breakdown, server-computed from the frozen snapshot (never
+            // derive client-side — rounding/rate correctness lives here).
+            // booking_vat = VAT inside the guest's total; commission_vat =
+            // VAT on Calm's commission (commission_minor includes it).
+            'booking_vat' => $this->vat_amount / 100,
+            'booking_vat_minor' => (int) $this->vat_amount,
+            'commission_vat' => $this->commission_vat_amount / 100,
+            'commission_vat_minor' => (int) $this->commission_vat_amount,
             'payout_state' => $state,
             'payout_paid_at' => $this->payout_paid_at?->toIso8601String(),
             'payout_reference' => $this->payout_reference,

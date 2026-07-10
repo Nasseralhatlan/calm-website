@@ -66,6 +66,8 @@ Paginated ledger, newest checkout first. Optional filter:
   "gross": 500.0,      "gross_minor": 50000,
   "commission": 57.5,  "commission_minor": 5750,
   "net": 442.5,        "net_minor": 44250,
+  "booking_vat": 75.0,    "booking_vat_minor": 7500,
+  "commission_vat": 7.5,  "commission_vat_minor": 750,
   "payout_state": "paid",
   "payout_paid_at": "2026-07-06T18:47:06+00:00",
   "payout_reference": "8362513285481670",
