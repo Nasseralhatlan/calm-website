@@ -18,6 +18,7 @@ use App\Services\Notification\OwnerNotifier;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 final class PlaceService
 {
@@ -172,6 +173,27 @@ final class PlaceService
      * matches one of this host's Draft places we update it; otherwise we
      * create a fresh row. Existing rows in non-Draft state are ignored.
      */
+    /**
+     * Per-day price columns are non-nullable ("0" means "fall back to the
+     * base price"). A blank day input arrives here as null (empty strings are
+     * nulled by middleware and the rules are nullable), so coerce any
+     * provided-but-null day back to 0 — the last guard before the DB, applied
+     * by EVERY place write path (host wizard, host edit, admin edit).
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private static function dayPricesToZero(array $data): array
+    {
+        foreach (Place::PRICE_COLUMNS as $column) {
+            if (array_key_exists($column, $data) && $data[$column] === null) {
+                $data[$column] = 0;
+            }
+        }
+
+        return $data;
+    }
+
     private function upsertPlace(User $host, array $data, ?string $draftId, PlaceReviewStatus $reviewStatus): Place
     {
         $existing = null;
@@ -190,15 +212,7 @@ final class PlaceService
                 ->first();
         }
 
-        // Per-day price columns are non-nullable ("0" means "fall back to the
-        // base price"). A blank day input arrives here as null (empty strings
-        // are nulled by middleware), so coerce any provided-but-null day back
-        // to 0 before persisting — the last guard before the DB for every path.
-        foreach (Place::PRICE_COLUMNS as $column) {
-            if (array_key_exists($column, $data) && $data[$column] === null) {
-                $data[$column] = 0;
-            }
-        }
+        $data = self::dayPricesToZero($data);
 
         $payload = [
             ...$data,
@@ -358,7 +372,7 @@ final class PlaceService
         $lists = $data['lists'] ?? null;
         unset($data['lists']);
 
-        $place->update($data);
+        $place->update(self::dayPricesToZero($data));
 
         if (is_array($lists)) {
             $this->syncLists($place, $lists);
@@ -381,7 +395,7 @@ final class PlaceService
     public function updateByAdmin(Place $place, array $data, array $attributes, array $photos, array $lists): Place
     {
         return DB::transaction(function () use ($place, $data, $attributes, $photos, $lists): Place {
-            $place->update($data);
+            $place->update(self::dayPricesToZero($data));
 
             // An edit carries the full desired state — empty amenities means
             // "remove them all" rather than "leave untouched".
@@ -440,7 +454,7 @@ final class PlaceService
     {
         $place = DB::transaction(function () use ($place, $data, $attributes, $photos): Place {
             $place->update([
-                ...$data,
+                ...self::dayPricesToZero($data),
                 'status' => PlaceStatus::Inactive->value,
                 'review_status' => PlaceReviewStatus::PendingReview->value,
                 'rejection_reason' => null,
@@ -468,27 +482,66 @@ final class PlaceService
     }
 
     /**
-     * The host's own places for the host app's "My listings" — ALL of them
-     * regardless of status (so drafts/pending/rejected show too), newest first,
-     * paginated, with the card relations + likes/reviews/bookings counts.
+     * The host's own places for the host app's "My listings" — ALL of them in
+     * one unpaginated response (hosts own a handful of places, so the app
+     * renders the full set at once), every status included so drafts/pending/
+     * rejected show too, newest first, with the card relations +
+     * likes/reviews/bookings counts. An optional $status narrows to one
+     * lifecycle tab: `active` filters the live status column; the other
+     * values are review_status stages.
      *
-     * @return LengthAwarePaginator<int, Place>
+     * @return Collection<int, Place>
      */
-    public function listingsForHost(User $host, ?int $perPage = null): LengthAwarePaginator
+    public function listingsForHost(User $host, ?string $status = null): Collection
     {
         return Place::query()
             ->where('host_user_id', $host->id)
+            ->when($status === 'active', fn ($q) => $q->where('status', PlaceStatus::Active->value))
+            ->when($status !== null && $status !== 'active', fn ($q) => $q->where('review_status', $status))
             ->with(['type', 'cityArea.city', 'coverPhoto'])
             ->withCount(['likes', 'publishedReviews', 'bookings'])
             ->withAvg('publishedReviews', 'rate')
             ->latest()
-            ->paginate($perPage ?? config('pagination.per_page'))
-            ->withQueryString();
+            ->get();
+    }
+
+    /**
+     * Hydrate a host-owned place for the mobile resume/edit screen: the raw
+     * editable columns plus its attribute values and flat photo list (the app
+     * regroups photos client-side, mirroring the web wizard JS). No visibility
+     * gate — drafts, pending and rejected rows are all editable by their
+     * owner; ownership itself is enforced by the controller.
+     */
+    public function editableForHost(Place $place): Place
+    {
+        return $place->load(['attributeValues', 'photos', 'cityArea:id,city_id']);
     }
 
     public function setReviewStatus(Place $place, PlaceReviewStatus $status): Place
     {
         $place->update(['review_status' => $status->value]);
+
+        return $place->refresh();
+    }
+
+    /**
+     * Host pause/unpause toggle. Deactivating (pausing) is always allowed, but
+     * activating requires the listing to already be Approved — a host must
+     * never be able to self-publish a draft/pending/rejected place around the
+     * review pipeline. Never touches review_status, so an approved paused
+     * place reactivates freely. Idempotent.
+     */
+    public function setStatusForHost(Place $place, PlaceStatus $status): Place
+    {
+        if ($status === PlaceStatus::Active && $place->review_status !== PlaceReviewStatus::Approved) {
+            throw ValidationException::withMessages([
+                'status' => __('Only approved places can be activated. This place is still :state.', [
+                    'state' => $place->review_status->value,
+                ]),
+            ]);
+        }
+
+        $place->update(['status' => $status->value]);
 
         return $place->refresh();
     }

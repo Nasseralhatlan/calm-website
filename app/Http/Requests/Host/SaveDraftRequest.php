@@ -118,6 +118,13 @@ class SaveDraftRequest extends FormRequest
      */
     public function photosData(): array
     {
+        // An auto-save from a step before photos carries no photo fields at
+        // all — return the syncPhotos() no-op shape so photos already saved
+        // on the draft survive instead of being replaced with nothing.
+        if (! $this->has('attribute_image_paths') && ! $this->has('extra_image_paths')) {
+            return [];
+        }
+
         $validated = $this->validated();
 
         return [

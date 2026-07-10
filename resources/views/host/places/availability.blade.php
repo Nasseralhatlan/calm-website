@@ -213,11 +213,12 @@
                         $end = $b->end_date;
                         $sameDay = $start->isSameDay($end);
                         $nights = $start->diffInDays($end) + 1;
+                        $imported = ($b->source ?? 'manual') === 'ical';
                     @endphp
                     <div class="flex items-center justify-between border-t first:border-t-0 border-[#ebebeb]" style="padding: 14px 20px;">
                         <div class="flex items-center" style="gap: 14px;">
                             <span class="inline-flex items-center justify-center"
-                                  style="width: 40px; height: 40px; border-radius: 12px; background: #fef2f2; font-size: 18px;">🚫</span>
+                                  style="width: 40px; height: 40px; border-radius: 12px; background: {{ $imported ? '#eff6ff' : '#fef2f2' }}; font-size: 18px;">{{ $imported ? '🔗' : '🚫' }}</span>
                             <div class="{{ $fa }}">
                                 <div class="font-semibold text-[#222] text-[14px]" dir="ltr">
                                     @if($sameDay)
@@ -227,30 +228,207 @@
                                     @endif
                                 </div>
                                 <div class="text-[12px] text-[#717171]">
-                                    {{ $nights }} {{ $isRtl ? 'ليلة' : 'night(s)' }}@if($b->reason) · {{ $b->reason }}@endif
+                                    {{ $nights }} {{ $isRtl ? 'ليلة' : 'night(s)' }}@if($imported && $b->feed) · {{ $isRtl ? 'عبر' : 'via' }} {{ $b->feed->name }}@elseif($b->reason) · {{ $b->reason }}@endif
                                 </div>
                             </div>
                         </div>
-                        <form method="POST" action="{{ route('host.places.blockings.destroy', [$place, $b]) }}"
-                              onsubmit="return confirm('{{ $isRtl ? 'إلغاء حجب هذه التواريخ؟' : 'Unblock these dates?' }}');">
-                            @csrf
-                            @method('DELETE')
-                            <button type="submit"
-                                    class="inline-flex items-center font-semibold text-[#dc2626] hover:bg-[#fef2f2] {{ $fa }}"
-                                    style="padding: 8px 14px; border-radius: 12px; font-size: 13px; border: 1px solid #fecaca;">
-                                {{ $isRtl ? 'إلغاء الحجب' : 'Unblock' }}
-                            </button>
-                        </form>
+                        @if($imported)
+                            {{-- Managed by its feed — unblocking here would just resurrect next sync. --}}
+                            <span class="inline-flex items-center font-semibold text-[#2563eb] {{ $fa }}"
+                                  style="padding: 8px 14px; border-radius: 12px; font-size: 13px; background: #eff6ff;">
+                                {{ $isRtl ? 'مزامنة خارجية' : 'Synced' }}
+                            </span>
+                        @else
+                            <form method="POST" action="{{ route('host.places.blockings.destroy', [$place, $b]) }}"
+                                  onsubmit="return confirm('{{ $isRtl ? 'إلغاء حجب هذه التواريخ؟' : 'Unblock these dates?' }}');">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit"
+                                        class="inline-flex items-center font-semibold text-[#dc2626] hover:bg-[#fef2f2] {{ $fa }}"
+                                        style="padding: 8px 14px; border-radius: 12px; font-size: 13px; border: 1px solid #fecaca;">
+                                    {{ $isRtl ? 'إلغاء الحجب' : 'Unblock' }}
+                                </button>
+                            </form>
+                        @endif
                     </div>
                 @endforeach
             </div>
         @endif
     </div>
 
+    {{-- ── Calendar sync (iCal — Airbnb / Gathern / Google) ─────────────── --}}
+    <div style="margin-top: 28px;">
+        <h2 class="font-bold text-[#222] text-[16px] {{ $fa }}" style="margin-bottom: 14px;">
+            {{ $isRtl ? 'مزامنة التقويم' : 'Calendar sync' }}
+        </h2>
+
+        <div class="bg-white" style="border-radius: 20px; padding: 20px; box-shadow: 0px 10px 30px 0px rgba(0,0,0,0.05);">
+            {{-- Export: Calm → other platforms --}}
+            <div class="{{ $fa }}">
+                <div class="font-semibold text-[#222] text-[14px]">{{ $isRtl ? 'تصدير تقويم كالم' : 'Export your Calm calendar' }}</div>
+                <p class="text-[13px] text-[#717171]" style="margin-top: 4px;">
+                    {{ $isRtl
+                        ? 'الصق هذا الرابط في Airbnb أو Gathern أو تقويم Google لتُحجب تواريخ كالم المحجوزة هناك تلقائياً.'
+                        : 'Paste this link into Airbnb, Gathern or Google Calendar so your Calm bookings block those dates there automatically.' }}
+                </p>
+                <div x-data="copyField()" class="flex items-center" style="gap: 10px; margin-top: 12px;">
+                    <input type="text" readonly x-ref="copySource" value="{{ $exportUrl }}" onclick="this.select()" dir="ltr"
+                           class="flex-1 text-[13px] text-[#717171] bg-[#fafafa]"
+                           style="padding: 10px 14px; border-radius: 12px; border: 1px solid #e5e7eb; min-width: 0;">
+                    <button type="button" data-no-loading @click="copy()"
+                            class="inline-flex items-center justify-center font-semibold text-white bg-[#222] hover:bg-[#000] {{ $fa }}"
+                            style="padding: 10px 16px; border-radius: 12px; font-size: 13px; white-space: nowrap;">
+                        <span x-show="!copied">{{ $isRtl ? 'نسخ' : 'Copy' }}</span>
+                        <span x-show="copied" x-cloak>{{ $isRtl ? 'تم النسخ ✓' : 'Copied ✓' }}</span>
+                    </button>
+                    <form method="POST" action="{{ route('host.places.calendar-token.rotate', $place) }}"
+                          onsubmit="return confirm('{{ $isRtl ? 'سيتوقف الرابط القديم فوراً وستحتاج لتحديثه في المنصات الأخرى. متابعة؟' : 'The old link stops working instantly and must be re-pasted on the other platforms. Continue?' }}');">
+                        @csrf
+                        <button type="submit"
+                                class="inline-flex items-center font-semibold text-[#717171] hover:bg-[#f3f4f6] {{ $fa }}"
+                                style="padding: 10px 14px; border-radius: 12px; font-size: 13px; border: 1px solid #ebebeb; white-space: nowrap;">
+                            {{ $isRtl ? 'تجديد الرابط' : 'Regenerate link' }}
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <div style="height: 1px; background: #ebebeb; margin: 20px 0;"></div>
+
+            {{-- Import: other platforms → Calm --}}
+            <div class="{{ $fa }}">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <div class="font-semibold text-[#222] text-[14px]">{{ $isRtl ? 'استيراد تقويمات خارجية' : 'Import external calendars' }}</div>
+                        <p class="text-[13px] text-[#717171]" style="margin-top: 4px;">
+                            {{ $isRtl
+                                ? 'الصق رابط iCal من المنصة الأخرى لتُحجب حجوزاتها هنا. تتم المزامنة كل ساعة تلقائياً.'
+                                : "Paste the other platform's iCal link so its bookings block dates here. Feeds re-sync automatically every hour." }}
+                        </p>
+                    </div>
+                    @if($feeds->isNotEmpty())
+                        <form method="POST" action="{{ route('host.places.calendar-feeds.sync', $place) }}">
+                            @csrf
+                            <button type="submit"
+                                    class="inline-flex items-center font-semibold text-[#222] hover:bg-[#f3f4f6] {{ $fa }}"
+                                    style="padding: 9px 14px; border-radius: 12px; font-size: 13px; border: 1px solid #ebebeb; white-space: nowrap;">
+                                ⟳ {{ $isRtl ? 'مزامنة الآن' : 'Sync now' }}
+                            </button>
+                        </form>
+                    @endif
+                </div>
+
+                @if($feeds->isNotEmpty())
+                    <div style="margin-top: 14px; border: 1px solid #ebebeb; border-radius: 14px; overflow: hidden;">
+                        @foreach($feeds as $feed)
+                            <div class="flex items-center justify-between border-t first:border-t-0 border-[#ebebeb]" style="padding: 12px 16px; gap: 12px;">
+                                <div style="min-width: 0;">
+                                    <div class="flex items-center" style="gap: 8px;">
+                                        <span class="font-semibold text-[#222] text-[14px]">{{ $feed->name }}</span>
+                                        @if($feed->last_status === 'ok')
+                                            <span class="text-[11px] font-bold text-[#059669]" style="padding: 2px 8px; border-radius: 999px; background: #ecfdf5;">{{ $isRtl ? 'متزامن' : 'OK' }}</span>
+                                        @elseif($feed->last_status === 'error')
+                                            <span class="text-[11px] font-bold text-[#dc2626]" style="padding: 2px 8px; border-radius: 999px; background: #fef2f2;" title="{{ $feed->last_error }}">{{ $isRtl ? 'خطأ' : 'Error' }}</span>
+                                        @endif
+                                    </div>
+                                    <div class="text-[12px] text-[#717171] truncate" dir="ltr" style="max-width: 460px;">
+                                        {{ $feed->url }}
+                                        @if($feed->last_synced_at) · {{ $isRtl ? 'آخر مزامنة' : 'synced' }} {{ $feed->last_synced_at->diffForHumans() }}@endif
+                                    </div>
+                                </div>
+                                <form method="POST" action="{{ route('host.places.calendar-feeds.destroy', [$place, $feed]) }}"
+                                      onsubmit="return confirm('{{ $isRtl ? 'إزالة هذا التقويم؟ ستتحرر كل التواريخ المحجوبة عبره.' : 'Remove this calendar? Every date it blocks becomes available again.' }}');">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit"
+                                            class="inline-flex items-center font-semibold text-[#dc2626] hover:bg-[#fef2f2] {{ $fa }}"
+                                            style="padding: 7px 12px; border-radius: 10px; font-size: 12px; border: 1px solid #fecaca; white-space: nowrap;">
+                                        {{ $isRtl ? 'إزالة' : 'Remove' }}
+                                    </button>
+                                </form>
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
+
+                <form method="POST" action="{{ route('host.places.calendar-feeds.store', $place) }}"
+                      class="flex flex-wrap items-end" style="gap: 10px; margin-top: 14px;">
+                    @csrf
+                    <div style="flex: 0 1 180px;">
+                        <label class="block text-[12px] font-semibold text-[#717171]" style="margin-bottom: 6px;">{{ $isRtl ? 'الاسم' : 'Name' }}</label>
+                        <input type="text" name="name" required maxlength="100" value="{{ old('name') }}"
+                               placeholder="{{ $isRtl ? 'مثال: Airbnb' : 'e.g. Airbnb' }}"
+                               class="w-full text-[14px] {{ $fa }}"
+                               style="padding: 10px 14px; border-radius: 12px; border: 1px solid #e5e7eb;">
+                    </div>
+                    <div style="flex: 1 1 280px;">
+                        <label class="block text-[12px] font-semibold text-[#717171]" style="margin-bottom: 6px;">{{ $isRtl ? 'رابط iCal' : 'iCal link' }}</label>
+                        <input type="url" name="url" required maxlength="2048" value="{{ old('url') }}" dir="ltr"
+                               placeholder="https://…/calendar.ics"
+                               class="w-full text-[14px]"
+                               style="padding: 10px 14px; border-radius: 12px; border: 1px solid #e5e7eb;">
+                    </div>
+                    <button type="submit"
+                            class="inline-flex items-center justify-center font-semibold text-white bg-[#F88379] hover:bg-[#f56b60] {{ $fa }}"
+                            style="padding: 11px 18px; border-radius: 12px; font-size: 14px; white-space: nowrap; box-shadow: 0 6px 14px rgba(248,131,121,0.3);">
+                        {{ $isRtl ? 'إضافة' : 'Connect' }}
+                    </button>
+                </form>
+                @error('url')
+                    <p class="text-[12px] text-[#dc2626] {{ $fa }}" style="margin-top: 8px;">{{ $message }}</p>
+                @enderror
+                @error('name')
+                    <p class="text-[12px] text-[#dc2626] {{ $fa }}" style="margin-top: 8px;">{{ $message }}</p>
+                @enderror
+                @error('blocking')
+                    <p class="text-[12px] text-[#dc2626] {{ $fa }}" style="margin-top: 8px;">{{ $message }}</p>
+                @enderror
+            </div>
+        </div>
+    </div>
+
     <style>[x-cloak] { display: none !important; }</style>
 
     <script>
         document.addEventListener('alpine:init', () => {
+            // Copy-to-clipboard for the export URL. navigator.clipboard only
+            // exists in secure contexts (HTTPS / localhost) — on plain-HTTP
+            // staging or LAN IPs it's undefined and the click would silently
+            // throw. Fall back to the legacy select + execCommand path, which
+            // works everywhere the page renders.
+            Alpine.data('copyField', () => ({
+                copied: false,
+
+                copy() {
+                    const el = this.$refs.copySource;
+                    if (navigator.clipboard && window.isSecureContext) {
+                        navigator.clipboard.writeText(el.value)
+                            .then(() => this.flash())
+                            .catch(() => this.fallbackCopy(el));
+                    } else {
+                        this.fallbackCopy(el);
+                    }
+                },
+
+                fallbackCopy(el) {
+                    el.focus();
+                    el.select();
+                    el.setSelectionRange(0, el.value.length); // iOS Safari needs the explicit range
+                    try {
+                        if (document.execCommand('copy')) this.flash();
+                    } catch (e) {
+                        // Copy genuinely unavailable — the text stays selected
+                        // so the user can Cmd/Ctrl+C manually.
+                    }
+                },
+
+                flash() {
+                    this.copied = true;
+                    clearTimeout(this._copyTimer);
+                    this._copyTimer = setTimeout(() => { this.copied = false; }, 2000);
+                },
+            }));
+
             Alpine.data('availabilityCalendar', (cfg) => ({
                 today: cfg.today,
                 blocked: cfg.blocked,

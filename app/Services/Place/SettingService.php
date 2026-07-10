@@ -31,16 +31,17 @@ final class SettingService
 
     /**
      * Settings the mobile app is allowed to read. The exposed keys are a
-     * hardcoded whitelist on purpose — clients can't ask for arbitrary settings,
-     * so admin-only values (e.g. commission_percentage) never leak. Every
-     * whitelisted key is always present (null when unset). Expose another
-     * setting to the app by adding its key here.
+     * hardcoded whitelist on purpose — clients can't ask for arbitrary
+     * settings. commission_percentage + vat_percentage are deliberately
+     * exposed so the host wizard's pricing step can preview Calm's cut and
+     * the host's take-home. Every whitelisted key is always present (null
+     * when unset). Expose another setting to the app by adding its key here.
      *
      * @return array<string, string|null>
      */
     public function publicSettings(): array
     {
-        $keys = ['support_phone', 'support_email'];
+        $keys = ['support_phone', 'support_email', 'commission_percentage', 'vat_percentage'];
 
         $values = $this->byKeys($keys);
 

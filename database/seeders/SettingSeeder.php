@@ -21,6 +21,12 @@ class SettingSeeder extends Seeder
         ['key' => 'commission_percentage', 'value' => '10'],          // Calm's cut per booking
         ['key' => 'support_email',         'value' => 'support@calmapp.co'],
         ['key' => 'support_phone',         'value' => '+966500000000'],
+        // Hours after checkout before a host payout becomes payable/executes —
+        // the dispute window. Admin-editable; NOT exposed to the public API.
+        ['key' => 'payout_hold_hours',     'value' => '24'],
+        // Admin cancellations refund the guest in FULL via Moyasar, and only
+        // while the cancel happens at least this many days before check-in.
+        ['key' => 'refund_days_before_checkin', 'value' => '4'],
     ];
 
     public function run(): void

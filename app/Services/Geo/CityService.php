@@ -20,11 +20,13 @@ final class CityService
     }
 
     /**
-     * Active cities for the mobile API home screen, each with its areas so the
-     * app can render the city → area picker in a single call. Only cities that
-     * actually have at least one visible (active + approved) place are returned,
-     * and each city's areas are likewise trimmed to those with a visible place —
-     * so the picker never offers a city/area you can't book in.
+     * Active cities for the mobile API, each with its areas so the app can
+     * render the city → area picker in a single call. Deliberately NOT
+     * filtered to cities that already have listings: this endpoint is also
+     * the host wizard's reference data, and a new marketplace (or new city)
+     * must be pickable BEFORE its first place exists — otherwise no host
+     * could ever create one. A guest picking an empty city just gets an
+     * empty search result.
      *
      * @return Collection<int, City>
      */
@@ -32,10 +34,7 @@ final class CityService
     {
         return City::query()
             ->active()
-            ->whereHas('areas.places', fn ($q) => $q->visible())
-            ->with(['areas' => fn ($q) => $q
-                ->whereHas('places', fn ($p) => $p->visible())
-                ->orderBy('name_en')])
+            ->with(['areas' => fn ($q) => $q->orderBy('name_en')])
             ->orderBy('name_en')
             ->get();
     }

@@ -160,6 +160,67 @@ final class NotificationService
         ));
     }
 
+    /**
+     * An imported external-calendar event landed on dates this active booking
+     * holds — the place is double-booked across platforms. Sent once per new
+     * external event (the calendar sync dedups re-imports).
+     */
+    public function calendarConflict(Booking $booking): void
+    {
+        $this->notify($booking->host, $this->compose(
+            'calendar_conflict', 'host', $this->bookingVars($booking),
+            ['booking_id' => $booking->id, 'place_id' => $booking->place_id],
+        ));
+    }
+
+    /** The host's payout settled at the bank — the money actually moved. */
+    public function hostPayoutPaid(Booking $booking): void
+    {
+        $amount = number_format($booking->hostNetMinor() / 100, 2);
+        $vars = $this->bookingVars($booking);
+        $vars['ar']['{amount}'] = $amount;
+        $vars['en']['{amount}'] = $amount;
+
+        $this->notify($booking->host, $this->compose(
+            'host_payout_paid', 'host', $vars,
+            ['booking_id' => $booking->id, 'place_id' => $booking->place_id],
+        ));
+    }
+
+    /**
+     * A payout is due but the host has no IBAN on file. The payout sweep runs
+     * every 15 minutes and calls this each pass, so dedup here: at most ONE
+     * nudge per host per day (covers several due bookings with one SMS, and
+     * keeps reminding daily until the IBAN lands).
+     */
+    public function hostIbanNeeded(Booking $booking): void
+    {
+        $host = $booking->host;
+        if ($host === null) {
+            return;
+        }
+
+        $alreadyNudged = UserNotification::query()
+            ->where('user_id', $host->id)
+            ->where('type', 'host_iban_needed')
+            ->where('created_at', '>=', now()->subDay())
+            ->exists();
+
+        if ($alreadyNudged) {
+            return;
+        }
+
+        $amount = number_format($booking->hostNetMinor() / 100, 2);
+        $vars = $this->bookingVars($booking);
+        $vars['ar']['{amount}'] = $amount;
+        $vars['en']['{amount}'] = $amount;
+
+        $this->notify($host, $this->compose(
+            'host_iban_needed', 'host', $vars,
+            ['booking_id' => $booking->id, 'place_id' => $booking->place_id],
+        ));
+    }
+
     public function placeApproved(Place $place): void
     {
         $this->notify($place->host, $this->compose(

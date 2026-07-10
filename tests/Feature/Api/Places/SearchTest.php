@@ -84,14 +84,13 @@ function searchConfirmedBooking(Place $place, string $start, string $end): Booki
         'start_date' => $start,
         'end_date' => $end,
         'guests' => 2,
-        'booking_price' => 100000,
-        'quantity' => 2,
-        'booking_amount' => 200000,
+        'nights' => 2,
+        'stay_amount' => 200000,
         'commission_rate' => 10,
         'commission_amount' => 20000,
         'vat_rate' => 15,
         'vat_amount' => 30000,
-        'total' => 230000,
+        'total_amount' => 230000,
         'payout_status' => 'not_paid',
     ]);
 }

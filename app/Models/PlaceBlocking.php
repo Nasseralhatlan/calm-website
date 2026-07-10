@@ -17,6 +17,9 @@ class PlaceBlocking extends Model
         'start_date',
         'end_date',
         'reason',
+        'source',
+        'calendar_feed_id',
+        'external_uid',
     ];
 
     protected function casts(): array
@@ -30,5 +33,17 @@ class PlaceBlocking extends Model
     public function place(): BelongsTo
     {
         return $this->belongsTo(Place::class);
+    }
+
+    /** The external feed this block mirrors (null for host-made manual blocks). */
+    public function feed(): BelongsTo
+    {
+        return $this->belongsTo(PlaceCalendarFeed::class, 'calendar_feed_id');
+    }
+
+    /** Mirrored from an external calendar (managed by sync, not the host). */
+    public function isImported(): bool
+    {
+        return $this->source === 'ical';
     }
 }

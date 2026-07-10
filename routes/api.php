@@ -2,12 +2,18 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Api\AttributeGroupsController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BookingsController;
 use App\Http\Controllers\Api\CitiesController;
 use App\Http\Controllers\Api\CountriesController;
+use App\Http\Controllers\Api\FinanceDocumentsController;
 // use App\Http\Controllers\Api\DeviceTokenController; // notifications temporarily disabled
+use App\Http\Controllers\Api\HostBlockingController;
+use App\Http\Controllers\Api\HostCalendarSyncController;
 use App\Http\Controllers\Api\HostController;
+use App\Http\Controllers\Api\HostPlaceController;
+use App\Http\Controllers\Api\HostUploadController;
 use App\Http\Controllers\Api\MoyasarWebhookController;
 // use App\Http\Controllers\Api\NotificationController; // notifications temporarily disabled
 use App\Http\Controllers\Api\PlaceAvailabilityController;
@@ -34,6 +40,8 @@ Route::middleware('throttle:public')->group(function (): void {
     Route::get('/countries', [CountriesController::class, 'index']);
     Route::get('/cities', [CitiesController::class, 'index']);
     Route::get('/place-types', [PlaceTypesController::class, 'index']);
+    // Amenity catalog (groups + attributes) for the host place wizard.
+    Route::get('/attribute-groups', [AttributeGroupsController::class, 'index']);
     Route::get('/place-lists', [PlaceListsController::class, 'index']);
     // Public app settings — a hardcoded whitelist (currently support phone +
     // email). Clients can't request arbitrary settings.
@@ -97,9 +105,41 @@ Route::middleware(['auth:api', 'throttle:authenticated'])->group(function (): vo
 
     // Host app: bookings on the host's places, their own listings, earnings, reviews.
     Route::get('/host/bookings', [HostController::class, 'bookings']);
+    Route::get('/host/bookings/highlights', [HostController::class, 'bookingHighlights']);
+    Route::get('/host/calendar', [HostController::class, 'calendar']);
+    Route::get('/host/calendar/day', [HostController::class, 'calendarDay']);
+    // Host availability: block / unblock / list dates on the host's own place.
+    Route::get('/host/places/{place}/blockings', [HostBlockingController::class, 'index']);
+    Route::post('/host/places/{place}/blockings', [HostBlockingController::class, 'store']);
+    Route::delete('/host/places/{place}/blockings/{blocking}', [HostBlockingController::class, 'destroy'])->scopeBindings();
+    // Calendar sync (Airbnb/Gathern-style iCal): the place's secret export URL
+    // + the external feed URLs imported into it. {calendarFeed} (not {feed})
+    // so the scoped binding resolves through Place::calendarFeeds().
+    Route::get('/host/places/{place}/calendar-sync', [HostCalendarSyncController::class, 'show']);
+    Route::post('/host/places/{place}/calendar-feeds', [HostCalendarSyncController::class, 'storeFeed']);
+    Route::delete('/host/places/{place}/calendar-feeds/{calendarFeed}', [HostCalendarSyncController::class, 'destroyFeed'])->scopeBindings();
+    Route::post('/host/places/{place}/calendar-feeds/sync', [HostCalendarSyncController::class, 'syncNow']);
+    Route::post('/host/places/{place}/calendar-token/rotate', [HostCalendarSyncController::class, 'rotateToken']);
+    // Host listings — optional ?status= narrows to one lifecycle tab.
     Route::get('/host/listings', [HostController::class, 'listings']);
     Route::get('/host/earnings', [HostController::class, 'earnings']);
+    // Finance tab "Transfers" ledger — per-booking net + payout state,
+    // optional ?state= filter. The "Invoices" sub-tab is /finance-documents.
+    Route::get('/host/payouts', [HostController::class, 'payouts']);
     Route::get('/host/reviews', [HostController::class, 'reviews']);
+
+    // Host place wizard: presigned photo uploads + create/resume/edit/delete.
+    // Same FormRequests + service as the web wizard; owner-only throughout.
+    Route::post('/host/uploads/presign', [HostUploadController::class, 'presign']);
+    // /draft is registered before {place} so the literal segment is never
+    // swallowed by the binding (moot for POST today, but cheap insurance).
+    Route::post('/host/places/draft', [HostPlaceController::class, 'draft']);
+    Route::post('/host/places', [HostPlaceController::class, 'store']);
+    Route::get('/host/places/{place}', [HostPlaceController::class, 'show']);
+    Route::put('/host/places/{place}', [HostPlaceController::class, 'update']);
+    // Pause/unpause — separate from PUT so a status flip never re-triggers review.
+    Route::patch('/host/places/{place}/status', [HostPlaceController::class, 'updateStatus']);
+    Route::delete('/host/places/{place}', [HostPlaceController::class, 'destroy']);
 
     // Bookings. POST holds the dates + opens a Moyasar invoice; the status
     // endpoint re-verifies and confirms once paid.
@@ -116,6 +156,12 @@ Route::middleware(['auth:api', 'throttle:authenticated'])->group(function (): vo
     // Guest reviews: post one for a completed booking's place; delete own.
     Route::post('/bookings/{booking}/reviews', [ReviewsController::class, 'store']);
     Route::delete('/reviews/{review}', [ReviewsController::class, 'destroy']);
+
+    // Financial documents — strictly the viewer's own (guest: booking
+    // invoices/credit notes; host: commission invoices + payout statements).
+    // PDF links are Qoyod-hosted and expire; fetch fresh each time.
+    Route::get('/finance-documents', [FinanceDocumentsController::class, 'index']);
+    Route::get('/finance-documents/{document}/pdf-url', [FinanceDocumentsController::class, 'pdfUrl']);
 });
 
 // ─── Admin-only ──────────────────────────────────────────────────────────────

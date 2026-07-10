@@ -12,9 +12,8 @@ use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 /**
- * The "regular user" dashboard tabs. Bookings are live; the rest
- * (financials, favorites, support) are still placeholders awaiting their
- * backing features.
+ * The "regular user" dashboard tabs. Bookings and financials are live;
+ * favorites/support are still placeholders awaiting their backing features.
  */
 class DashboardController extends Controller
 {
@@ -51,10 +50,18 @@ class DashboardController extends Controller
         ]);
     }
 
+    /**
+     * Host finances: earnings summary (total / paid out / pending payout),
+     * the payout bank account, and the per-booking transaction list.
+     */
     public function financials(Request $request): View
     {
+        $finance = $this->bookings->financeForHost($request->user());
+
         return view('user.financials', [
             'user' => $request->user(),
+            'earnings' => $finance['earnings'],
+            'bookings' => $finance['bookings'],
         ]);
     }
 

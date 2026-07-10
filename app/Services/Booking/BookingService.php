@@ -8,14 +8,18 @@ use App\Enums\BookingStatus;
 use App\Integrations\Payment\MoyasarGateway;
 use App\Integrations\Payment\MoyasarInvoice;
 use App\Models\Booking;
+use App\Models\FinancialDocument;
 use App\Models\Place;
 use App\Models\PlaceReview;
+use App\Models\Setting;
 use App\Models\User;
+use App\Services\Finance\BookingFinanceFinalizer;
 use App\Services\Notification\NotificationService;
 use App\Services\Notification\OwnerNotifier;
 use App\Services\Place\PlaceAvailabilityService;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -28,6 +32,7 @@ final class BookingService
         private readonly MoyasarGateway $gateway,
         private readonly NotificationService $notifications,
         private readonly OwnerNotifier $owner,
+        private readonly BookingFinanceFinalizer $finance,
     ) {}
 
     /**
@@ -40,6 +45,7 @@ final class BookingService
             $this->notifications->bookingConfirmed($booking);   // guest
             $this->notifications->hostNewBooking($booking);     // host gets a booking
             $this->owner->bookingPaid($booking);                // owners: revenue
+            $this->finance->recordGuestPayment($booking);       // finance: money-in movement
         }
         // No guest SMS on Expired: an expired hold is an abandoned/unpaid booking,
         // not a real cancellation. bookingCancelled() stays for a future cancel flow.
@@ -67,15 +73,28 @@ final class BookingService
                 abort(404, 'Place not found.');
             }
 
+            // Self-dealing guard: a host booking their own listing would let
+            // them fabricate stays, commissions, payouts and self-reviews.
+            if ($locked->host_user_id === $user->id) {
+                abort(422, 'You cannot book your own place.');
+            }
+
             $quote = $this->availability->quote($locked, $checkIn, $checkOut, $guests);
             if ($quote === null) {
                 abort(404, 'Place not found.');
             }
             if (! $quote['guests_ok']) {
-                abort(422, 'This place allows at most '.$quote['max_guests'].' guests.');
+                abort(422, $quote['max_guests'] !== null
+                    ? 'This place allows at most '.$quote['max_guests'].' guests.'
+                    : 'This place has no guest capacity configured — contact support.');
             }
             if (! $quote['dates_available']) {
                 abort(422, 'Those dates are no longer available.');
+            }
+            if (! $quote['price_ok']) {
+                // A zero total would only fail later at the gateway, leaving a
+                // junk creation_failed row — refuse before creating anything.
+                abort(422, 'This place has no nightly price set.');
             }
 
             $pricing = $quote['pricing'];
@@ -92,14 +111,13 @@ final class BookingService
                 'checkout_next_day' => $locked->checkout_next_day,
                 'rules' => $locked->rules,
                 'guests' => $guests,
-                'booking_price' => (int) $locked->price * 100,  // base nightly snapshot, halalas
-                'quantity' => $quote['days'],
-                'booking_amount' => $pricing['subtotal_minor'],
+                'nights' => $quote['days'],
+                'stay_amount' => $pricing['subtotal_minor'],
                 'commission_rate' => $pricing['commission_rate'],
                 'commission_amount' => $pricing['commission_amount_minor'],
                 'vat_rate' => $pricing['vat_rate'],
                 'vat_amount' => $pricing['vat_amount_minor'],
-                'total' => $pricing['total_minor'],
+                'total_amount' => $pricing['total_minor'],
                 'payout_status' => 'not_paid',
                 'expires_at' => $holdExpiresAt,
             ]);
@@ -117,10 +135,17 @@ final class BookingService
 
         try {
             $invoice = $this->gateway->createInvoice(
-                amountMinor: $booking->total,
+                amountMinor: $booking->total_amount,
                 description: 'Booking — '.$place->title,
                 callbackUrl: route('payments.moyasar.webhook'),
-                metadata: ['booking_id' => $booking->id],
+                // Every Moyasar object we create carries the full identity
+                // set — searchable in the dashboard, echoed in webhooks.
+                metadata: [
+                    'booking_id' => (string) $booking->id,
+                    'booking_reference' => (string) $booking->reference,
+                    'guest_id' => (string) $booking->guest_user_id,
+                    'host_id' => (string) $booking->host_user_id,
+                ],
                 expiredAt: $invoiceExpiresAt,
             );
         } catch (RuntimeException $e) {
@@ -179,7 +204,7 @@ final class BookingService
      *
      * @return LengthAwarePaginator<int, Booking>
      */
-    public function paginateForAdmin(?string $q = null, ?string $status = null, ?int $perPage = null): LengthAwarePaginator
+    public function paginateForAdmin(?string $q = null, ?string $status = null, ?int $perPage = null, bool $payoutFailed = false): LengthAwarePaginator
     {
         $term = $q !== null && trim($q) !== '' ? trim($q) : null;
 
@@ -196,6 +221,9 @@ final class BookingService
                 });
             })
             ->when($status, fn ($query, string $status) => $query->whereIn('booking_status', self::statusGroup($status)))
+            // Payouts are fully automatic; this surfaces the only rows that
+            // need a human — transfers Moyasar/the bank rejected.
+            ->when($payoutFailed, fn ($query) => $query->whereNotNull('payout_failure')->where('payout_status', 'not_paid'))
             ->latest()
             ->paginate($perPage ?? config('pagination.per_page'))
             ->withQueryString();
@@ -203,7 +231,8 @@ final class BookingService
 
     /**
      * Booking counts per status filter for the admin chips. Returns keys:
-     * all, pending_payment, confirmed, completed, cancelled, expired.
+     * all, pending_payment, confirmed, completed, cancelled, expired,
+     * payout_failed (rejected automatic transfers awaiting an admin retry).
      *
      * @return array<string, int>
      */
@@ -221,6 +250,7 @@ final class BookingService
             'completed' => (int) $byStatus->get(BookingStatus::Completed->value, 0),
             'cancelled' => (int) collect(self::statusGroup('cancelled'))->sum(fn (string $s) => (int) $byStatus->get($s, 0)),
             'expired' => (int) $byStatus->get(BookingStatus::Expired->value, 0),
+            'payout_failed' => Booking::query()->whereNotNull('payout_failure')->where('payout_status', 'not_paid')->count(),
         ];
     }
 
@@ -259,6 +289,26 @@ final class BookingService
             __('Only confirmed bookings can be cancelled.'),
         );
 
+        // Refund policy: cancelling a PAID booking refunds the guest IN FULL,
+        // and is only allowed until N days before check-in. The refund runs
+        // FIRST (outside any DB transaction) — if Moyasar refuses, the
+        // booking stays confirmed and nothing was recorded.
+        if ($booking->payment_status === 'paid' && $booking->payment_id !== null) {
+            $windowDays = (int) (Setting::query()->where('key', 'refund_days_before_checkin')->value('value') ?? 4);
+            $checkIn = $booking->checkInAt();
+
+            if ($checkIn === null || CarbonImmutable::now()->greaterThan($checkIn->subDays($windowDays))) {
+                abort(422, __('Refunds are only possible until :days days before check-in — this booking can no longer be cancelled with a refund.', ['days' => $windowDays]));
+            }
+
+            try {
+                $this->gateway->refundInvoice($booking->payment_id);
+            } catch (RuntimeException $e) {
+                Log::error('Booking cancel refund failed', ['booking' => $booking->id, 'error' => $e->getMessage()]);
+                abort(502, __('The Moyasar refund failed — the booking was NOT cancelled. Try again.'));
+            }
+        }
+
         $booking = DB::transaction(function () use ($booking, $as): Booking {
             $booking->update([
                 'booking_status' => $as->value,
@@ -273,6 +323,11 @@ final class BookingService
         } else {
             $this->notifications->bookingCanceledByAdmin($booking);
         }
+
+        // Finance trail (§14): Case B refund movement, or Case C credit notes
+        // when the invoices were already issued. Case A never reaches here
+        // (only confirmed bookings can be cancelled).
+        $this->finance->handleCancellation($booking);
 
         return $booking;
     }
@@ -332,18 +387,91 @@ final class BookingService
     /**
      * Bookings guests placed on this host's places — the host app's "Bookings"
      * list. Newest first, paginated, with the place summary + the guest (so the
-     * host can see/contact them).
+     * host can see/contact them). An optional `$q` searches the booking reference
+     * or the guest's phone.
      *
      * @return LengthAwarePaginator<int, Booking>
      */
-    public function forHostPaginated(User $host, ?int $perPage = null): LengthAwarePaginator
+    public function forHostPaginated(User $host, ?string $q = null, ?int $perPage = null): LengthAwarePaginator
     {
         return Booking::query()
             ->where('host_user_id', $host->id)
+            ->when($q !== null && $q !== '', fn ($query) => $this->applyHostBookingSearch($query, $q))
             ->with(['place', 'place.coverPhoto', 'place.cityArea.city', 'place.type', 'guest'])
             ->latest()
             ->paginate($perPage ?? config('pagination.per_page'))
             ->withQueryString();
+    }
+
+    /**
+     * Narrow a host's bookings by a free-text query: matches the booking
+     * reference OR the guest's phone. The phone is normalized (digits only,
+     * country code / leading zero stripped) so "0501…", "966501…" and "501…"
+     * all match the stored "5xxxxxxxx".
+     *
+     * @param  Builder<Booking>  $query
+     */
+    private function applyHostBookingSearch(Builder $query, string $q): void
+    {
+        $phone = preg_replace('/^(966|0)/', '', (string) preg_replace('/\D/', '', $q));
+
+        $query->where(function ($sub) use ($q, $phone): void {
+            $sub->where('reference', 'like', '%'.$q.'%');
+
+            if ($phone !== '') {
+                $sub->orWhereHas('guest', fn ($g) => $g->where('phone', 'like', '%'.$phone.'%'));
+            }
+        });
+    }
+
+    /**
+     * Host home-screen highlights in one shot (no pagination). Three buckets of
+     * CONFIRMED bookings, decided by the real check-in / checkout instants
+     * (times included, not just dates), relative to now:
+     *   - ongoing:  guest is in-house now — checked in (check_in_time passed)
+     *               and not yet checked out. Covers a stay starting today whose
+     *               check-in time has already passed.
+     *   - today:    checking in later today (check-in date is today but its
+     *               check_in_time hasn't arrived yet).
+     *   - upcoming: checking in after today, within the next 7 days.
+     *
+     * checkInAt() = start_date @ check_in_time; checkoutAt() = end_date (+1 when
+     * checkout_next_day) @ check_out_time. Both are computed, so the buckets are
+     * resolved in PHP after a narrow DB pre-filter (future side capped at +7 days).
+     *
+     * @return array{ongoing: Collection<int, Booking>, today: Collection<int, Booking>, upcoming: Collection<int, Booking>}
+     */
+    public function homeHighlightsForHost(User $host): array
+    {
+        $now = CarbonImmutable::now();
+        $today = $now->startOfDay();
+        $upcomingUntil = $today->addDays(7)->endOfDay();
+
+        $candidates = Booking::query()
+            ->where('host_user_id', $host->id)
+            ->where('booking_status', BookingStatus::Confirmed->value)
+            ->whereDate('start_date', '<=', $upcomingUntil->toDateString())
+            ->with(['place', 'place.coverPhoto', 'place.cityArea.city', 'place.type', 'guest'])
+            ->orderBy('start_date')
+            ->get();
+
+        return [
+            // In-house right now: check-in instant passed, checkout still ahead.
+            'ongoing' => $candidates->filter(
+                fn (Booking $b): bool => ($b->checkInAt()?->lte($now) ?? false)
+                    && ($b->checkoutAt()?->gt($now) ?? false),
+            )->values(),
+            // Arriving later today: check-in is today but its time hasn't come yet.
+            'today' => $candidates->filter(
+                fn (Booking $b): bool => $b->start_date !== null
+                    && $b->start_date->isSameDay($today)
+                    && ($b->checkInAt()?->gt($now) ?? false),
+            )->values(),
+            // Future arrivals within the next 7 days.
+            'upcoming' => $candidates->filter(
+                fn (Booking $b): bool => $b->start_date !== null && $b->start_date->gt($today),
+            )->values(),
+        ];
     }
 
     /**
@@ -355,39 +483,124 @@ final class BookingService
      */
     public function earningsForHost(User $host): array
     {
-        $rows = Booking::query()
+        // host_payout_amount is the frozen per-booking payout (gross −
+        // commission − commission VAT); legacy rows were backfilled. Buckets
+        // are derived per booking via Booking::payoutState() so the summary
+        // cards, the Transfers ledger and the admin panel always agree.
+        $bookings = Booking::query()
             ->where('host_user_id', $host->id)
             ->whereIn('booking_status', [BookingStatus::Confirmed->value, BookingStatus::Completed->value])
-            ->selectRaw('payout_status, SUM(booking_amount) as gross_minor, SUM(commission_amount) as commission_minor, COUNT(*) as cnt')
-            ->groupBy('payout_status')
-            ->get();
+            ->where('payment_status', 'paid')
+            ->with('host')
+            ->get(['id', 'host_user_id', 'booking_status', 'payout_status', 'payout_failure', 'financial_completed_at', 'host_payout_amount']);
 
-        $paidMinor = 0;
-        $notPaidMinor = 0;
-        $count = 0;
+        $buckets = ['paid' => 0, 'processing' => 0, 'upcoming' => 0, 'awaiting_completion' => 0];
 
-        foreach ($rows as $row) {
-            $netMinor = (int) $row->gross_minor - (int) $row->commission_minor;
-            $count += (int) $row->cnt;
-
-            if ($row->payout_status === 'paid') {
-                $paidMinor += $netMinor;
-            } else {
-                $notPaidMinor += $netMinor;
-            }
+        foreach ($bookings as $booking) {
+            $bucket = match ($booking->payoutState()) {
+                'paid' => 'paid',
+                'processing' => 'processing',
+                'awaiting_completion' => 'awaiting_completion',
+                // Blocked money (no IBAN / failed transfer) is still upcoming
+                // from the host's view — the banner/admin explain the blocker.
+                default => 'upcoming',
+            };
+            $buckets[$bucket] += (int) $booking->host_payout_amount;
         }
 
-        $totalMinor = $paidMinor + $notPaidMinor;
+        $totalMinor = array_sum($buckets);
+        $notPaidMinor = $totalMinor - $buckets['paid'];
 
         return [
             'currency' => 'SAR',
-            'bookings_count' => $count,
+            'bookings_count' => $bookings->count(),
             'total' => $totalMinor / 100,
             'total_minor' => $totalMinor,
-            'paid' => $paidMinor / 100,
-            'paid_minor' => $paidMinor,
+            'paid' => $buckets['paid'] / 100,
+            'paid_minor' => $buckets['paid'],
             'not_paid' => $notPaidMinor / 100,
             'not_paid_minor' => $notPaidMinor,
+            'processing' => $buckets['processing'] / 100,
+            'processing_minor' => $buckets['processing'],
+            'upcoming' => $buckets['upcoming'] / 100,
+            'upcoming_minor' => $buckets['upcoming'],
+            'awaiting_completion' => $buckets['awaiting_completion'] / 100,
+            'awaiting_completion_minor' => $buckets['awaiting_completion'],
+            // The app's "add your IBAN" banner: money exists that isn't fully
+            // paid out yet and the host has no bank account on file.
+            'needs_bank_details' => blank($host->bank_account) && $notPaidMinor > 0,
+        ];
+    }
+
+    /**
+     * The host Finance tab's "Transfers" ledger: one row per money-relevant
+     * booking (paid by the guest, confirmed/completed), newest checkout
+     * first, each row carrying the full gross − commission = net breakdown
+     * and the payout state. `$state` filters via the same rules as
+     * Booking::payoutState() (the host's IBAN presence is constant per call).
+     */
+    public function payoutsForHost(User $host, ?string $state = null, ?int $perPage = null): LengthAwarePaginator
+    {
+        $hasIban = ! blank($host->bank_account);
+
+        return Booking::query()
+            ->where('host_user_id', $host->id)
+            ->whereIn('booking_status', [BookingStatus::Confirmed->value, BookingStatus::Completed->value])
+            ->where('payment_status', 'paid')
+            ->when($state === 'paid', fn ($q) => $q->where('payout_status', 'paid'))
+            ->when($state === 'processing', fn ($q) => $q->where('payout_status', 'processing'))
+            ->when($state === 'failed', fn ($q) => $q
+                ->where('payout_status', 'not_paid')->whereNotNull('payout_failure'))
+            ->when($state === 'awaiting_completion', fn ($q) => $q
+                ->where('payout_status', 'not_paid')->whereNull('payout_failure')
+                ->where(fn ($inner) => $inner
+                    ->where('booking_status', '!=', BookingStatus::Completed->value)
+                    ->orWhereNull('financial_completed_at')))
+            ->when($state === 'awaiting_bank_details' || $state === 'upcoming', fn ($q) => $q
+                ->where('payout_status', 'not_paid')->whereNull('payout_failure')
+                ->where('booking_status', BookingStatus::Completed->value)
+                ->whereNotNull('financial_completed_at')
+                // With an IBAN on file nothing is "awaiting bank details";
+                // without one nothing is plain "upcoming" — one of the two
+                // filters always yields the empty set.
+                ->whereRaw($state === 'upcoming' ? ($hasIban ? '1 = 1' : '1 = 0') : ($hasIban ? '1 = 0' : '1 = 1')))
+            ->with([
+                'place', 'host',
+                // The row embeds the HOST's paper (commission invoice,
+                // statement, credit note) so opening it costs no extra
+                // request. Strictly buyer-scoped — the guest's invoice and
+                // internal vouchers never ride along.
+                'financialDocuments' => fn ($query) => $query
+                    ->where('buyer_id', $host->id)
+                    ->where('document_type', '!=', FinancialDocument::TYPE_VOUCHER),
+            ])
+            ->orderByDesc('end_date')
+            ->orderByDesc('created_at')
+            ->paginate($perPage ?? config('pagination.per_page'))
+            ->withQueryString();
+    }
+
+    /**
+     * Everything the web "Finances" page shows a host in one call: the
+     * earnings summary (total / paid out / pending) plus their earning
+     * bookings (confirmed + completed — the same set earningsForHost sums),
+     * newest first, paginated, with the payout state per row.
+     *
+     * @return array{earnings: array<string, mixed>, bookings: LengthAwarePaginator<int, Booking>}
+     */
+    public function financeForHost(User $host, ?int $perPage = null): array
+    {
+        $bookings = Booking::query()
+            ->where('host_user_id', $host->id)
+            ->whereIn('booking_status', [BookingStatus::Confirmed->value, BookingStatus::Completed->value])
+            ->with(['place', 'place.coverPhoto', 'place.type'])
+            ->latest('start_date')
+            ->paginate($perPage ?? config('pagination.per_page'))
+            ->withQueryString();
+
+        return [
+            'earnings' => $this->earningsForHost($host),
+            'bookings' => $bookings,
         ];
     }
 
@@ -450,6 +663,10 @@ final class BookingService
             if (! is_string($secret) || ! hash_equals((string) $expected, $secret)) {
                 abort(401, 'Invalid webhook secret.');
             }
+        } elseif (app()->isProduction()) {
+            // Safe (the body is never trusted — we re-fetch from Moyasar), but
+            // production should still authenticate its webhooks.
+            Log::warning('Moyasar webhook signature verification is DISABLED — set MOYASAR_WEBHOOK_SECRET.');
         }
 
         $bookingId = data_get($payload, 'data.metadata.booking_id') ?? data_get($payload, 'metadata.booking_id');
@@ -594,8 +811,9 @@ final class BookingService
     private function applyInvoice(Booking $booking, MoyasarInvoice $invoice): Booking
     {
         $transitionedTo = null;
+        $refundMismatch = false;
 
-        $result = DB::transaction(function () use ($booking, $invoice, &$transitionedTo): Booking {
+        $result = DB::transaction(function () use ($booking, $invoice, &$transitionedTo, &$refundMismatch): Booking {
             $fresh = Booking::query()->whereKey($booking->id)->lockForUpdate()->first();
 
             if ($fresh === null || $fresh->booking_status !== BookingStatus::PendingPayment) {
@@ -604,16 +822,18 @@ final class BookingService
 
             $fresh->payment_status = $invoice->status;
             $fresh->payment_response = $invoice->raw;
-            $fresh->payment_status_check_attempts = $fresh->payment_status_check_attempts + 1;
+            $fresh->payment_check_attempts = $fresh->payment_check_attempts + 1;
 
             if ($invoice->isPaid()) {
-                if ($invoice->amount !== $fresh->total) {
-                    // Paid amount doesn't match what we quoted — never confirm.
+                if ($invoice->amount !== $fresh->total_amount) {
+                    // Paid amount doesn't match what we quoted — never confirm,
+                    // and give the captured money back (outside this lock).
                     Log::warning('Moyasar paid amount mismatch', [
-                        'booking' => $fresh->id, 'expected' => $fresh->total, 'paid' => $invoice->amount,
+                        'booking' => $fresh->id, 'expected' => $fresh->total_amount, 'paid' => $invoice->amount,
                     ]);
                     $fresh->booking_status = BookingStatus::Expired;
                     $transitionedTo = BookingStatus::Expired;
+                    $refundMismatch = true;
                 } else {
                     $fresh->booking_status = BookingStatus::Confirmed;
                     $fresh->payment_method = $invoice->paymentMethod();
@@ -632,6 +852,21 @@ final class BookingService
 
             return $fresh;
         });
+
+        // A mismatched capture is money we never agreed to take — refund it in
+        // full. AFTER the transaction (no HTTP under a row lock), and this
+        // transition only happens once (the booking has left pending_payment),
+        // so a refund failure here needs manual follow-up from the dashboard.
+        if ($refundMismatch && $result->payment_id !== null) {
+            try {
+                $this->gateway->refundInvoice($result->payment_id);
+                Log::warning('Moyasar mismatch payment auto-refunded', ['booking' => $result->id]);
+            } catch (RuntimeException $e) {
+                Log::error('Moyasar mismatch refund FAILED — refund manually from the Moyasar dashboard', [
+                    'booking' => $result->id, 'invoice' => $result->payment_id, 'error' => $e->getMessage(),
+                ]);
+            }
+        }
 
         $this->fireBookingNotification($result, $transitionedTo);
 

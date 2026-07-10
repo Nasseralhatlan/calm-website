@@ -13,7 +13,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *
  *   bookable           → gate the "Book" button on this single flag.
  *   dates_available /  → granular reasons so the UI can explain *why* a stay
- *   guests_ok            isn't bookable.
+ *   guests_ok /          isn't bookable.
+ *   price_ok
  *   breakdown          → per-day rows for the price summary.
  *   pricing            → subtotal (sum of nights) → VAT → total. The guest pays
  *                        `total` (= subtotal + VAT); Calm's commission is taken
@@ -40,6 +41,7 @@ class PlaceQuoteResource extends JsonResource
             'bookable' => $this->resource['bookable'],
             'dates_available' => $this->resource['dates_available'],
             'guests_ok' => $this->resource['guests_ok'],
+            'price_ok' => $this->resource['price_ok'],
             'unavailable_dates' => $this->resource['unavailable_dates'],
             'breakdown' => $this->resource['breakdown'],
             'pricing' => [

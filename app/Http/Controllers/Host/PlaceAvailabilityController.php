@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Host\StoreBlockingRequest;
 use App\Models\Place;
 use App\Models\PlaceBlocking;
+use App\Services\Calendar\CalendarSyncService;
 use App\Services\Place\PlaceAvailabilityService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -20,18 +21,23 @@ use Illuminate\View\View;
  */
 class PlaceAvailabilityController extends Controller
 {
-    public function __construct(private readonly PlaceAvailabilityService $service) {}
+    public function __construct(
+        private readonly PlaceAvailabilityService $service,
+        private readonly CalendarSyncService $calendarSync,
+    ) {}
 
-    /** Calendar + current blockings for one of the host's places. */
+    /** Calendar + current blockings + calendar-sync card for one of the host's places. */
     public function show(Request $request, Place $place): View
     {
         $this->authorizeOwner($request, $place);
 
-        $blockings = $this->service->upcomingBlockingsForHost($place);
+        $data = $this->calendarSync->availabilityPageData($place);
 
         return view('host.places.availability', [
             'place' => $place->load(['type', 'cityArea.city']),
-            'blockings' => $blockings,
+            'blockings' => $data['blockings'],
+            'exportUrl' => $data['export_url'],
+            'feeds' => $data['feeds'],
         ]);
     }
 

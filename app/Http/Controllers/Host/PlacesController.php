@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Host;
 
 use App\Enums\PlaceReviewStatus;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\PresignUploadRequest;
 use App\Http\Requests\Host\SaveDraftRequest;
 use App\Http\Requests\Host\StorePlaceRequest;
 use App\Http\Requests\Host\UpdatePlaceDetailsRequest;
@@ -16,14 +17,11 @@ use App\Models\PlaceType;
 use App\Models\User;
 use App\Services\Place\PlaceService;
 use App\Services\Place\SettingService;
+use App\Services\Upload\PresignService;
 use App\Services\User\UserService;
-use Aws\S3\S3Client;
-use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 class PlacesController extends Controller
@@ -149,40 +147,14 @@ class PlacesController extends Controller
     /**
      * Mint a short-lived presigned PUT URL so the browser uploads the file
      * straight to DO Spaces / S3 — the PHP container never sees the bytes.
-     * Mirrors master's `hosts.presign-upload` route.
+     * Shares PresignService with the mobile API's /host/uploads/presign.
      */
-    public function presignUpload(Request $request): JsonResponse
+    public function presignUpload(PresignUploadRequest $request, PresignService $presign): JsonResponse
     {
-        $request->validate([
-            'filename' => ['required', 'string', 'max:255'],
-            'mime' => ['required', 'string', 'max:120'],
-        ]);
-
-        $ext = pathinfo((string) $request->input('filename'), PATHINFO_EXTENSION) ?: 'jpg';
-        $key = 'places/uploads/'.Str::lower(Str::random(24)).'.'.Str::lower($ext);
-        $mime = (string) $request->input('mime');
-
-        /** @var FilesystemAdapter $disk */
-        $disk = Storage::disk('s3');
-        /** @var S3Client $client */
-        $client = $disk->getClient();
-        $bucket = config('filesystems.disks.s3.bucket');
-
-        $command = $client->getCommand('PutObject', [
-            'Bucket' => $bucket,
-            'Key' => $key,
-            'ContentType' => $mime,
-            'ACL' => 'public-read',
-        ]);
-
-        $presigned = $client->createPresignedRequest($command, '+15 minutes');
-
-        return response()->json([
-            'put_url' => (string) $presigned->getUri(),
-            'path' => $key,
-            'public_url' => $disk->url($key),
-            'mime' => $mime,
-        ]);
+        return response()->json($presign->presignPut(
+            (string) $request->validated('filename'),
+            (string) $request->validated('mime'),
+        ));
     }
 
     public function store(StorePlaceRequest $request): RedirectResponse

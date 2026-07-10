@@ -42,14 +42,13 @@ function makeBooking(Place $place, User $guest, array $attrs = []): Booking
         'start_date' => now()->addDays(3)->toDateString(),
         'end_date' => now()->addDays(4)->toDateString(),
         'guests' => 2,
-        'booking_price' => 100000,
-        'quantity' => 2,
-        'booking_amount' => 200000,
+        'nights' => 2,
+        'stay_amount' => 200000,
         'commission_rate' => 10,
         'commission_amount' => 20000,
         'vat_rate' => 15,
         'vat_amount' => 30000,
-        'total' => 230000,
+        'total_amount' => 230000,
         'payout_status' => 'not_paid',
     ], $attrs));
 }
@@ -152,7 +151,7 @@ it('lets the guest open their booking detail', function (): void {
         ->assertSee('2,300.00'); // total the guest paid
 });
 
-it('lets the host open the booking detail with payout + guest contact', function (): void {
+it('lets the host open the booking detail with payout + guest name, but NOT the guest phone', function (): void {
     $host = User::factory()->create(['phone' => '517000014']);
     $guest = User::factory()->create(['phone' => '517000015', 'name' => 'Sara Guest']);
     $place = dashboardPlace($host);
@@ -161,9 +160,9 @@ it('lets the host open the booking detail with payout + guest contact', function
     $this->actingAs($host, 'api')
         ->get("/bookings/{$booking->id}")
         ->assertOk()
-        ->assertSee('Sara Guest')      // guest name
-        ->assertSee('517000015')       // guest phone — host can contact
-        ->assertSee('1,800.00');       // payout = 2000 − 200 commission
+        ->assertSee('Sara Guest')        // guest name
+        ->assertDontSee('517000015')     // guest phone is hidden from the host (admin only)
+        ->assertSee('1,770.00');         // payout = 2000 − 200 commission − 30 commission VAT
 });
 
 it('404s the booking detail for a user who is neither guest nor host', function (): void {

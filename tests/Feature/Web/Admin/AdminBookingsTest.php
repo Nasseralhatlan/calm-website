@@ -40,21 +40,32 @@ function bk(Place $place, User $guest, array $attrs = []): Booking
         'booking_status' => BookingStatus::Confirmed->value,
         'start_date' => now()->addDays(3)->toDateString(),
         'end_date' => now()->addDays(4)->toDateString(),
-        'guests' => 2, 'booking_price' => 100000, 'quantity' => 2, 'booking_amount' => 200000,
+        'guests' => 2, 'nights' => 2, 'stay_amount' => 200000,
         'commission_rate' => 10, 'commission_amount' => 20000, 'vat_rate' => 15, 'vat_amount' => 30000,
-        'total' => 230000, 'payout_status' => 'not_paid',
+        'total_amount' => 230000, 'payout_status' => 'not_paid',
     ], $attrs));
 }
 
-it('lists all bookings on the admin page', function (): void {
-    $place = bkPlace($this->host);
-    bk($place, $this->guest);
-    bk($place, $this->guest, ['booking_status' => BookingStatus::Completed->value]);
+it('lists all bookings across every host (admin fetches everything)', function (): void {
+    // Two different hosts — the admin list must show BOTH, unscoped.
+    $mine = bk(bkPlace($this->host), $this->guest);
+
+    $otherHost = User::factory()->create(['phone' => '516100077']);
+    $otherGuest = User::factory()->create(['phone' => '517100077']);
+    $theirs = bk(bkPlace($otherHost), $otherGuest);
 
     $this->actingAs($this->admin, 'api')
         ->get('/admin/bookings')
         ->assertOk()
-        ->assertSee('Bookings place');
+        ->assertSee($mine->reference)
+        ->assertSee($theirs->reference);   // another host's booking is visible to admin
+});
+
+it('blocks a non-admin from the admin bookings page', function (): void {
+    // The mobile host scoping is separate; this admin web page is admin-only.
+    $this->actingAs($this->host, 'api')
+        ->get('/admin/bookings')
+        ->assertRedirect('/profile');
 });
 
 it('searches bookings by guest phone, host phone, place id and reference', function (): void {
