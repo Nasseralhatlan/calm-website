@@ -477,42 +477,92 @@ final class BookingService
      */
     public function earningsForHost(User $host): array
     {
-        $rows = Booking::query()
+        // host_payout_amount is the frozen per-booking payout (gross −
+        // commission − commission VAT); legacy rows were backfilled. Buckets
+        // are derived per booking via Booking::payoutState() so the summary
+        // cards, the Transfers ledger and the admin panel always agree.
+        $bookings = Booking::query()
             ->where('host_user_id', $host->id)
             ->whereIn('booking_status', [BookingStatus::Confirmed->value, BookingStatus::Completed->value])
-            // host_payout_amount is the frozen per-booking payout (gross −
-            // commission − commission VAT); legacy rows were backfilled.
-            ->selectRaw('payout_status, SUM(host_payout_amount) as net_minor, COUNT(*) as cnt')
-            ->groupBy('payout_status')
-            ->get();
+            ->where('payment_status', 'paid')
+            ->with('host')
+            ->get(['id', 'host_user_id', 'booking_status', 'payout_status', 'payout_failure', 'financial_completed_at', 'host_payout_amount']);
 
-        $paidMinor = 0;
-        $notPaidMinor = 0;
-        $count = 0;
+        $buckets = ['paid' => 0, 'processing' => 0, 'upcoming' => 0, 'awaiting_completion' => 0];
 
-        foreach ($rows as $row) {
-            $netMinor = (int) $row->net_minor;
-            $count += (int) $row->cnt;
-
-            if ($row->payout_status === 'paid') {
-                $paidMinor += $netMinor;
-            } else {
-                $notPaidMinor += $netMinor;
-            }
+        foreach ($bookings as $booking) {
+            $bucket = match ($booking->payoutState()) {
+                'paid' => 'paid',
+                'processing' => 'processing',
+                'awaiting_completion' => 'awaiting_completion',
+                // Blocked money (no IBAN / failed transfer) is still upcoming
+                // from the host's view — the banner/admin explain the blocker.
+                default => 'upcoming',
+            };
+            $buckets[$bucket] += (int) $booking->host_payout_amount;
         }
 
-        $totalMinor = $paidMinor + $notPaidMinor;
+        $totalMinor = array_sum($buckets);
+        $notPaidMinor = $totalMinor - $buckets['paid'];
 
         return [
             'currency' => 'SAR',
-            'bookings_count' => $count,
+            'bookings_count' => $bookings->count(),
             'total' => $totalMinor / 100,
             'total_minor' => $totalMinor,
-            'paid' => $paidMinor / 100,
-            'paid_minor' => $paidMinor,
+            'paid' => $buckets['paid'] / 100,
+            'paid_minor' => $buckets['paid'],
             'not_paid' => $notPaidMinor / 100,
             'not_paid_minor' => $notPaidMinor,
+            'processing' => $buckets['processing'] / 100,
+            'processing_minor' => $buckets['processing'],
+            'upcoming' => $buckets['upcoming'] / 100,
+            'upcoming_minor' => $buckets['upcoming'],
+            'awaiting_completion' => $buckets['awaiting_completion'] / 100,
+            'awaiting_completion_minor' => $buckets['awaiting_completion'],
+            // The app's "add your IBAN" banner: money exists that isn't fully
+            // paid out yet and the host has no bank account on file.
+            'needs_bank_details' => blank($host->bank_account) && $notPaidMinor > 0,
         ];
+    }
+
+    /**
+     * The host Finance tab's "Transfers" ledger: one row per money-relevant
+     * booking (paid by the guest, confirmed/completed), newest checkout
+     * first, each row carrying the full gross − commission = net breakdown
+     * and the payout state. `$state` filters via the same rules as
+     * Booking::payoutState() (the host's IBAN presence is constant per call).
+     */
+    public function payoutsForHost(User $host, ?string $state = null, ?int $perPage = null): LengthAwarePaginator
+    {
+        $hasIban = ! blank($host->bank_account);
+
+        return Booking::query()
+            ->where('host_user_id', $host->id)
+            ->whereIn('booking_status', [BookingStatus::Confirmed->value, BookingStatus::Completed->value])
+            ->where('payment_status', 'paid')
+            ->when($state === 'paid', fn ($q) => $q->where('payout_status', 'paid'))
+            ->when($state === 'processing', fn ($q) => $q->where('payout_status', 'processing'))
+            ->when($state === 'failed', fn ($q) => $q
+                ->where('payout_status', 'not_paid')->whereNotNull('payout_failure'))
+            ->when($state === 'awaiting_completion', fn ($q) => $q
+                ->where('payout_status', 'not_paid')->whereNull('payout_failure')
+                ->where(fn ($inner) => $inner
+                    ->where('booking_status', '!=', BookingStatus::Completed->value)
+                    ->orWhereNull('financial_completed_at')))
+            ->when($state === 'awaiting_bank_details' || $state === 'upcoming', fn ($q) => $q
+                ->where('payout_status', 'not_paid')->whereNull('payout_failure')
+                ->where('booking_status', BookingStatus::Completed->value)
+                ->whereNotNull('financial_completed_at')
+                // With an IBAN on file nothing is "awaiting bank details";
+                // without one nothing is plain "upcoming" — one of the two
+                // filters always yields the empty set.
+                ->whereRaw($state === 'upcoming' ? ($hasIban ? '1 = 1' : '1 = 0') : ($hasIban ? '1 = 0' : '1 = 1')))
+            ->with(['place', 'host'])
+            ->orderByDesc('end_date')
+            ->orderByDesc('created_at')
+            ->paginate($perPage ?? config('pagination.per_page'))
+            ->withQueryString();
     }
 
     /**

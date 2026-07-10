@@ -86,6 +86,18 @@ payouts carry `metadata` {booking_id, booking_reference, attempt} plus the CB-re
 - Booking payloads: a cancelled PAID booking carries
   `refund: {refunded, amount, amount_minor}` (full-refund policy — equals the
   guest total) so the app can show "SR X was refunded to your card".
+- **Host Finance tab** = summary cards + two sub-tabs:
+  - `GET /api/host/earnings` — cards: existing total/paid/not_paid PLUS
+    `processing`, `upcoming`, `awaiting_completion` (each + `_minor`) and
+    `needs_bank_details` (IBAN banner). Buckets derive from
+    `Booking::payoutState()` — always agrees with the ledger and admin.
+  - `GET /api/host/payouts` — the "Transfers" ledger: paginated rows with the
+    full gross − commission = net breakdown, `payout_state` (paid |
+    processing | upcoming | awaiting_completion | awaiting_bank_details |
+    failed), paid date + bank reference, `expected_at` while unpaid. Optional
+    `?state=` filter. Money-relevant bookings only (guest paid).
+  - "Invoices" sub-tab = `GET /api/finance-documents` as-is (commission
+    invoices + credit notes + payout statements, PDFs via pdf-url).
 
 ## Automatic host payouts (Moyasar Payouts)
 

@@ -40,6 +40,9 @@ function finBooking(Place $place, User $guest, array $attrs = []): Booking
         'guests' => 2, 'nights' => 1, 'stay_amount' => 100000,
         'commission_rate' => 10, 'commission_amount' => 10000, 'vat_rate' => 15, 'vat_amount' => 15000,
         'total_amount' => 115000, 'payout_status' => 'not_paid', 'confirmed_at' => now()->subDays(6),
+        // Real bookings are always paid by the time they're confirmed — the
+        // earnings summary only counts money-relevant (guest-paid) bookings.
+        'payment_status' => 'paid',
     ], $attrs));
 }
 

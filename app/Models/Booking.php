@@ -171,6 +171,27 @@ class Booking extends Model
             && $payableAt->lessThanOrEqualTo($now ?? CarbonImmutable::now());
     }
 
+    /**
+     * The single source of truth for "where is this booking's payout?" —
+     * shared by the host Transfers ledger, the earnings buckets and (branch
+     * order mirrored by) the admin finance panel. States:
+     * paid | processing | failed | awaiting_completion | awaiting_bank_details
+     * | upcoming. `upcoming` covers invoiced-and-queued AND still-in-hold —
+     * `expected_at` (payableAt) tells the app when.
+     */
+    public function payoutState(): string
+    {
+        return match (true) {
+            $this->payout_status === 'paid' => 'paid',
+            $this->payout_status === 'processing' => 'processing',
+            $this->payout_failure !== null => 'failed',
+            $this->booking_status !== BookingStatus::Completed
+                || $this->financial_completed_at === null => 'awaiting_completion',
+            blank($this->host?->bank_account) => 'awaiting_bank_details',
+            default => 'upcoming',
+        };
+    }
+
     /** All financial documents born from this booking (invoices, statements, credit notes). */
     public function financialDocuments(): MorphMany
     {

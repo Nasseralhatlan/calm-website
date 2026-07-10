@@ -173,11 +173,12 @@ it('totals the host\'s earnings split by payout status', function (): void {
     $place = hostApiPlace($host);
 
     // Net per booking = 200000 − commission 20000 − commission VAT 3000 = 177000 (1,770 SAR).
-    hostApiBooking($place, $guest, ['payout_status' => 'paid']);
-    hostApiBooking($place, $guest, ['payout_status' => 'not_paid']);
-    // These must NOT count toward earnings.
+    hostApiBooking($place, $guest, ['payout_status' => 'paid', 'payment_status' => 'paid']);
+    hostApiBooking($place, $guest, ['payout_status' => 'not_paid', 'payment_status' => 'paid']);
+    // These must NOT count toward earnings (never paid / not money-relevant).
     hostApiBooking($place, $guest, ['booking_status' => BookingStatus::PendingPayment->value]);
     hostApiBooking($place, $guest, ['booking_status' => BookingStatus::Expired->value]);
+    hostApiBooking($place, $guest); // confirmed but guest never paid
 
     $this->actingAs($host, 'api')
         ->getJson('/api/host/earnings')
@@ -206,4 +207,110 @@ it('returns zero earnings for a host with no confirmed bookings', function (): v
 
 it('requires auth for host earnings', function (): void {
     $this->getJson('/api/host/earnings')->assertStatus(401);
+});
+
+it('breaks earnings down by payout state with the IBAN banner flag', function (): void {
+    $host = User::factory()->create(['phone' => '54000040', 'bank_account' => 'SA4420000001234567891234']);
+    $guest = User::factory()->create(['phone' => '54000041']);
+    $place = hostApiPlace($host);
+
+    // One booking per bucket — net 177000 halalas each.
+    hostApiBooking($place, $guest, ['payment_status' => 'paid', 'payout_status' => 'paid', 'payout_paid_at' => now()]);
+    hostApiBooking($place, $guest, ['payment_status' => 'paid', 'payout_status' => 'processing', 'payout_id' => 'po_x']);
+    hostApiBooking($place, $guest, [
+        'payment_status' => 'paid',
+        'booking_status' => BookingStatus::Completed->value,
+        'financial_completed_at' => now(),
+    ]); // upcoming (invoiced, IBAN on file)
+    hostApiBooking($place, $guest, ['payment_status' => 'paid']); // confirmed → awaiting_completion
+
+    $this->actingAs($host, 'api')
+        ->getJson('/api/host/earnings')
+        ->assertOk()
+        ->assertJsonPath('data.bookings_count', 4)
+        ->assertJsonPath('data.total_minor', 708000)
+        ->assertJsonPath('data.paid_minor', 177000)
+        ->assertJsonPath('data.processing_minor', 177000)
+        ->assertJsonPath('data.upcoming_minor', 177000)
+        ->assertJsonPath('data.awaiting_completion_minor', 177000)
+        ->assertJsonPath('data.not_paid_minor', 531000)
+        ->assertJsonPath('data.needs_bank_details', false);
+});
+
+it('raises the bank-details flag when unpaid money exists without an IBAN', function (): void {
+    $host = User::factory()->create(['phone' => '54000042', 'bank_account' => null]);
+    $guest = User::factory()->create(['phone' => '54000043']);
+    hostApiBooking(hostApiPlace($host), $guest, [
+        'payment_status' => 'paid',
+        'booking_status' => BookingStatus::Completed->value,
+        'financial_completed_at' => now(),
+    ]);
+
+    $this->actingAs($host, 'api')
+        ->getJson('/api/host/earnings')
+        ->assertOk()
+        // Blocked-on-IBAN money still reads as upcoming; the flag explains why.
+        ->assertJsonPath('data.upcoming_minor', 177000)
+        ->assertJsonPath('data.needs_bank_details', true);
+});
+
+// ── Payouts ledger (Finance tab · Transfers) ────────────────────────────────
+
+it('lists the transfers ledger with breakdown, states and filter', function (): void {
+    $host = User::factory()->create(['phone' => '54000050', 'bank_account' => 'SA4420000001234567891234']);
+    $guest = User::factory()->create(['phone' => '54000051']);
+    $place = hostApiPlace($host);
+
+    $paid = hostApiBooking($place, $guest, [
+        'payment_status' => 'paid', 'payout_status' => 'paid',
+        'payout_paid_at' => now(), 'payout_reference' => '1234567890123456',
+        'start_date' => now()->subDays(9)->toDateString(), 'end_date' => now()->subDays(8)->toDateString(),
+    ]);
+    $upcoming = hostApiBooking($place, $guest, [
+        'payment_status' => 'paid',
+        'booking_status' => BookingStatus::Completed->value,
+        'financial_completed_at' => now(),
+        'start_date' => now()->subDays(3)->toDateString(), 'end_date' => now()->subDays(2)->toDateString(),
+    ]);
+    // Noise that must NOT appear: never paid, and another host's booking.
+    hostApiBooking($place, $guest);
+    hostApiBooking(hostApiPlace(User::factory()->create(['phone' => '54000052'])), $guest, ['payment_status' => 'paid']);
+
+    $res = $this->actingAs($host, 'api')
+        ->getJson('/api/host/payouts')
+        ->assertOk()
+        ->assertJsonPath('data.pagination.total', 2);
+
+    $items = collect($res->json('data.items'))->keyBy('booking_reference');
+
+    $paidRow = $items[$paid->reference];
+    expect($paidRow['payout_state'])->toBe('paid')
+        ->and($paidRow['gross_minor'])->toBe(200000)
+        ->and($paidRow['commission_minor'])->toBe(23000)
+        ->and($paidRow['net_minor'])->toBe(177000)
+        ->and($paidRow['payout_reference'])->toBe('1234567890123456')
+        ->and($paidRow['expected_at'])->toBeNull()
+        ->and($paidRow['place_title'])->not->toBeNull();
+
+    $upcomingRow = $items[$upcoming->reference];
+    expect($upcomingRow['payout_state'])->toBe('upcoming')
+        ->and($upcomingRow['expected_at'])->not->toBeNull();
+
+    // Newest checkout first.
+    expect($res->json('data.items.0.booking_reference'))->toBe($upcoming->reference);
+
+    // ?state filter narrows to one bucket.
+    $this->actingAs($host, 'api')
+        ->getJson('/api/host/payouts?state=paid')
+        ->assertOk()
+        ->assertJsonPath('data.pagination.total', 1)
+        ->assertJsonPath('data.items.0.booking_reference', $paid->reference);
+
+    $this->actingAs($host, 'api')
+        ->getJson('/api/host/payouts?state=bogus')
+        ->assertStatus(422);
+});
+
+it('requires auth for the payouts ledger', function (): void {
+    $this->getJson('/api/host/payouts')->assertStatus(401);
 });

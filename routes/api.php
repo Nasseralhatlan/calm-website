@@ -123,6 +123,9 @@ Route::middleware(['auth:api', 'throttle:authenticated'])->group(function (): vo
     // Host listings — optional ?status= narrows to one lifecycle tab.
     Route::get('/host/listings', [HostController::class, 'listings']);
     Route::get('/host/earnings', [HostController::class, 'earnings']);
+    // Finance tab "Transfers" ledger — per-booking net + payout state,
+    // optional ?state= filter. The "Invoices" sub-tab is /finance-documents.
+    Route::get('/host/payouts', [HostController::class, 'payouts']);
     Route::get('/host/reviews', [HostController::class, 'reviews']);
 
     // Host place wizard: presigned photo uploads + create/resume/edit/delete.
