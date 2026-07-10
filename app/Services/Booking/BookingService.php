@@ -17,12 +17,14 @@ use App\Services\Finance\BookingFinanceFinalizer;
 use App\Services\Notification\NotificationService;
 use App\Services\Notification\OwnerNotifier;
 use App\Services\Place\PlaceAvailabilityService;
+use App\Support\MockPhoneRegistry;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use RuntimeException;
 
 final class BookingService
@@ -99,11 +101,21 @@ final class BookingService
 
             $pricing = $quote['pricing'];
 
+            // Demo bubble (App Store review): when BOTH parties are mock-phone
+            // accounts (SMS_MOCK_PHONES), the booking confirms instantly with
+            // a mock payment — no Moyasar, and the finance pipeline ignores
+            // payment_method='mock' everywhere. A mock guest booking a REAL
+            // host's place goes through the normal paid flow — real hosts can
+            // never be booked for free.
+            $registry = new MockPhoneRegistry;
+            $isDemo = $registry->has((string) $user->phone)
+                && $registry->has((string) ($locked->host?->phone ?? ''));
+
             return Booking::query()->create([
                 'place_id' => $locked->id,
                 'guest_user_id' => $user->id,
                 'host_user_id' => $locked->host_user_id,
-                'booking_status' => BookingStatus::PendingPayment->value,
+                'booking_status' => ($isDemo ? BookingStatus::Confirmed : BookingStatus::PendingPayment)->value,
                 'start_date' => $quote['check_in'],
                 'end_date' => $quote['check_out'],
                 'check_in_time' => $locked->check_in_time,
@@ -119,9 +131,26 @@ final class BookingService
                 'vat_amount' => $pricing['vat_amount_minor'],
                 'total_amount' => $pricing['total_minor'],
                 'payout_status' => 'not_paid',
-                'expires_at' => $holdExpiresAt,
+                'expires_at' => $isDemo ? null : $holdExpiresAt,
+                ...($isDemo ? [
+                    'payment_status' => 'paid',
+                    'payment_method' => 'mock',
+                    'payment_id' => 'mock_'.Str::uuid(),
+                    'confirmed_at' => CarbonImmutable::now(),
+                ] : []),
             ]);
         });
+
+        // Demo bookings are done: notify both (mock) parties and stop before
+        // any gateway call. Deliberately NOT fireBookingNotification — that
+        // path records real-revenue signals (guest_payment movement, owner
+        // revenue ping) that mock money must never produce.
+        if ($booking->payment_method === 'mock') {
+            $this->notifications->bookingConfirmed($booking);
+            $this->notifications->hostNewBooking($booking);
+
+            return $booking;
+        }
 
         // Close the invoice a buffer BEFORE the date-hold, so Moyasar refuses
         // payment before the expiry sweep can release the dates (no "paid after
@@ -292,8 +321,9 @@ final class BookingService
         // Refund policy: cancelling a PAID booking refunds the guest IN FULL,
         // and is only allowed until N days before check-in. The refund runs
         // FIRST (outside any DB transaction) — if Moyasar refuses, the
-        // booking stays confirmed and nothing was recorded.
-        if ($booking->payment_status === 'paid' && $booking->payment_id !== null) {
+        // booking stays confirmed and nothing was recorded. Demo bookings
+        // (payment_method='mock') carry no real money — no refund, no window.
+        if ($booking->payment_status === 'paid' && $booking->payment_id !== null && $booking->payment_method !== 'mock') {
             $windowDays = (int) (Setting::query()->where('key', 'refund_days_before_checkin')->value('value') ?? 4);
             $checkIn = $booking->checkInAt();
 
@@ -491,6 +521,8 @@ final class BookingService
             ->where('host_user_id', $host->id)
             ->whereIn('booking_status', [BookingStatus::Confirmed->value, BookingStatus::Completed->value])
             ->where('payment_status', 'paid')
+            // Demo bookings (mock payments) are visible bookings, never money.
+            ->where(fn ($q) => $q->whereNull('payment_method')->orWhere('payment_method', '!=', 'mock'))
             ->with('host')
             ->get(['id', 'host_user_id', 'booking_status', 'payout_status', 'payout_failure', 'financial_completed_at', 'host_payout_amount']);
 
@@ -547,6 +579,8 @@ final class BookingService
             ->where('host_user_id', $host->id)
             ->whereIn('booking_status', [BookingStatus::Confirmed->value, BookingStatus::Completed->value])
             ->where('payment_status', 'paid')
+            // Demo bookings (mock payments) never appear in the money ledger.
+            ->where(fn ($q) => $q->whereNull('payment_method')->orWhere('payment_method', '!=', 'mock'))
             ->when($state === 'paid', fn ($q) => $q->where('payout_status', 'paid'))
             ->when($state === 'processing', fn ($q) => $q->where('payout_status', 'processing'))
             ->when($state === 'failed', fn ($q) => $q

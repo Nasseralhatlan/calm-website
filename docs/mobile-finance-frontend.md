@@ -168,3 +168,16 @@ else's `booking_id` also returns an empty list (never an error).
   derive payout status client-side from raw fields; use `payout_state`.
 - All lists are paginated; request more with `?page=N` while
   `pagination.has_more` is true.
+
+---
+
+## 4. App Store review mode (demo accounts)
+
+Phones listed in `SMS_MOCK_PHONES` are review accounts: fixed OTP `111111`,
+no real SMS ever. **When BOTH the guest and the place's host are review
+accounts, booking skips payment entirely** — the create response comes back
+`status: "confirmed"` immediately with `payment.method: "mock"` and no
+payment URL, so the app should treat it like a post-payment success (no
+checkout webview). A review guest booking a REAL host's place gets the
+normal paid flow. Demo bookings never appear in host earnings, the payouts
+ledger, or any financial documents.

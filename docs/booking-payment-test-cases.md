@@ -173,3 +173,11 @@ the system as built (459 automated tests + live Qoyod/Moyasar sandbox runs).
 Policy items pending accountant sign-off: tax-point timing (invoice at
 completion vs at payment) and the commission offset-account treatment — see
 `feature-finance-qoyod.md`.*
+
+---
+
+*Demo mode (App Store review): when guest AND host are both `SMS_MOCK_PHONES`
+accounts, the booking confirms instantly with `payment_method='mock'` — no
+Moyasar object, no documents, no movements, no Qoyod, no payout, excluded
+from host earnings/ledger; admin cancel needs no refund. Any scenario above
+involving real money requires non-mock accounts.*

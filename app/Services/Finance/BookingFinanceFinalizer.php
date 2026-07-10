@@ -36,6 +36,9 @@ final class BookingFinanceFinalizer
         $checkout = $booking->checkoutAt();
 
         return $booking->payment_status === 'paid'
+            // Demo bookings (App Store review, payment_method='mock') carry
+            // no real money — never invoiced, never in Qoyod, never paid out.
+            && $booking->payment_method !== 'mock'
             && in_array($booking->booking_status, [BookingStatus::Confirmed, BookingStatus::Completed], true)
             && $booking->financial_completed_at === null
             && $checkout !== null
@@ -140,8 +143,8 @@ final class BookingFinanceFinalizer
      */
     public function handleCancellation(Booking $booking): void
     {
-        if ($booking->payment_status !== 'paid') {
-            return; // Case A — zero financial footprint.
+        if ($booking->payment_status !== 'paid' || $booking->payment_method === 'mock') {
+            return; // Case A / demo booking — zero financial footprint.
         }
 
         if ($booking->financial_completed_at === null) {
