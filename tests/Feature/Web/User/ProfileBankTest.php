@@ -37,12 +37,15 @@ it('saves the bank name and IBAN from the profile page', function (): void {
         ->patch('/profile', [
             'bank' => 'Al Rajhi Bank',
             'bank_account' => 'SA0380000000608010167519',
+            // The name as written at the bank — payout beneficiary name.
+            'bank_account_name' => 'MOHAMMED A ALQAHTANI',
         ])
         ->assertRedirect();
 
     $this->user->refresh();
     expect($this->user->bank)->toBe('Al Rajhi Bank')
-        ->and($this->user->bank_account)->toBe('SA0380000000608010167519');
+        ->and($this->user->bank_account)->toBe('SA0380000000608010167519')
+        ->and($this->user->bank_account_name)->toBe('MOHAMMED A ALQAHTANI');
 });
 
 it('normalises the IBAN — strips spaces and upper-cases', function (): void {

@@ -10,6 +10,7 @@ use App\Http\Controllers\Admin\CityAreasController;
 use App\Http\Controllers\Admin\CountriesController;
 use App\Http\Controllers\Admin\DashboardController;
 // use App\Http\Controllers\Admin\NotificationsController; // notifications temporarily disabled
+use App\Http\Controllers\Admin\FinanceDocumentPdfController;
 use App\Http\Controllers\Admin\PlaceListsController;
 use App\Http\Controllers\Admin\PlaceReviewController;
 use App\Http\Controllers\Admin\PlacesController;
@@ -165,6 +166,14 @@ Route::middleware(['auth:api', 'admin'])
         Route::get('/bookings', [BookingsController::class, 'index'])->name('bookings.index');
         Route::get('/bookings/{booking}', [BookingsController::class, 'show'])->name('bookings.show');
         Route::post('/bookings/{booking}/cancel', [BookingsController::class, 'cancel'])->name('bookings.cancel');
+
+        // Payouts are automatic (Moyasar). Human actions, from the booking's
+        // page: retry a bank-rejected transfer, or record a hand-made bank
+        // transfer while automatic payouts aren't available.
+        Route::post('/bookings/{booking}/payout/retry', [BookingsController::class, 'retryPayout'])->name('bookings.payout.retry');
+        Route::post('/bookings/{booking}/payout/mark-paid', [BookingsController::class, 'markPayoutPaid'])->name('bookings.payout.mark-paid');
+        // Fresh expiring Qoyod PDF for a tax document (admin support view).
+        Route::get('/finance-documents/{document}/pdf', FinanceDocumentPdfController::class)->name('finance-documents.pdf');
 
         // Curated landing-page lists ("Featured chalets", "Editor's picks", etc.)
         // Adding places to a list happens from the place's edit page; this

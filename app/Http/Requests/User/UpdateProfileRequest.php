@@ -58,6 +58,9 @@ class UpdateProfileRequest extends FormRequest
             'bank' => ['sometimes', 'nullable', 'string', 'max:120'],
             // Saudi IBAN: "SA" + 2 check digits + 18-digit BBAN = 24 chars.
             'bank_account' => ['sometimes', 'nullable', 'string', 'regex:/^SA\d{22}$/'],
+            // Name AS WRITTEN ON THE BANK ACCOUNT (may differ from the profile
+            // name) — payout transfers use it as the beneficiary name.
+            'bank_account_name' => ['sometimes', 'nullable', 'string', 'max:120'],
         ];
     }
 

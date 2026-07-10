@@ -85,12 +85,14 @@ class BookingResource extends JsonResource
             'checkout_at' => $this->checkoutAt()?->toIso8601String(),
             'guests' => $this->guests,
             'currency' => 'SAR',
+            // JSON keys are the app's contract — sourced from the finance
+            // snapshot columns (guest side of the money model).
             'pricing' => [
-                'subtotal' => $this->booking_amount / 100,
+                'subtotal' => $this->stay_amount / 100,
                 'vat_percentage' => $this->vat_rate,
                 'vat' => $this->vat_amount / 100,
-                'total' => $this->total / 100,
-                'total_minor' => $this->total,
+                'total' => $this->total_amount / 100,
+                'total_minor' => $this->total_amount,
             ],
             'payment' => [
                 'id' => $this->payment_id,
@@ -98,6 +100,19 @@ class BookingResource extends JsonResource
                 'status' => $this->payment_status,
                 'url' => $this->payment_url,
             ],
+            // Present ONLY on a cancelled booking the guest had paid: the
+            // refund policy is full-only, so the refunded amount = the total.
+            // Lets the app show "SR X was refunded to your card".
+            'refund' => $this->when(
+                $this->payment_status === 'paid' && in_array($this->booking_status, [
+                    BookingStatus::CanceledByHost, BookingStatus::CanceledByGuest, BookingStatus::CanceledByAdmin,
+                ], true),
+                fn (): array => [
+                    'refunded' => true,
+                    'amount' => $this->total_amount / 100,
+                    'amount_minor' => $this->total_amount,
+                ],
+            ),
             'expires_at' => $this->expires_at?->toIso8601String(),
             'confirmed_at' => $this->confirmed_at?->toIso8601String(),
             'created_at' => $this->created_at?->toIso8601String(),

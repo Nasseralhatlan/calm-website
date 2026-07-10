@@ -42,14 +42,13 @@ function refBooking(User $guest, Place $place): Booking
         'start_date' => now()->addDays(3)->toDateString(),
         'end_date' => now()->addDays(4)->toDateString(),
         'guests' => 2,
-        'booking_price' => 100000,
-        'quantity' => 1,
-        'booking_amount' => 100000,
+        'nights' => 1,
+        'stay_amount' => 100000,
         'commission_rate' => 10,
         'commission_amount' => 10000,
         'vat_rate' => 15,
         'vat_amount' => 15000,
-        'total' => 115000,
+        'total_amount' => 115000,
         'payout_status' => 'not_paid',
     ]);
 }

@@ -28,6 +28,12 @@
         <env name="DB_URL" value=""/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
+        <!-- Integration flags pinned OFF so local .env state (live testing
+             against real Qoyod/Moyasar) can never leak into the suite. -->
+        <env name="QOYOD_ENABLED" value="false"/>
+        <env name="QOYOD_API_KEY" value=""/>
+        <env name="MOYASAR_PAYOUTS_MODE" value="manual"/>
+        <env name="MOYASAR_PAYOUT_ACCOUNT_ID" value=""/>
         <env name="SESSION_DRIVER" value="array"/>
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>

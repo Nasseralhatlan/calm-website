@@ -6,6 +6,13 @@
     $isRtl = $locale === 'ar';
     $fa = $isRtl ? 'font-arabic' : '';
     $canCancel = $booking->booking_status === BookingStatus::Confirmed;
+
+    // Paid cancellations refund the guest IN FULL via Moyasar, and only until
+    // N days before check-in — mirror the server-side guard for the UI state.
+    $refundDays = (int) (\App\Models\Setting::query()->where('key', 'refund_days_before_checkin')->value('value') ?? 4);
+    $isPaid = $booking->payment_status === 'paid';
+    $refundDeadline = $booking->checkInAt()?->subDays($refundDays);
+    $insideWindow = $isPaid && ($refundDeadline === null || now()->greaterThan($refundDeadline));
 @endphp
 
 @section('title', $isRtl ? 'تفاصيل الحجز' : 'Booking details')
@@ -20,12 +27,29 @@
     <div style="max-width: 860px; display: flex; flex-direction: column; gap: 16px;">
         @include('partials._booking_detail', ['booking' => $booking, 'audience' => 'admin'])
 
+        {{-- ── Finance: payout state, documents, money trail ── --}}
+        @include('admin.bookings._finance', ['booking' => $booking])
+
         {{-- ── Cancel actions (admin only) ── --}}
         <div style="background:#fff;border-radius:24px;padding:24px;box-shadow:0px 8px 24px 0px rgba(0,0,0,0.05);">
             <h2 class="text-[15px] font-bold text-[#222] {{ $fa }}" style="margin-bottom: 4px;">{{ $isRtl ? 'إلغاء الحجز' : 'Cancel booking' }}</h2>
-            @if($canCancel)
+            @if($canCancel && $insideWindow)
+                {{-- Paid + past the refund window: the server refuses the
+                     cancel (422), so don't offer buttons that can only fail. --}}
+                <p class="text-[13px] text-[#b45309] {{ $fa }}" style="background: #fffbeb; padding: 10px 14px; border-radius: 12px;">
+                    ⏸ {{ $isRtl
+                        ? "لا يمكن الإلغاء مع الاسترداد — الاسترداد متاح حتى {$refundDays} أيام قبل الوصول."
+                        : "Cancellation with refund is no longer possible — refunds close {$refundDays} days before check-in." }}
+                </p>
+            @elseif($canCancel)
                 <p class="text-[13px] text-[#999] {{ $fa }}" style="margin-bottom: 16px;">
-                    {{ $isRtl ? 'سيتم إشعار الضيف والمضيف. لا يتم استرداد المبلغ تلقائياً.' : 'The guest and host will be notified. No automatic refund.' }}
+                    @if($isPaid)
+                        {{ $isRtl
+                            ? 'سيتم إشعار الضيف والمضيف، وسيُسترد للضيف كامل المبلغ ('.number_format($booking->total_amount / 100, 2).' ر.س) تلقائياً عبر ميسر.'
+                            : 'The guest and host will be notified, and the guest is refunded IN FULL (SR '.number_format($booking->total_amount / 100, 2).') automatically via Moyasar.' }}
+                    @else
+                        {{ $isRtl ? 'سيتم إشعار الضيف والمضيف. لا يوجد مبلغ مدفوع لاسترداده.' : 'The guest and host will be notified. Nothing was paid, so nothing is refunded.' }}
+                    @endif
                 </p>
                 <div class="grid grid-cols-1 sm:grid-cols-2" style="gap: 10px;">
                     <form method="POST" action="{{ route('admin.bookings.cancel', $booking) }}"

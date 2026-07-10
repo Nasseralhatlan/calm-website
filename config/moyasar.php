@@ -26,4 +26,18 @@ return [
     // Moyasar stops accepting payment before our expiry sweep can release the
     // dates — closes the "paid after we expired" race.
     'invoice_buffer_minutes' => (int) env('MOYASAR_INVOICE_BUFFER_MINUTES', 1),
+
+    // ── Moyasar Payouts (automatic host transfers) ───────────────────────────
+    // 'manual' keeps the admin mark-paid flow; 'auto' lets the scheduler
+    // execute real bank transfers via POST /v1/payouts. Flip to auto only
+    // after Moyasar activates Payouts and the payout account (Al Rajhi / SNB
+    // corporate account with API credentials) is registered — its id below.
+    'payouts_mode' => env('MOYASAR_PAYOUTS_MODE', 'manual'),
+    'payout_account_id' => env('MOYASAR_PAYOUT_ACCOUNT_ID'),
+    // payment_to_merchant: verified against the live API — the IPS transfer
+    // channel rejects several enum-valid purposes (e.g. expenses_services)
+    // after creation with "Unsupported purpose".
+    'payout_purpose' => env('MOYASAR_PAYOUT_PURPOSE', 'payment_to_merchant'),
+    // Moyasar bank destinations require a city; hosts don't store one yet.
+    'payout_default_city' => env('MOYASAR_PAYOUT_DEFAULT_CITY', 'Riyadh'),
 ];

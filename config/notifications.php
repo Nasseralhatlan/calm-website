@@ -52,6 +52,38 @@ return [
         ],
     ],
 
+    // The host's payout settled at the bank — tell them the money moved.
+    'host_payout_paid' => [
+        'host' => [
+            'title_ar' => 'تم تحويل أرباحك',
+            'title_en' => 'Your payout was sent',
+            'body_ar' => 'تم تحويل {amount} ر.س عن الحجز {ref} إلى حسابك البنكي.',
+            'body_en' => 'SR {amount} for booking {ref} was transferred to your bank account.',
+        ],
+    ],
+
+    // A payout is due but the host has no bank IBAN on file. Nudged at most
+    // once per day until they add it (then the payout fires automatically).
+    'host_iban_needed' => [
+        'host' => [
+            'title_ar' => 'أضف الآيبان لاستلام أرباحك',
+            'title_en' => 'Add your IBAN to get paid',
+            'body_ar' => 'لديك دفعة بقيمة {amount} ر.س بانتظارك عن الحجز {ref}. أضف رقم الآيبان البنكي في تطبيق كالم لاستلامها تلقائياً.',
+            'body_en' => 'A payout of SR {amount} for booking {ref} is waiting. Add your bank IBAN in the Calm app to receive it automatically.',
+        ],
+    ],
+
+    // A connected external calendar (Airbnb/Gathern) imported an event over
+    // dates an active Calm booking already holds — likely double-booked.
+    'calendar_conflict' => [
+        'host' => [
+            'title_ar' => 'تعارض في التقويم',
+            'title_en' => 'Calendar conflict',
+            'body_ar' => 'حجز من تقويم خارجي مرتبط يتداخل مع حجزك {ref} بتاريخ {dates}. يرجى التحقق لتجنب الحجز المزدوج.',
+            'body_en' => 'An external calendar event overlaps your booking {ref} for {dates}. Please check to avoid a double booking.',
+        ],
+    ],
+
     'booking_canceled_by_host' => [
         'guest' => [
             'title_ar' => 'تم إلغاء حجزك',

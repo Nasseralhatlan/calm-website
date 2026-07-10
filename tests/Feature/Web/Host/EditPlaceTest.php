@@ -256,6 +256,31 @@ it('clears all amenities when none are submitted', function (): void {
     expect($place->attributeValues()->count())->toBe(0);
 });
 
+it('stores blank per-day prices as 0 instead of failing on the NOT NULL columns', function (): void {
+    $host = User::factory()->create(['phone' => '513000013']);
+    $place = editablePlace($host, ['price_friday' => 900, 'price_saturday' => 900]);
+
+    // The pricing form posts every weekday field; blank ones arrive as ''
+    // (→ null via middleware). Only Friday is overridden here — the regression
+    // was a 500: "NOT NULL constraint failed: places.price_sunday".
+    $this->actingAs($host, 'api')
+        ->put("/my-places/{$place->id}", editPayload([
+            'price' => 5,
+            'price_sunday' => '', 'price_monday' => '', 'price_tuesday' => '',
+            'price_wednesday' => '', 'price_thursday' => '', 'price_friday' => 5,
+            'price_saturday' => '',
+        ]))
+        ->assertRedirect(route('user.places'));
+
+    $place->refresh();
+    expect($place->price)->toBe(5)
+        ->and($place->price_friday)->toBe(5)
+        // Blank days fall back to 0 = "use the base price" — including
+        // Saturday, which previously had an override.
+        ->and($place->price_sunday)->toBe(0)
+        ->and($place->price_saturday)->toBe(0);
+});
+
 it('syncs photos and the cover on edit', function (): void {
     $host = User::factory()->create(['phone' => '513000012']);
     $place = editablePlace($host);

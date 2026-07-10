@@ -42,14 +42,13 @@ function makeBooking(Place $place, User $guest, array $attrs = []): Booking
         'start_date' => now()->addDays(3)->toDateString(),
         'end_date' => now()->addDays(4)->toDateString(),
         'guests' => 2,
-        'booking_price' => 100000,
-        'quantity' => 2,
-        'booking_amount' => 200000,
+        'nights' => 2,
+        'stay_amount' => 200000,
         'commission_rate' => 10,
         'commission_amount' => 20000,
         'vat_rate' => 15,
         'vat_amount' => 30000,
-        'total' => 230000,
+        'total_amount' => 230000,
         'payout_status' => 'not_paid',
     ], $attrs));
 }
@@ -163,7 +162,7 @@ it('lets the host open the booking detail with payout + guest name, but NOT the 
         ->assertOk()
         ->assertSee('Sara Guest')        // guest name
         ->assertDontSee('517000015')     // guest phone is hidden from the host (admin only)
-        ->assertSee('1,800.00');         // payout = 2000 − 200 commission
+        ->assertSee('1,770.00');         // payout = 2000 − 200 commission − 30 commission VAT
 });
 
 it('404s the booking detail for a user who is neither guest nor host', function (): void {

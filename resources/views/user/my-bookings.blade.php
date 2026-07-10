@@ -78,7 +78,7 @@
                             </td>
                             <td class="text-start text-[#717171]" style="padding: 14px 20px;">{{ $booking->guests }}</td>
                             <td class="text-start font-semibold tabular-nums" style="padding: 14px 20px;" dir="ltr">
-                                {{ number_format($booking->total / 100, 2) }} {{ $isRtl ? 'ر.س' : 'SAR' }}
+                                {{ number_format($booking->total_amount / 100, 2) }} {{ $isRtl ? 'ر.س' : 'SAR' }}
                             </td>
                             <td class="text-start" style="padding: 14px 20px;">
                                 <span class="inline-flex items-center text-[11px] font-bold uppercase tracking-wider text-white {{ $fa }}"

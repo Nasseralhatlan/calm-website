@@ -9,8 +9,10 @@ use App\Http\Requests\Api\HostBookingsIndexRequest;
 use App\Http\Requests\Api\HostCalendarDayRequest;
 use App\Http\Requests\Api\HostCalendarWindowRequest;
 use App\Http\Requests\Api\HostListingsRequest;
+use App\Http\Requests\Api\HostPayoutsIndexRequest;
 use App\Http\Resources\Api\BookingResource;
 use App\Http\Resources\Api\HostListingResource;
+use App\Http\Resources\Api\HostPayoutItemResource;
 use App\Http\Resources\Api\PlaceBlockingResource;
 use App\Http\Resources\Api\PlaceReviewResource;
 use App\Http\Responses\ApiResponse;
@@ -176,6 +178,27 @@ class HostController extends Controller
         return ApiResponse::success(
             data: $this->bookings->earningsForHost($host),
             message: 'Host earnings fetched.',
+        );
+    }
+
+    /**
+     * The Finance tab's "Transfers" ledger: per-booking net + payout state,
+     * newest checkout first. Rows carry the full gross − commission = net
+     * breakdown for inline expansion. Optional ?state= filter.
+     */
+    public function payouts(HostPayoutsIndexRequest $request): JsonResponse
+    {
+        /** @var User $host */
+        $host = $request->user();
+
+        $paginator = $this->bookings->payoutsForHost($host, $request->state());
+
+        return ApiResponse::success(
+            data: [
+                'items' => HostPayoutItemResource::collection($paginator->items())->resolve($request),
+                'pagination' => self::pagination($paginator),
+            ],
+            message: 'Host payouts fetched.',
         );
     }
 

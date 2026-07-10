@@ -93,7 +93,7 @@ it('removes a block', function (): void {
     expect(PlaceBlocking::query()->whereKey($blocking->id)->exists())->toBeFalse();
 });
 
-it('allows blocking a range that already has a booking (booking untouched)', function (): void {
+it('refuses blocking a range that holds an active booking', function (): void {
     $host = User::factory()->create(['phone' => '513000004']);
     $guest = User::factory()->create(['phone' => '513000005']);
     $place = blkPlace($host);
@@ -102,16 +102,30 @@ it('allows blocking a range that already has a booking (booking untouched)', fun
         'place_id' => $place->id, 'guest_user_id' => $guest->id, 'host_user_id' => $host->id,
         'booking_status' => BookingStatus::Confirmed->value,
         'start_date' => '2026-07-15', 'end_date' => '2026-07-16',
-        'guests' => 2, 'booking_price' => 100000, 'quantity' => 1, 'booking_amount' => 100000,
+        'guests' => 2, 'nights' => 1, 'stay_amount' => 100000,
         'commission_rate' => 10, 'commission_amount' => 10000, 'vat_rate' => 15, 'vat_amount' => 15000,
-        'total' => 115000, 'payout_status' => 'not_paid', 'confirmed_at' => now(),
+        'total_amount' => 115000, 'payout_status' => 'not_paid', 'confirmed_at' => now(),
     ]);
 
+    // Blocking wouldn't cancel the stay — it would only bury a real conflict.
+    $this->actingAs($host, 'api')
+        ->postJson("/api/host/places/{$place->id}/blockings", ['start_date' => '2026-07-15', 'end_date' => '2026-07-16'])
+        ->assertStatus(422)
+        ->assertJsonStructure(['data' => ['errors' => ['start_date']]]);
+
+    // Partial overlap counts too.
+    $this->actingAs($host, 'api')
+        ->postJson("/api/host/places/{$place->id}/blockings", ['start_date' => '2026-07-16', 'end_date' => '2026-07-20'])
+        ->assertStatus(422);
+
+    expect(PlaceBlocking::query()->where('place_id', $place->id)->count())->toBe(0);
+    expect($booking->fresh()->booking_status)->toBe(BookingStatus::Confirmed);
+
+    // A cancelled stay frees the range — blocking works again.
+    $booking->update(['booking_status' => BookingStatus::CanceledByAdmin->value]);
     $this->actingAs($host, 'api')
         ->postJson("/api/host/places/{$place->id}/blockings", ['start_date' => '2026-07-15', 'end_date' => '2026-07-16'])
         ->assertCreated();
-
-    expect($booking->fresh()->booking_status)->toBe(BookingStatus::Confirmed);
 });
 
 it('validates the date window', function (): void {

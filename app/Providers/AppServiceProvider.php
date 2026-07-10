@@ -7,7 +7,9 @@ namespace App\Providers;
 use App\Contracts\PushDeliveryContract;
 use App\Integrations\Push\ExpoPushDelivery;
 use App\Integrations\Push\MockPushDelivery;
+use App\Models\Booking;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\RateLimiter;
@@ -39,6 +41,13 @@ class AppServiceProvider extends ServiceProvider
         if ($this->app->environment('production')) {
             URL::forceScheme('https');
         }
+
+        // Financial documents/movements store their business source as a short
+        // alias ('booking'), not a class name — stable across refactors and
+        // exactly what the accounting export expects.
+        Relation::morphMap([
+            'booking' => Booking::class,
+        ]);
 
         $this->registerRateLimiters();
         $this->registerJwtCookieParser();
