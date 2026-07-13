@@ -120,6 +120,9 @@ class AttributesController extends Controller
             'options' => $attribute->options ?? [],
             'is_highlighted' => (bool) $attribute->is_highlighted,
             'sort_order' => (int) $attribute->sort_order,
+            // How many places carry this amenity — shown in the delete confirm
+            // (loaded via withCount on the index; 0 for fresh create/update JSON).
+            'places_count' => (int) ($attribute->place_values_count ?? 0),
         ];
     }
 }

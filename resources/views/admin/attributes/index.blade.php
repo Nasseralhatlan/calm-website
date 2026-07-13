@@ -248,12 +248,28 @@
                 if (res.ok) group.is_standalone = (await res.json()).is_standalone;
             },
             async deleteAttribute(group, attr) {
-                if (!confirm(isRtl ? 'حذف هذه الخاصية؟' : 'Delete this attribute?')) return;
+                // Deleting cascades: the amenity disappears from every place using
+                // it, and its section photos become general photos — warn with the
+                // blast radius when it's actually in use.
+                const n = attr.places_count || 0;
+                const msg = n > 0
+                    ? (isRtl
+                        ? `حذف «${this.label(attr)}»؟ مستخدمة في ${n} ${n === 1 ? 'مكان' : 'أماكن'} — ستُحذف منها وستتحول صورها إلى صور عامة.`
+                        : `Delete "${this.label(attr)}"? Used by ${n} place${n === 1 ? '' : 's'} — it will be removed from them and its section photos become general photos.`)
+                    : (isRtl ? 'حذف هذه الخاصية؟' : 'Delete this attribute?');
+                if (!confirm(msg)) return;
                 const res = await this.req('DELETE', `/admin/attributes/${attr.id}`);
                 if (res.ok) group.attributes = group.attributes.filter(a => a.id !== attr.id);
             },
             async deleteGroup(group) {
-                if (!confirm(isRtl ? 'حذف هذه المجموعة وكل خصائصها؟' : 'Delete this group and all its attributes?')) return;
+                const m = group.attributes.length;
+                const n = group.attributes.reduce((sum, a) => sum + (a.places_count || 0), 0);
+                const msg = n > 0
+                    ? (isRtl
+                        ? `حذف «${this.label(group)}» وخصائصها الـ${m}؟ مستخدمة في ${n} ${n === 1 ? 'مكان' : 'أماكن'} إجمالًا — ستُحذف منها وستتحول صورها إلى صور عامة.`
+                        : `Delete "${this.label(group)}" and its ${m} attribute${m === 1 ? '' : 's'}? Used by ${n} place${n === 1 ? '' : 's'} in total — they will be removed from them and their section photos become general photos.`)
+                    : (isRtl ? 'حذف هذه المجموعة وكل خصائصها؟' : 'Delete this group and all its attributes?');
+                if (!confirm(msg)) return;
                 const res = await this.req('DELETE', `/admin/attribute-groups/${group.id}`);
                 if (res.ok) this.groups = this.groups.filter(g => g.id !== group.id);
             },

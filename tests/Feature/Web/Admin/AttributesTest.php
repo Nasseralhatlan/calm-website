@@ -3,9 +3,15 @@
 declare(strict_types=1);
 
 use App\Enums\AttributeType;
+use App\Enums\PlaceReviewStatus;
+use App\Enums\PlaceStatus;
 use App\Enums\UserRole;
 use App\Models\Attribute;
 use App\Models\AttributeGroup;
+use App\Models\CityArea;
+use App\Models\Place;
+use App\Models\PlaceAttribute;
+use App\Models\PlaceType;
 use App\Models\User;
 
 beforeEach(function (): void {
@@ -98,6 +104,34 @@ it('toggles highlight via the JSON endpoint', function (): void {
         ->assertOk()
         ->assertJsonPath('is_highlighted', false);
     expect($attr->refresh()->is_highlighted)->toBeFalse();
+});
+
+it('exposes places_count per attribute so the delete confirm can warn', function (): void {
+    $this->seed();
+    $used = Attribute::query()->create(attrPayload(['name_en' => 'Pool']));
+    $unused = Attribute::query()->create(attrPayload(['name_en' => 'Sauna']));
+
+    $host = User::factory()->create(['phone' => '517200001']);
+    $place = Place::query()->create([
+        'host_user_id' => $host->id,
+        'place_type_id' => PlaceType::query()->first()->id,
+        'city_area_id' => CityArea::query()->first()->id,
+        'title' => 'Count me',
+        'description' => 'x',
+        'price' => 500,
+        'check_in_time' => '15:00',
+        'check_out_time' => '12:00',
+        'max_guests' => 4,
+        'status' => PlaceStatus::Active->value,
+        'review_status' => PlaceReviewStatus::Approved->value,
+    ]);
+    PlaceAttribute::query()->create(['place_id' => $place->id, 'attribute_id' => $used->id, 'value' => '1']);
+
+    $init = $this->get('/admin/attributes')->assertOk()->viewData('init');
+    $attrs = collect($init['groups'])->firstWhere('id', $this->group->id)['attributes'];
+
+    expect(collect($attrs)->firstWhere('id', $used->id)['places_count'])->toBe(1)
+        ->and(collect($attrs)->firstWhere('id', $unused->id)['places_count'])->toBe(0);
 });
 
 it('toggles a group\'s standalone flag via the JSON endpoint', function (): void {
