@@ -94,6 +94,11 @@ return [
 
     'ttl' => (int) env('JWT_TTL', 60),
 
+    // Calm addition: lifetime for NON-ADMIN tokens (guests + hosts in the
+    // mobile app). Admins keep the short `ttl` above — same api guard, the
+    // branch happens at mint time in AuthLoginService. Default ~6 months.
+    'user_ttl' => (int) env('JWT_USER_TTL', 60 * 24 * 180),
+
     /*
     |--------------------------------------------------------------------------
     | Refresh time to live
@@ -121,7 +126,9 @@ return [
     */
 
     'refresh_iat' => env('JWT_REFRESH_IAT', false),
-    'refresh_ttl' => (int) env('JWT_REFRESH_TTL', 20160),
+    // Must exceed user_ttl or long-lived app tokens lose the ability to
+    // refresh while still valid. 210 days > the 180-day user_ttl.
+    'refresh_ttl' => (int) env('JWT_REFRESH_TTL', 60 * 24 * 210),
 
     /*
     |--------------------------------------------------------------------------

@@ -80,7 +80,8 @@ final class OtpAuthService
             user: $user,
             token: $tokens['token'],
             ttlSeconds: $tokens['ttl_seconds'],
-            cookie: $this->login->buildCookie($tokens['token']),
+            // Cookie lifetime mirrors the role-based token TTL.
+            cookie: $this->login->buildCookie($tokens['token'], intdiv($tokens['ttl_seconds'], 60)),
         );
     }
 }

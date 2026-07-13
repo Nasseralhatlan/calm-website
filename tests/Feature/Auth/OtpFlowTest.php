@@ -225,7 +225,43 @@ it('refreshes a token', function (): void {
     $this->withHeader('Authorization', 'Bearer '.$token)
         ->postJson('/api/auth/refresh')
         ->assertOk()
-        ->assertJsonStructure(['status', 'message', 'data' => ['token', 'token_type', 'expires_in', 'expires_at']]);
+        ->assertJsonStructure(['status', 'message', 'data' => ['token', 'token_type', 'expires_in', 'expires_at']])
+        // Refresh mints through the same role-aware path — app users keep
+        // the months-long session.
+        ->assertJsonPath('data.expires_in', (int) config('jwt.user_ttl') * 60);
+});
+
+it('issues months-long tokens to app users but hourly tokens to admins', function (): void {
+    // Guest/host → long-lived app session (jwt.user_ttl, ~6 months).
+    $this->postJson('/api/auth/otp/request', ['phone' => '512345678'])->assertOk();
+    $userResponse = $this->postJson('/api/auth/otp/verify', [
+        'phone' => '512345678',
+        'otp' => $this->sink->lastCode(),
+    ])->assertOk();
+
+    $userTtlSeconds = (int) config('jwt.user_ttl') * 60;
+    expect($userResponse->json('data.expires_in'))->toBe($userTtlSeconds)
+        ->and($userResponse->json('data.expires_at'))
+        ->toBeGreaterThan(now()->addDays(179)->toIso8601String());
+
+    // The JWT itself carries the long exp claim (not just the response body).
+    $payload = auth('api')->setToken($userResponse->json('data.token'))->payload();
+    expect($payload->get('exp') - $payload->get('iat'))->toBe($userTtlSeconds);
+
+    // The httpOnly cookie expires with the token.
+    $cookie = collect($userResponse->baseResponse->headers->getCookies())
+        ->first(fn ($c) => $c->getName() === (string) config('jwt.cookie_key_name'));
+    expect($cookie->getExpiresTime())->toBeGreaterThan(now()->addDays(179)->getTimestamp());
+
+    // Admin on the SAME guard → short dashboard session (jwt.ttl).
+    User::factory()->create(['phone' => '512345670', 'role' => UserRole::Admin->value]);
+    $this->postJson('/api/auth/otp/request', ['phone' => '512345670'])->assertOk();
+    $adminResponse = $this->postJson('/api/auth/otp/verify', [
+        'phone' => '512345670',
+        'otp' => $this->sink->lastCode(),
+    ])->assertOk();
+
+    expect($adminResponse->json('data.expires_in'))->toBe((int) config('jwt.ttl') * 60);
 });
 
 it('puts the admin role in the jwt custom claims', function (): void {
