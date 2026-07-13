@@ -115,7 +115,7 @@ it('returns photo_groups ordered by the host gallery arrangement', function (): 
 it('returns attributes grouped with their definition + group', function (): void {
     $place = detailPlace();
 
-    $group = AttributeGroup::query()->create(['name_en' => 'Indoor', 'name_ar' => 'داخلي']);
+    $group = AttributeGroup::query()->create(['name_en' => 'Indoor', 'name_ar' => 'داخلي', 'is_standalone' => true]);
     $attribute = Attribute::query()->create([
         'group_id' => $group->id,
         'name_en' => 'WiFi',
@@ -137,7 +137,9 @@ it('returns attributes grouped with their definition + group', function (): void
         ->assertJsonPath('data.attributes.0.description', 'Fast fiber.')
         ->assertJsonPath('data.attributes.0.attribute.name_en', 'WiFi')
         ->assertJsonPath('data.attributes.0.attribute.icon', '📶')
-        ->assertJsonPath('data.attributes.0.attribute.group.name_en', 'Indoor');
+        ->assertJsonPath('data.attributes.0.attribute.group.name_en', 'Indoor')
+        // The app splits standalone groups into their own section from this flag.
+        ->assertJsonPath('data.attributes.0.attribute.group.is_standalone', true);
 });
 
 it('orders attributes by the admin sort_order and exposes is_highlighted', function (): void {

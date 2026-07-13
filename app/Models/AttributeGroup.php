@@ -17,12 +17,16 @@ class AttributeGroup extends Model
         'name_ar',
         'name_en',
         'sort_order',
+        // Standalone sections render as their own block in the app instead
+        // of inside the general amenities list.
+        'is_standalone',
     ];
 
     protected function casts(): array
     {
         return [
             'sort_order' => 'integer',
+            'is_standalone' => 'boolean',
         ];
     }
 

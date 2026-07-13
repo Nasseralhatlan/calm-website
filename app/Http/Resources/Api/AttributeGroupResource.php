@@ -26,6 +26,8 @@ class AttributeGroupResource extends JsonResource
             'name_ar' => $this->name_ar,
             'name_en' => $this->name_en,
             'sort_order' => (int) $this->sort_order,
+            // Standalone sections render as their own block in the app.
+            'is_standalone' => (bool) $this->is_standalone,
             'attributes' => AttributeResource::collection($this->whenLoaded('attributes')),
         ];
     }

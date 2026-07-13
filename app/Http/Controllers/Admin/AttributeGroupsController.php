@@ -69,6 +69,7 @@ class AttributeGroupsController extends Controller
             'name_ar' => $group->name_ar,
             'name_en' => $group->name_en,
             'sort_order' => (int) $group->sort_order,
+            'is_standalone' => (bool) $group->is_standalone,
             'attributes' => [],
         ];
     }

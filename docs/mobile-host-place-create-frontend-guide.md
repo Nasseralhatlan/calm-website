@@ -558,3 +558,12 @@ only the pin is sent the server derives
 **Travel time:** client-side per your plan (Distance Matrix, origin = device,
 destination = the public approximate coords pre-booking / exact post-booking).
 Existing places with parseable pasted URLs were backfilled with coordinates.
+
+## Addendum: standalone amenity sections — added 2026-07-13
+
+Attribute groups now carry `is_standalone` (boolean) in BOTH payloads the app
+reads: the wizard catalog (`GET /api/attribute-groups`, on each group) and the
+place detail (`attributes[].attribute.group.is_standalone`). Rendering rule:
+groups with `is_standalone: true` are rendered as their OWN section (own
+header, outside the general amenities list); everything else stays in the
+amenities list as today. Admin controls the flag per group.

@@ -88,6 +88,12 @@
                                 <input type="text" x-model="modal.data.name_en" dir="ltr" class="w-full bg-[#fafafa] border border-[#ebebeb] focus:border-[#222] text-[15px] focus:outline-none" style="padding: 11px 14px; border-radius: 12px;">
                                 <template x-if="modal.errors.name_en"><p class="text-[12px] text-[#dc2626]" style="margin-top: 4px;" x-text="modal.errors.name_en[0]"></p></template>
                             </div>
+                            <label class="sm:col-span-2 flex items-center cursor-pointer" style="gap: 10px; padding: 4px 2px;">
+                                <input type="checkbox" x-model="modal.data.is_standalone" class="accent-[#222]" style="width: 17px; height: 17px;">
+                                <span class="text-[13px] text-[#222]">
+                                    {{ $isRtl ? 'قسم مستقل — يظهر في التطبيق كقسم منفصل عن قائمة المرافق' : 'Standalone section — appears in the app as its own section, outside the amenities list' }}
+                                </span>
+                            </label>
                         </div>
                     </template>
 
@@ -200,8 +206,8 @@
                     is_highlighted: attr.is_highlighted,
                 } };
             },
-            openCreateGroup() { this.modal = { kind: 'group', mode: 'create', errors: {}, saving: false, data: { id: null, name_ar: '', name_en: '' } }; },
-            openEditGroup(group) { this.modal = { kind: 'group', mode: 'edit', errors: {}, saving: false, data: { id: group.id, name_ar: group.name_ar, name_en: group.name_en } }; },
+            openCreateGroup() { this.modal = { kind: 'group', mode: 'create', errors: {}, saving: false, data: { id: null, name_ar: '', name_en: '', is_standalone: false } }; },
+            openEditGroup(group) { this.modal = { kind: 'group', mode: 'edit', errors: {}, saving: false, data: { id: group.id, name_ar: group.name_ar, name_en: group.name_en, is_standalone: !!group.is_standalone } }; },
             closeModal() { this.modal = null; },
 
             submitModal() { return this.modal.kind === 'attribute' ? this.saveAttribute() : this.saveGroup(); },
@@ -227,7 +233,7 @@
                 if (res.status === 422) { m.errors = ((await res.json()).data || {}).errors || {}; m.saving = false; return; }
                 if (!res.ok) { m.saving = false; alert('Save failed'); return; }
                 const group = (await res.json()).group;
-                if (isEdit) { const g = this.groups.find(x => x.id === group.id); if (g) { g.name_ar = group.name_ar; g.name_en = group.name_en; } }
+                if (isEdit) { const g = this.groups.find(x => x.id === group.id); if (g) { g.name_ar = group.name_ar; g.name_en = group.name_en; g.is_standalone = group.is_standalone; } }
                 else { this.groups.push({ ...group, attributes: [] }); }
                 this.closeModal();
                 this.persistOrder();

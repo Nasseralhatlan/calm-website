@@ -36,6 +36,7 @@ class AttributesController extends Controller
                     'id' => $g->id,
                     'name_ar' => $g->name_ar,
                     'name_en' => $g->name_en,
+                    'is_standalone' => (bool) $g->is_standalone,
                     'attributes' => $g->attributes->map(fn (Attribute $a): array => $this->serialize($a))->values(),
                 ])->values(),
                 'typeOptions' => array_map(fn (AttributeType $c): string => $c->value, AttributeType::cases()),

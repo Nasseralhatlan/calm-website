@@ -168,3 +168,22 @@ it('rejects a reorder payload with an unknown group id', function (): void {
     $this->post('/admin/attributes/reorder', ['payload' => $payload])
         ->assertSessionHasErrors('groups.0.id');
 });
+
+it('persists the standalone flag on groups and defaults it off when omitted', function (): void {
+    // Create with the flag on.
+    $id = $this->postJson('/admin/attribute-groups', [
+        'name_ar' => 'الجلسات الخارجية', 'name_en' => 'Outdoor seating', 'is_standalone' => true,
+    ])
+        ->assertCreated()
+        ->assertJsonPath('group.is_standalone', true)
+        ->json('group.id');
+
+    expect(AttributeGroup::query()->find($id)->is_standalone)->toBeTrue();
+
+    // Updating WITHOUT the field (unchecked checkbox) flips it back off.
+    $this->putJson("/admin/attribute-groups/{$id}", ['name_ar' => 'الجلسات', 'name_en' => 'Seating'])
+        ->assertOk()
+        ->assertJsonPath('group.is_standalone', false);
+
+    expect(AttributeGroup::query()->find($id)->is_standalone)->toBeFalse();
+});

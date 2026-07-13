@@ -40,6 +40,9 @@ class PlaceAttributeResource extends JsonResource
                     'id' => $attribute->group->id,
                     'name_en' => $attribute->group->name_en,
                     'name_ar' => $attribute->group->name_ar,
+                    // The app groups amenities by this block — standalone
+                    // sections split into their own UI section.
+                    'is_standalone' => (bool) $attribute->group->is_standalone,
                 ] : null,
             ] : null,
         ];
