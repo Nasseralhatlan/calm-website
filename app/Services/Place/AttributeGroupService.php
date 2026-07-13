@@ -57,6 +57,13 @@ final class AttributeGroupService
         return $group->refresh();
     }
 
+    public function toggleStandalone(AttributeGroup $group): bool
+    {
+        $group->update(['is_standalone' => ! $group->is_standalone]);
+
+        return (bool) $group->is_standalone;
+    }
+
     public function delete(AttributeGroup $group): void
     {
         $group->delete();

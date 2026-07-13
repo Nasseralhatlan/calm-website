@@ -46,6 +46,11 @@ class AttributeGroupsController extends Controller
             ->with('status', __('Group ":name" updated.', ['name' => $group->name_en]));
     }
 
+    public function toggleStandalone(AttributeGroup $attributeGroup): JsonResponse
+    {
+        return response()->json(['is_standalone' => $this->service->toggleStandalone($attributeGroup)]);
+    }
+
     public function destroy(Request $request, AttributeGroup $attributeGroup): RedirectResponse|JsonResponse
     {
         $name = $attributeGroup->name_en;

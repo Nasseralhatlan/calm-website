@@ -100,6 +100,18 @@ it('toggles highlight via the JSON endpoint', function (): void {
     expect($attr->refresh()->is_highlighted)->toBeFalse();
 });
 
+it('toggles a group\'s standalone flag via the JSON endpoint', function (): void {
+    $this->postJson("/admin/attribute-groups/{$this->group->id}/standalone")
+        ->assertOk()
+        ->assertJsonPath('is_standalone', true);
+    expect($this->group->refresh()->is_standalone)->toBeTrue();
+
+    $this->postJson("/admin/attribute-groups/{$this->group->id}/standalone")
+        ->assertOk()
+        ->assertJsonPath('is_standalone', false);
+    expect($this->group->refresh()->is_standalone)->toBeFalse();
+});
+
 it('creates, updates and deletes an attribute over JSON', function (): void {
     // Create
     $created = $this->postJson('/admin/attributes', attrPayload(['name_en' => 'Sauna', 'is_highlighted' => true]))
