@@ -64,6 +64,8 @@ class Place extends Model
         'rules_ar',
         'rules_en',
         'location_url',
+        'latitude',
+        'longitude',
         'status',
         'review_status',
         'rejection_reason',
@@ -87,6 +89,28 @@ class Place extends Model
             'max_guests' => 'integer',
             'checkout_next_day' => 'boolean',
             'reviewed_at' => 'datetime',
+            'latitude' => 'float',
+            'longitude' => 'float',
+        ];
+    }
+
+    /**
+     * The pin coordinates PUBLIC payloads may carry: rounded to 2 decimals
+     * (≈ ±1 km) so guests see the area, not the door. The exact pin is
+     * host-only until a booking is confirmed — same sensitivity rule as
+     * location_url. Null until the host sets a pin.
+     *
+     * @return array{latitude: float, longitude: float}|null
+     */
+    public function approxCoords(): ?array
+    {
+        if ($this->latitude === null || $this->longitude === null) {
+            return null;
+        }
+
+        return [
+            'latitude' => round((float) $this->latitude, 2),
+            'longitude' => round((float) $this->longitude, 2),
         ];
     }
 

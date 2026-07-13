@@ -111,6 +111,12 @@ class PlaceResource extends JsonResource
                     ]
                     : null,
             ),
+            // APPROXIMATE pin (~±1 km, rounded to 2 decimals) — enough for
+            // the area map + client-side distance/travel time. The exact pin
+            // is deliberately withheld until a booking is confirmed (same
+            // rule as location_url); null until the host sets one.
+            'latitude' => $this->approxCoords()['latitude'] ?? null,
+            'longitude' => $this->approxCoords()['longitude'] ?? null,
             // Aggregates — present when eager-loaded via withCount/withAvg.
             // Cast defensively so the response is always typed even if the
             // caller forgot to load them (then they read as 0 / null).

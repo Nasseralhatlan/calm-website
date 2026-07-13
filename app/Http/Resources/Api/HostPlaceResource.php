@@ -59,6 +59,9 @@ class HostPlaceResource extends JsonResource
             'checkout_next_day' => $this->checkout_next_day,
             'max_guests' => $this->max_guests,
             'location_url' => $this->location_url,
+            // Owner sees the EXACT pin (edit/resume hydration).
+            'latitude' => $this->latitude !== null ? (float) $this->latitude : null,
+            'longitude' => $this->longitude !== null ? (float) $this->longitude : null,
             'attributes' => $this->attributeValues->map(fn (PlaceAttribute $value): array => [
                 'attribute_id' => $value->attribute_id,
                 'value' => $value->value,

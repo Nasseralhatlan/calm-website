@@ -533,3 +533,28 @@ hourly server-side; adding one syncs immediately, and "Sync now" covers urgent c
 12. Fresh-wizard defaults to replicate: `check_in 15:00`, `check_out 12:00`,
     `checkout_next_day: true`, `max_guests: 1`, rules textareas pre-filled from a house-rules
     template (mobile can ship its own localized template).
+
+---
+
+## Addendum: place coordinates (map pin) — added 2026-07-13
+
+**Write (wizard):** `latitude` + `longitude` (decimal degrees) are accepted on
+draft, submit, and edit — always as a PAIR (`422` if only one is sent).
+Bounds: lat ∈ [-90, 90], lng ∈ [-180, 180]. On submit, `location_url` is now
+`required_without:latitude` — a pin fully replaces the pasted URL, and when
+only the pin is sent the server derives
+`location_url = https://maps.google.com/?q={lat},{lng}` automatically.
+
+**Read — three privacy tiers:**
+- `ApiHostPlaceResource` (edit/resume): `latitude`/`longitude` = the EXACT pin.
+- Public `ApiPlace` / `ApiPlaceDetail`: `latitude`/`longitude` are
+  **approximate by design** — rounded to 2 decimals (≈ ±1 km). Render the
+  details map as an area circle, not a precise marker. Null until the host
+  sets a pin (keep the current text fallback).
+- Booking payload (`place` block): EXACT `latitude`/`longitude` appear only
+  when the booking is confirmed/completed — same unlock as `location_url`.
+  Use these for post-booking navigation instead of parsing the URL.
+
+**Travel time:** client-side per your plan (Distance Matrix, origin = device,
+destination = the public approximate coords pre-booking / exact post-booking).
+Existing places with parseable pasted URLs were backfilled with coordinates.

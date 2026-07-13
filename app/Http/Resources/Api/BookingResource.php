@@ -53,6 +53,10 @@ class BookingResource extends JsonResource
                     'title_en' => $place->title_en,
                     'cover_photo_url' => $place->coverPhoto?->url,
                     'location_url' => $locationUnlocked ? $place->location_url : null,
+                    // EXACT pin unlocks with the map link — before that the
+                    // app only has the public ~1 km-rounded coords.
+                    'latitude' => $locationUnlocked && $place->latitude !== null ? (float) $place->latitude : null,
+                    'longitude' => $locationUnlocked && $place->longitude !== null ? (float) $place->longitude : null,
                     'type' => $place->type ? [
                         'name_en' => $place->type->name_en,
                         'name_ar' => $place->type->name_ar,

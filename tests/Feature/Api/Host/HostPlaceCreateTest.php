@@ -133,3 +133,63 @@ it('requires authentication', function (): void {
     $this->postJson('/api/host/places/draft', [])->assertStatus(401);
     $this->postJson('/api/host/places', [])->assertStatus(401);
 });
+
+it('stores the map pin and derives the location url from it', function (): void {
+    // Pin without a pasted URL — the server derives the canonical link.
+    $this->actingAs($this->host, 'api')
+        ->postJson('/api/host/places', hostPlacePayload([
+            'location_url' => null,
+            'latitude' => 24.7135517,
+            'longitude' => 46.6752957,
+        ]))
+        ->assertCreated();
+
+    $place = Place::query()->latest('created_at')->first();
+    expect((float) $place->latitude)->toBe(24.7135517)
+        ->and((float) $place->longitude)->toBe(46.6752957)
+        ->and($place->location_url)->toBe('https://maps.google.com/?q=24.7135517,46.6752957');
+});
+
+it('rejects out-of-range or half-missing coordinates', function (): void {
+    $this->actingAs($this->host, 'api')
+        ->postJson('/api/host/places', hostPlacePayload(['latitude' => 95, 'longitude' => 46.6]))
+        ->assertStatus(422)
+        ->assertJsonStructure(['data' => ['errors' => ['latitude']]]);
+
+    // Latitude without longitude — the pin is always a pair.
+    $this->actingAs($this->host, 'api')
+        ->postJson('/api/host/places', hostPlacePayload(['latitude' => 24.7]))
+        ->assertStatus(422)
+        ->assertJsonStructure(['data' => ['errors' => ['longitude']]]);
+
+    // Neither a URL nor a pin → the location step is incomplete.
+    $this->actingAs($this->host, 'api')
+        ->postJson('/api/host/places', hostPlacePayload(['location_url' => null]))
+        ->assertStatus(422)
+        ->assertJsonStructure(['data' => ['errors' => ['location_url']]]);
+});
+
+it('exposes coordinates by tier: approximate publicly, exact to the owner', function (): void {
+    $this->actingAs($this->host, 'api')
+        ->postJson('/api/host/places', hostPlacePayload([
+            'latitude' => 24.7135517,
+            'longitude' => 46.6752957,
+        ]))
+        ->assertCreated();
+
+    $place = Place::query()->latest('created_at')->first();
+    $place->update(['status' => 'active', 'review_status' => 'approved']);
+
+    // Owner (edit/resume): the exact pin.
+    $this->actingAs($this->host, 'api')
+        ->getJson("/api/host/places/{$place->id}")
+        ->assertOk()
+        ->assertJsonPath('data.latitude', 24.7135517)
+        ->assertJsonPath('data.longitude', 46.6752957);
+
+    // Public detail: rounded to ~1 km — never the exact door.
+    $this->getJson("/api/places/{$place->id}")
+        ->assertOk()
+        ->assertJsonPath('data.latitude', 24.71)
+        ->assertJsonPath('data.longitude', 46.68);
+});

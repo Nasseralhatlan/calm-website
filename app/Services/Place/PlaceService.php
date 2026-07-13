@@ -214,6 +214,12 @@ final class PlaceService
 
         $data = self::dayPricesToZero($data);
 
+        // A map pin can replace the pasted link: when the host set coords but
+        // no URL, derive the canonical Google Maps link from the pin.
+        if (! empty($data['latitude']) && ! empty($data['longitude']) && empty($data['location_url'])) {
+            $data['location_url'] = sprintf('https://maps.google.com/?q=%s,%s', $data['latitude'], $data['longitude']);
+        }
+
         $payload = [
             ...$data,
             'host_user_id' => $host->id,
@@ -453,6 +459,12 @@ final class PlaceService
     public function updateDetailsForHost(Place $place, array $data, array $attributes = [], array $photos = []): Place
     {
         $place = DB::transaction(function () use ($place, $data, $attributes, $photos): Place {
+            // Same pin→URL derivation as create: coords without a pasted link
+            // produce the canonical Google Maps link.
+            if (! empty($data['latitude']) && ! empty($data['longitude']) && empty($data['location_url'])) {
+                $data['location_url'] = sprintf('https://maps.google.com/?q=%s,%s', $data['latitude'], $data['longitude']);
+            }
+
             $place->update([
                 ...self::dayPricesToZero($data),
                 'status' => PlaceStatus::Inactive->value,

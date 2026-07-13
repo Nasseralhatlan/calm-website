@@ -53,7 +53,11 @@ class UpdatePlaceRequest extends FormRequest
             'rules_en' => ['nullable', 'string', 'max:10000'],
             // A map link the host pastes (Google Maps, etc.); only revealed to
             // the guest once their booking is confirmed.
-            'location_url' => ['required', 'string', 'url', 'max:2048'],
+            'location_url' => ['required_without:latitude', 'nullable', 'string', 'url', 'max:2048'],
+            // The map pin (decimal degrees). Optional — but always as a pair,
+            // and it can replace the pasted URL (the server derives one).
+            'latitude' => ['nullable', 'required_with:longitude', 'numeric', 'between:-90,90'],
+            'longitude' => ['nullable', 'required_with:latitude', 'numeric', 'between:-180,180'],
             'status' => ['required', Rule::enum(PlaceStatus::class)],
             'review_status' => ['required', Rule::enum(PlaceReviewStatus::class)],
             // Admin can edit / clear the rejection feedback directly.
