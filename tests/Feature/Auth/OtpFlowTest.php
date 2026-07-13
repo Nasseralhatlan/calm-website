@@ -42,12 +42,13 @@ it('issues an otp for a new phone number and auto-creates the user', function ()
 it('sends the otp in the user\'s language (default Arabic, English when opted in)', function (): void {
     $service = new OtpService($this->sink, app(MockPhoneRegistry::class));
 
-    // Default locale (ar) → Arabic body, code stays in Latin digits.
+    // Default locale (ar) → terse Arabic body ("رمز: 123456") — the shape iOS
+    // one-time-code autofill detects reliably. Code stays in Latin digits.
     $arUser = User::factory()->create(['phone' => '512345678', 'locale' => 'ar']);
     $service->issue($arUser, OtpType::Phone, $arUser->phone);
     expect($this->sink->sent[0]['message'])
-        ->toContain('رمز التحقق')
-        ->toMatch('/\d{6}/');
+        ->toContain('رمز:')
+        ->toMatch('/رمز: \d{6}$/u');
 
     // English-locale user → English body.
     $enUser = User::factory()->create(['phone' => '512345679', 'locale' => 'en']);

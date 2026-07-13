@@ -27,8 +27,11 @@ return [
     // One-time verification code (sign-in / sign-up). Flat shape — a single
     // line per channel, not title+body. The {code} stays in Latin digits so it
     // matches the phone keypad. Delivered in the user's locale (default ar).
+    // The Arabic body is deliberately terse ("رمز: 1234") — iOS one-time-code
+    // autofill reliably detects that keyword+digits shape; longer RTL prose
+    // around the code breaks the detection.
     'otp' => [
-        'sms_ar' => 'رمز التحقق الخاص بك في كالم هو: {code}',
+        'sms_ar' => 'رمز: {code}',
         'sms_en' => 'Your Calm verification code is: {code}',
         'email_subject_ar' => 'رمز التحقق في كالم',
         'email_subject_en' => 'Your Calm verification code',
