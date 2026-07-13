@@ -67,7 +67,7 @@ class PlaceDetailResource extends JsonResource
                 ->map(fn ($pa) => $pa->attribute)
             : collect();
 
-        return $this->photos
+        return $this->visiblePhotos()
             ->groupBy(fn ($p) => $p->place_attribute_id ?? '__general__')
             ->map(function ($photos, $key) use ($attrMap) {
                 $sorted = $photos->sortBy('sort_order')->values();

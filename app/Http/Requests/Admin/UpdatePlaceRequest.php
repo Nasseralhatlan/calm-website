@@ -7,6 +7,7 @@ namespace App\Http\Requests\Admin;
 use App\Enums\PlaceReviewStatus;
 use App\Enums\PlaceStatus;
 use App\Http\Requests\Concerns\DerivesCanonicalContent;
+use App\Http\Requests\Concerns\ValidatesAmenityPhotoRules;
 use App\Models\Place;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -15,6 +16,7 @@ use Illuminate\Validation\Validator;
 class UpdatePlaceRequest extends FormRequest
 {
     use DerivesCanonicalContent;
+    use ValidatesAmenityPhotoRules;
 
     public function authorize(): bool
     {
@@ -94,20 +96,13 @@ class UpdatePlaceRequest extends FormRequest
 
     public function withValidator(Validator $validator): void
     {
-        // Only enforce the 5-image minimum when the edit actually re-submits
-        // photos — a details-only edit leaves the existing gallery untouched.
+        // Only enforce photo rules when the edit actually re-submits photos —
+        // a details-only edit leaves the existing gallery untouched.
         if (! $this->has('attribute_image_paths') && ! $this->has('extra_image_paths')) {
             return;
         }
 
-        $validator->after(function (Validator $validator): void {
-            $total = collect($this->input('attribute_image_paths', []))->flatten()->filter()->count()
-                + collect($this->input('extra_image_paths', []))->filter()->count();
-
-            if ($total < 5) {
-                $validator->errors()->add('images', __('A place must have at least :min images.', ['min' => 5]));
-            }
-        });
+        $validator->after(fn (Validator $validator) => $this->enforceAmenityPhotoRules($validator));
     }
 
     /**

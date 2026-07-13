@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Place;
 
+use App\Enums\AttributePhotoRule;
 use App\Enums\PlaceReviewStatus;
 use App\Enums\PlaceStatus;
 use App\Models\Attribute;
@@ -312,6 +313,20 @@ final class PlaceService
 
         $attributePaths = $photos['attribute_paths'] ?? [];
         $extraPaths = $photos['extra_paths'] ?? [];
+
+        // Authoritative photo_rule guard: photos under a none-rule amenity are
+        // never persisted, regardless of what the client sent. (Validation
+        // already excludes them from the 5-image minimum.)
+        if ($attributePaths !== []) {
+            $noPhotoIds = Attribute::query()
+                ->whereIn('id', array_map(strval(...), array_keys($attributePaths)))
+                ->where('photo_rule', AttributePhotoRule::None)
+                ->pluck('id')
+                ->all();
+
+            $attributePaths = array_diff_key($attributePaths, array_flip($noPhotoIds));
+        }
+
         /** @var list<string> $featured Ordered keys shown outside (first = cover). */
         $featured = array_values($photos['featured'] ?? []);
 
@@ -526,7 +541,7 @@ final class PlaceService
      */
     public function editableForHost(Place $place): Place
     {
-        return $place->load(['attributeValues', 'photos', 'cityArea:id,city_id']);
+        return $place->load(['attributeValues', 'photos.attribute:id,photo_rule', 'cityArea:id,city_id']);
     }
 
     public function setReviewStatus(Place $place, PlaceReviewStatus $status): Place
@@ -577,7 +592,7 @@ final class PlaceService
      */
     public function eagerHomeFields(mixed $query, ?User $viewer = null): mixed
     {
-        $query->with(['type', 'cityArea.city', 'coverPhoto', 'photos'])
+        $query->with(['type', 'cityArea.city', 'coverPhoto', 'photos.attribute:id,photo_rule'])
             ->withCount('likes')
             ->withCount('publishedReviews')
             ->withAvg('publishedReviews', 'rate');
@@ -611,7 +626,7 @@ final class PlaceService
             'host',
             'type',
             'cityArea.city',
-            'photos',
+            'photos.attribute:id,photo_rule',
             'coverPhoto',
             'attributeValues.attribute.group',
             'publishedReviews' => fn ($q) => $q->with('guest')->latest()->limit(10),

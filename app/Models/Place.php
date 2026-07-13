@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\AttributePhotoRule;
 use App\Enums\PlaceReviewStatus;
 use App\Enums\PlaceStatus;
 use App\Enums\ReviewStatus;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -166,6 +168,7 @@ class Place extends Model
     {
         return $this->hasOne(PlacePhoto::class)
             ->whereNotNull('featured_order')
+            ->whereDoesntHave('attribute', fn (Builder $q) => $q->where('photo_rule', AttributePhotoRule::None))
             ->orderBy('featured_order');
     }
 
@@ -174,7 +177,24 @@ class Place extends Model
     {
         return $this->hasMany(PlacePhoto::class)
             ->whereNotNull('featured_order')
+            ->whereDoesntHave('attribute', fn (Builder $q) => $q->where('photo_rule', AttributePhotoRule::None))
             ->orderBy('featured_order');
+    }
+
+    /**
+     * The client-visible gallery: photos tied to a none-rule amenity are
+     * hidden (such rows only exist from before the amenity's rule changed —
+     * new writes never persist them). General photos (null amenity) always
+     * show. Eager-load `photos.attribute:id,photo_rule` before calling.
+     *
+     * @return Collection<int, PlacePhoto>
+     */
+    public function visiblePhotos(): Collection
+    {
+        return $this->photos
+            ->filter(fn (PlacePhoto $photo): bool => $photo->place_attribute_id === null
+                || $photo->attribute?->photo_rule !== AttributePhotoRule::None)
+            ->values();
     }
 
     public function attributeValues(): HasMany

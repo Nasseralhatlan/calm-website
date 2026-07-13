@@ -57,15 +57,16 @@ class PlaceResource extends JsonResource
             // Cover = the first "shown outside" photo (falls back to the first
             // gallery photo if the host hasn't featured any).
             'cover_photo_url' => $this->coverPhoto?->url
-                ?? ($this->whenLoaded('photos', fn () => $this->photos->first()?->url)),
+                ?? ($this->whenLoaded('photos', fn () => $this->visiblePhotos()->first()?->url)),
             // Full gallery, ordered by the host-chosen sort_order. Each photo
             // carries its `attribute_id` (null = general) so the app can build
             // the grouped "view images" gallery, plus `sort_order` (order within
             // a group) and `featured_order` (its slot in the place-page showcase,
-            // null = not shown outside).
+            // null = not shown outside). Photos under none-rule amenities are
+            // never returned (visiblePhotos filter).
             'photos' => $this->whenLoaded(
                 'photos',
-                fn () => $this->photos
+                fn () => $this->visiblePhotos()
                     ->map(fn ($p) => [
                         'id' => $p->id,
                         'url' => $p->url,
@@ -80,7 +81,7 @@ class PlaceResource extends JsonResource
             // the first is the cover. Derived from the loaded photos.
             'featured_photos' => $this->whenLoaded(
                 'photos',
-                fn () => $this->photos
+                fn () => $this->visiblePhotos()
                     ->whereNotNull('featured_order')
                     ->sortBy('featured_order')
                     ->map(fn ($p) => [

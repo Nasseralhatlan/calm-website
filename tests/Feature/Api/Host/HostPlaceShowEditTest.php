@@ -96,6 +96,32 @@ it('returns the full editable shape for the owner, drafts included', function ()
         ->assertJsonStructure(['data' => ['photos' => [['place_attribute_id', 'path', 'url', 'featured_order', 'sort_order']]]]);
 });
 
+it('omits legacy none-rule amenity photos from the editable payload', function (): void {
+    $place = apiEditablePlace($this->host);
+    // A photo owned by a none-rule amenity (rule was flipped after upload):
+    // the wizard has no box to show it in, so the API hides it.
+    $noPhoto = Attribute::query()->create([
+        'group_id' => Attribute::query()->first()->group_id,
+        'name_en' => 'Quiet area', 'name_ar' => 'منطقة هادئة',
+        'icon' => '🤫', 'type' => 'boolean', 'photo_rule' => 'none',
+    ]);
+
+    PlacePhoto::query()->create([
+        'place_id' => $place->id, 'place_attribute_id' => $noPhoto->id,
+        'path' => 'a/hidden.jpg', 'sort_order' => 0, 'featured_order' => null,
+    ]);
+    PlacePhoto::query()->create([
+        'place_id' => $place->id, 'place_attribute_id' => null,
+        'path' => 'p/visible.jpg', 'sort_order' => 1, 'featured_order' => null,
+    ]);
+
+    $this->actingAs($this->host, 'api')
+        ->getJson("/api/host/places/{$place->id}")
+        ->assertOk()
+        ->assertJsonCount(1, 'data.photos')
+        ->assertJsonPath('data.photos.0.path', 'p/visible.jpg');
+});
+
 it('is owner-only on every verb', function (): void {
     $place = apiEditablePlace($this->host);
     $other = User::factory()->create(['phone' => '514200002']);

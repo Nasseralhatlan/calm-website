@@ -106,6 +106,11 @@ How the web uses this catalog (mirror it):
   a +/− count stepper on the configure step.
 - `photo_rule` — `required`/`optional` attributes each get their own photo section on the
   photos step; `required` means at least 1 photo in that section before submit.
+  A `none` attribute must NOT render an upload section at all — the catalog's
+  `photo_rule` is authoritative. The server also enforces this end-to-end: a
+  selected `required` attribute with no photo is a 422, photos sent under a
+  `none` attribute are silently discarded (and don't count toward the 5-photo
+  minimum), and read endpoints never return photos for `none` attributes.
 - `is_highlighted` — these attributes are ALSO shown in a separate "Highlights" section
   at the top of the amenities step (they stay in their group below too).
 

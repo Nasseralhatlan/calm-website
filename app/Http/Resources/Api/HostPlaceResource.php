@@ -67,7 +67,9 @@ class HostPlaceResource extends JsonResource
                 'value' => $value->value,
                 'description' => $value->description,
             ])->values()->all(),
-            'photos' => $this->photos->map(fn (PlacePhoto $photo): array => [
+            // None-rule amenity photos are filtered out — the wizard has no
+            // upload box for them, so returning them would strand dead rows.
+            'photos' => $this->visiblePhotos()->map(fn (PlacePhoto $photo): array => [
                 'place_attribute_id' => $photo->place_attribute_id,
                 'path' => $photo->path,
                 'url' => $photo->url,

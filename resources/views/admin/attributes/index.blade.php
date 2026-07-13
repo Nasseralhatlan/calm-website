@@ -36,6 +36,7 @@
                     <span x-sort:handle class="text-[#bbb] text-[18px] leading-none select-none cursor-grab">⠿</span>
                     <span class="font-semibold text-[#222] {{ $fa }}" x-text="label(group)"></span>
                     <span class="text-[12px] text-[#717171]" x-text="'· ' + group.attributes.length"></span>
+                    <span x-show="group.is_standalone" class="text-[11px] font-semibold text-white bg-[#222] {{ $fa }}" style="padding: 3px 10px; border-radius: 999px;">{{ $isRtl ? 'قسم مستقل' : 'Standalone' }}</span>
                     <div class="flex items-center" style="margin-inline-start: auto; gap: 14px;">
                         <button type="button" @click="openCreateAttribute(group.id)" class="text-[13px] font-semibold text-[#222] hover:underline {{ $fa }}">{{ $isRtl ? '+ خاصية' : '+ Attribute' }}</button>
                         <button type="button" @click="openEditGroup(group)" class="text-[13px] font-semibold text-[#717171] hover:text-[#222] {{ $fa }}">{{ $isRtl ? 'تعديل' : 'Edit' }}</button>
@@ -88,12 +89,19 @@
                                 <input type="text" x-model="modal.data.name_en" dir="ltr" class="w-full bg-[#fafafa] border border-[#ebebeb] focus:border-[#222] text-[15px] focus:outline-none" style="padding: 11px 14px; border-radius: 12px;">
                                 <template x-if="modal.errors.name_en"><p class="text-[12px] text-[#dc2626]" style="margin-top: 4px;" x-text="modal.errors.name_en[0]"></p></template>
                             </div>
-                            <label class="sm:col-span-2 flex items-center cursor-pointer" style="gap: 10px; padding: 4px 2px;">
-                                <input type="checkbox" x-model="modal.data.is_standalone" class="accent-[#222]" style="width: 17px; height: 17px;">
+                            <button type="button" @click="modal.data.is_standalone = !modal.data.is_standalone" role="switch" :aria-checked="modal.data.is_standalone"
+                                    class="sm:col-span-2 flex items-center w-full bg-[#fafafa] border border-[#ebebeb] hover:border-[#222] transition-colors cursor-pointer text-start"
+                                    style="padding: 11px 14px; border-radius: 12px; gap: 12px;">
+                                {{-- iOS-style toggle, RTL-safe via logical inset --}}
+                                <span class="relative shrink-0 transition-colors" style="width: 46px; height: 28px; border-radius: 999px;"
+                                      :style="modal.data.is_standalone ? 'background-color:#222' : 'background-color:#dddddd'">
+                                    <span class="absolute bg-white transition-all" style="width: 22px; height: 22px; top: 3px; border-radius: 999px; box-shadow: 0 1px 3px rgba(0,0,0,0.2);"
+                                          :style="modal.data.is_standalone ? 'inset-inline-start: 21px' : 'inset-inline-start: 3px'"></span>
+                                </span>
                                 <span class="text-[13px] text-[#222]">
                                     {{ $isRtl ? 'قسم مستقل — يظهر في التطبيق كقسم منفصل عن قائمة المرافق' : 'Standalone section — appears in the app as its own section, outside the amenities list' }}
                                 </span>
-                            </label>
+                            </button>
                         </div>
                     </template>
 
@@ -152,10 +160,17 @@
                                 <label class="block text-[13px] font-semibold text-[#222]" style="margin-bottom: 6px;">{{ $isRtl ? 'الخيارات (سطر لكل خيار)' : 'Options (one per line)' }}</label>
                                 <textarea x-model="modal.data.options_text" rows="4" class="w-full bg-[#fafafa] border border-[#ebebeb] focus:border-[#222] text-[15px] focus:outline-none font-mono" style="padding: 11px 14px; border-radius: 12px;"></textarea>
                             </div>
-                            <label class="flex items-center cursor-pointer" style="gap: 10px;">
-                                <input type="checkbox" x-model="modal.data.is_highlighted" class="w-4 h-4 accent-[#F88379]">
+                            <button type="button" @click="modal.data.is_highlighted = !modal.data.is_highlighted" role="switch" :aria-checked="modal.data.is_highlighted"
+                                    class="flex items-center w-full bg-[#fafafa] border border-[#ebebeb] hover:border-[#222] transition-colors cursor-pointer text-start"
+                                    style="padding: 11px 14px; border-radius: 12px; gap: 12px;">
+                                {{-- iOS-style toggle, RTL-safe via logical inset --}}
+                                <span class="relative shrink-0 transition-colors" style="width: 46px; height: 28px; border-radius: 999px;"
+                                      :style="modal.data.is_highlighted ? 'background-color:#F88379' : 'background-color:#dddddd'">
+                                    <span class="absolute bg-white transition-all" style="width: 22px; height: 22px; top: 3px; border-radius: 999px; box-shadow: 0 1px 3px rgba(0,0,0,0.2);"
+                                          :style="modal.data.is_highlighted ? 'inset-inline-start: 21px' : 'inset-inline-start: 3px'"></span>
+                                </span>
                                 <span class="text-[14px] text-[#222] {{ $fa }}">{{ $isRtl ? 'مميّزة — تظهر في قسم منفصل' : 'Highlight — show in a separate section' }}</span>
-                            </label>
+                            </button>
                         </div>
                     </template>
 
