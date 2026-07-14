@@ -19,6 +19,7 @@ class PlaceReview extends Model
     protected $fillable = [
         'place_id',
         'guest_user_id',
+        'reviewer_name',
         'booking_id',
         'rate',
         'comment',

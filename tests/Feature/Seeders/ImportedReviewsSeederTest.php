@@ -2,8 +2,10 @@
 
 declare(strict_types=1);
 
+use App\Enums\BookingStatus;
 use App\Enums\PlaceReviewStatus;
 use App\Enums\PlaceStatus;
+use App\Models\Booking;
 use App\Models\CityArea;
 use App\Models\Place;
 use App\Models\PlaceReview;
@@ -40,8 +42,9 @@ function importTargetPlace(): Place
     ]);
 }
 
-it('imports off-platform reviews as published, back-dated, with mock reviewer users', function (): void {
+it('imports reviews as published, back-dated, accountless rows — no users created', function (): void {
     $place = importTargetPlace();
+    $usersBefore = User::query()->count();
 
     ImportedReviewsSeeder::$reviews = [
         // Matched by title fragment; back-dated 60 days.
@@ -54,17 +57,12 @@ it('imports off-platform reviews as published, back-dated, with mock reviewer us
     $reviews = PlaceReview::query()->where('place_id', $place->id)->orderBy('rate')->get();
     expect($reviews)->toHaveCount(2)
         ->and($reviews->every(fn ($r) => $r->status->value === 'published'))->toBeTrue()
-        ->and($reviews->every(fn ($r) => $r->booking_id === null))->toBeTrue()
-        ->and($reviews->last()->created_at->lessThan(now()->subDays(59)))->toBeTrue();
+        ->and($reviews->every(fn ($r) => $r->guest_user_id === null && $r->booking_id === null))->toBeTrue()
+        ->and($reviews->last()->created_at->lessThan(now()->subDays(59)))->toBeTrue()
+        // The whole point: zero user rows minted.
+        ->and(User::query()->count())->toBe($usersBefore);
 
-    // Mock reviewers live in the reserved SEED-REV phone block — unclaimable
-    // by real registrations (those are always 5########).
-    $mockUsers = User::query()->where('phone', 'like', 'SEED-REV-%')->get();
-    expect($mockUsers)->toHaveCount(2)
-        ->and($mockUsers->pluck('name')->sort()->values()->all())
-        ->toBe(['سارة الدوسري', 'محمد العتيبي']);
-
-    // The app sees them like any other review: first name + rating aggregates.
+    // The app renders them like any other review: first name + aggregates.
     $this->getJson('/api/places/'.$place->id)
         ->assertOk()
         ->assertJsonPath('data.rating.count', 2)
@@ -89,8 +87,7 @@ it('is idempotent: re-running updates in place instead of duplicating', function
     $reviews = PlaceReview::query()->where('place_id', $place->id)->get();
     expect($reviews)->toHaveCount(1)
         ->and($reviews->first()->rate)->toBe(3)
-        ->and($reviews->first()->comment)->toBe('نص محدث.')
-        ->and(User::query()->where('phone', 'like', 'SEED-REV-%')->count())->toBe(1);
+        ->and($reviews->first()->comment)->toBe('نص محدث.');
 });
 
 it('skips unknown places without failing the batch', function (): void {
@@ -106,34 +103,56 @@ it('skips unknown places without failing the batch', function (): void {
         ->and(PlaceReview::query()->first()->place_id)->toBe($place->id);
 });
 
-it('purges imported reviews and their mock users via reviews:purge-imported', function (): void {
+it('purges only accountless imported reviews via reviews:purge-imported', function (): void {
     $place = importTargetPlace();
-    // A REAL registered guest's review must survive the purge untouched.
+
+    // An organic review from a REAL guest (booking-linked) must survive —
+    // including after that guest deletes their account (guest nulls, booking stays).
     $realGuest = User::factory()->create(['phone' => '518300002', 'name' => 'ضيف حقيقي']);
-    PlaceReview::query()->create([
-        'place_id' => $place->id, 'guest_user_id' => $realGuest->id,
+    $booking = Booking::query()->create([
+        'place_id' => $place->id,
+        'guest_user_id' => $realGuest->id,
+        'host_user_id' => $place->host_user_id,
+        'booking_status' => BookingStatus::Completed->value,
+        'start_date' => now()->subDays(5)->toDateString(),
+        'end_date' => now()->subDays(4)->toDateString(),
+        'guests' => 2,
+        'nights' => 1,
+        'stay_amount' => 100000,
+        'commission_rate' => 10,
+        'commission_amount' => 10000,
+        'vat_rate' => 15,
+        'vat_amount' => 15000,
+        'total_amount' => 115000,
+        'payout_status' => 'not_paid',
+    ]);
+    $organic = PlaceReview::query()->create([
+        'place_id' => $place->id, 'guest_user_id' => $realGuest->id, 'booking_id' => $booking->id,
         'rate' => 2, 'comment' => 'حقيقي.', 'status' => 'published',
+    ]);
+    $orphanedOrganic = PlaceReview::query()->create([
+        'place_id' => $place->id, 'guest_user_id' => null, 'booking_id' => $booking->id,
+        'rate' => 3, 'comment' => 'صاحبه حذف حسابه.', 'status' => 'published',
     ]);
 
     ImportedReviewsSeeder::$reviews = [
         ['place' => 'الوسام', 'reviewer' => 'محمد العتيبي', 'rate' => 5, 'comment' => 'مستورد.', 'days_ago' => 5],
     ];
     $this->seed(ImportedReviewsSeeder::class);
-    expect(PlaceReview::query()->count())->toBe(2);
+    expect(PlaceReview::query()->count())->toBe(3);
 
     // Dry run deletes nothing.
     $this->artisan('reviews:purge-imported', ['--dry-run' => true])->assertSuccessful();
-    expect(PlaceReview::query()->count())->toBe(2);
+    expect(PlaceReview::query()->count())->toBe(3);
 
     $this->artisan('reviews:purge-imported')->assertSuccessful();
 
-    expect(PlaceReview::query()->count())->toBe(1)
-        ->and(PlaceReview::query()->first()->guest_user_id)->toBe($realGuest->id)
-        ->and(User::query()->withTrashed()->where('phone', 'like', 'SEED-REV-%')->count())->toBe(0);
+    expect(PlaceReview::query()->orderBy('rate')->pluck('id')->all())
+        ->toBe([$organic->id, $orphanedOrganic->id]);
 
-    // Rating reflects only the surviving real review.
+    // Rating reflects only the surviving organic reviews.
     $this->getJson('/api/places/'.$place->id)
         ->assertOk()
-        ->assertJsonPath('data.rating.count', 1)
-        ->assertJsonPath('data.rating.avg', 2);
+        ->assertJsonPath('data.rating.count', 2)
+        ->assertJsonPath('data.rating.avg', 2.5);
 });

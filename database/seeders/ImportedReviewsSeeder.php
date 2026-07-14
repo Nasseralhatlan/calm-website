@@ -7,19 +7,17 @@ namespace Database\Seeders;
 use App\Enums\ReviewStatus;
 use App\Models\Place;
 use App\Models\PlaceReview;
-use App\Models\User;
 use Illuminate\Database\Seeder;
 
 /**
- * Imports REAL off-platform reviews (WhatsApp-era guests who never registered).
- * Each reviewer becomes a mock user so the review renders like any other in
- * the app (first name shown, placeholder avatar). Mock users carry a
- * `SEED-REV-###` phone — a shape no real registration can ever claim (real
- * phones are always 5########), which makes the whole batch identifiable and
- * fully removable later via `php artisan reviews:purge-imported`.
+ * Imports reviews for unregistered past guests WITHOUT creating any user
+ * rows: the review row carries the display name itself (reviewer_name),
+ * guest_user_id and booking_id stay null. That null pair is also the purge
+ * marker — `php artisan reviews:purge-imported` removes exactly these rows
+ * and never touches organic (booking-linked) reviews.
  *
  * Usage: fill REVIEWS below, then `php artisan db:seed --class=ImportedReviewsSeeder`.
- * Safe to re-run: one review per reviewer per place, updated in place.
+ * Safe to re-run: one review per reviewer-name per place, updated in place.
  */
 class ImportedReviewsSeeder extends Seeder
 {
@@ -32,8 +30,8 @@ class ImportedReviewsSeeder extends Seeder
 
     /**
      * `place` — the place's UUID, or (part of) its title in either language.
-     * `reviewer` — the real guest's display name (first word shows in the app).
-     * `rate` — 1..5. `comment` — the real review text (or null).
+     * `reviewer` — the guest's display name (first word shows in the app).
+     * `rate` — 1..5. `comment` — the review text (or null).
      * `days_ago` — how old the review should look (created_at back-dating).
      *
      * @var list<array{place: string, reviewer: string, rate: int, comment: ?string, days_ago?: int}>
@@ -63,10 +61,12 @@ class ImportedReviewsSeeder extends Seeder
                 continue;
             }
 
-            $reviewer = $this->reviewerUser((string) $entry['reviewer']);
-
             PlaceReview::query()->updateOrCreate(
-                ['place_id' => $place->id, 'guest_user_id' => $reviewer->id],
+                [
+                    'place_id' => $place->id,
+                    'reviewer_name' => (string) $entry['reviewer'],
+                    'guest_user_id' => null,
+                ],
                 [
                     'booking_id' => null,
                     'rate' => (int) $entry['rate'],
@@ -90,29 +90,5 @@ class ImportedReviewsSeeder extends Seeder
             ->orWhere('title_ar', 'like', "%{$key}%")
             ->orWhere('title_en', 'like', "%{$key}%")
             ->first();
-    }
-
-    /**
-     * One mock user per reviewer name, reused across runs. Phones are minted
-     * sequentially in the reserved SEED-REV block.
-     */
-    private function reviewerUser(string $name): User
-    {
-        $existing = User::query()
-            ->where('phone', 'like', 'SEED-REV-%')
-            ->where('name', $name)
-            ->first();
-
-        if ($existing !== null) {
-            return $existing;
-        }
-
-        $next = User::query()->where('phone', 'like', 'SEED-REV-%')->count() + 1;
-
-        return User::query()->create([
-            'name' => $name,
-            'phone' => sprintf('SEED-REV-%03d', $next),
-            'locale' => 'ar',
-        ]);
     }
 }
