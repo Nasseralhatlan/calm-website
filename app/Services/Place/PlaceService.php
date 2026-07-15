@@ -8,6 +8,7 @@ use App\Enums\AttributePhotoRule;
 use App\Enums\PlaceReviewStatus;
 use App\Enums\PlaceStatus;
 use App\Models\Attribute;
+use App\Models\City;
 use App\Models\CityArea;
 use App\Models\Place;
 use App\Models\PlaceAttribute;
@@ -28,7 +29,7 @@ final class PlaceService
         private readonly OwnerNotifier $owner,
     ) {}
 
-    public function paginate(?int $perPage = null, ?string $search = null): LengthAwarePaginator
+    public function paginate(?int $perPage = null, ?string $search = null, ?string $cityId = null): LengthAwarePaginator
     {
         return Place::query()
             ->with(['host', 'type', 'cityArea.city', 'coverPhoto'])
@@ -43,6 +44,7 @@ final class PlaceService
                 $q->where('id', $term)
                     ->orWhereHas('host', fn ($h) => $h->where('phone', 'like', '%'.$phone.'%'));
             }))
+            ->when($cityId, fn ($q, string $city) => $q->whereHas('cityArea', fn ($a) => $a->where('city_id', $city)))
             ->latest()
             ->paginate($perPage ?? config('pagination.per_page'))
             ->withQueryString();
@@ -56,12 +58,14 @@ final class PlaceService
      *
      * @return array{places: LengthAwarePaginator<int, Place>, counts: array<string,int>, nextReview: ?Place}
      */
-    public function indexData(?string $search = null, ?int $perPage = null): array
+    public function indexData(?string $search = null, ?string $cityId = null, ?int $perPage = null): array
     {
         return [
-            'places' => $this->paginate($perPage, $search),
+            'places' => $this->paginate($perPage, $search, $cityId),
             'counts' => $this->statusCounts(),
             'nextReview' => $this->nextPendingReview(),
+            // For the index page's city filter dropdown.
+            'cities' => City::query()->orderBy('name_en')->get(['id', 'name_ar', 'name_en']),
         ];
     }
 

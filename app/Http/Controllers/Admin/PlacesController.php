@@ -27,10 +27,12 @@ class PlacesController extends Controller
     public function index(Request $request): View
     {
         $search = trim((string) $request->query('q', '')) ?: null;
+        $cityId = trim((string) $request->query('city', '')) ?: null;
 
         return view('admin.places.index', [
-            ...$this->service->indexData($search),
+            ...$this->service->indexData($search, $cityId),
             'search' => $search,
+            'cityId' => $cityId,
         ]);
     }
 

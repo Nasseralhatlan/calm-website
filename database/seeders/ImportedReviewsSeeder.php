@@ -12,9 +12,9 @@ use Illuminate\Database\Seeder;
 /**
  * Imports reviews for unregistered past guests WITHOUT creating any user
  * rows: the review row carries the display name itself (reviewer_name),
- * guest_user_id and booking_id stay null. That null pair is also the purge
- * marker — `php artisan reviews:purge-imported` removes exactly these rows
- * and never touches organic (booking-linked) reviews.
+ * guest_user_id and booking_id stay null. That null pair permanently marks
+ * the imported rows — organic reviews always carry a booking — so they can
+ * be identified (and bulk-deleted) later if ever needed.
  *
  * Usage: fill REVIEWS below, then `php artisan db:seed --class=ImportedReviewsSeeder`.
  * Safe to re-run: one review per reviewer-name per place, updated in place.

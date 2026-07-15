@@ -2,10 +2,8 @@
 
 declare(strict_types=1);
 
-use App\Enums\BookingStatus;
 use App\Enums\PlaceReviewStatus;
 use App\Enums\PlaceStatus;
-use App\Models\Booking;
 use App\Models\CityArea;
 use App\Models\Place;
 use App\Models\PlaceReview;
@@ -101,58 +99,4 @@ it('skips unknown places without failing the batch', function (): void {
 
     expect(PlaceReview::query()->count())->toBe(1)
         ->and(PlaceReview::query()->first()->place_id)->toBe($place->id);
-});
-
-it('purges only accountless imported reviews via reviews:purge-imported', function (): void {
-    $place = importTargetPlace();
-
-    // An organic review from a REAL guest (booking-linked) must survive —
-    // including after that guest deletes their account (guest nulls, booking stays).
-    $realGuest = User::factory()->create(['phone' => '518300002', 'name' => 'ضيف حقيقي']);
-    $booking = Booking::query()->create([
-        'place_id' => $place->id,
-        'guest_user_id' => $realGuest->id,
-        'host_user_id' => $place->host_user_id,
-        'booking_status' => BookingStatus::Completed->value,
-        'start_date' => now()->subDays(5)->toDateString(),
-        'end_date' => now()->subDays(4)->toDateString(),
-        'guests' => 2,
-        'nights' => 1,
-        'stay_amount' => 100000,
-        'commission_rate' => 10,
-        'commission_amount' => 10000,
-        'vat_rate' => 15,
-        'vat_amount' => 15000,
-        'total_amount' => 115000,
-        'payout_status' => 'not_paid',
-    ]);
-    $organic = PlaceReview::query()->create([
-        'place_id' => $place->id, 'guest_user_id' => $realGuest->id, 'booking_id' => $booking->id,
-        'rate' => 2, 'comment' => 'حقيقي.', 'status' => 'published',
-    ]);
-    $orphanedOrganic = PlaceReview::query()->create([
-        'place_id' => $place->id, 'guest_user_id' => null, 'booking_id' => $booking->id,
-        'rate' => 3, 'comment' => 'صاحبه حذف حسابه.', 'status' => 'published',
-    ]);
-
-    ImportedReviewsSeeder::$reviews = [
-        ['place' => 'الوسام', 'reviewer' => 'محمد العتيبي', 'rate' => 5, 'comment' => 'مستورد.', 'days_ago' => 5],
-    ];
-    $this->seed(ImportedReviewsSeeder::class);
-    expect(PlaceReview::query()->count())->toBe(3);
-
-    // Dry run deletes nothing.
-    $this->artisan('reviews:purge-imported', ['--dry-run' => true])->assertSuccessful();
-    expect(PlaceReview::query()->count())->toBe(3);
-
-    $this->artisan('reviews:purge-imported')->assertSuccessful();
-
-    expect(PlaceReview::query()->orderBy('rate')->pluck('id')->all())
-        ->toBe([$organic->id, $orphanedOrganic->id]);
-
-    // Rating reflects only the surviving organic reviews.
-    $this->getJson('/api/places/'.$place->id)
-        ->assertOk()
-        ->assertJsonPath('data.rating.count', 2)
-        ->assertJsonPath('data.rating.avg', 2.5);
 });
