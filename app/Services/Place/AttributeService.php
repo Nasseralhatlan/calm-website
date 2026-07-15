@@ -30,7 +30,8 @@ final class AttributeService
     public function grouped(): Collection
     {
         return AttributeGroup::query()
-            ->with(['attributes' => fn ($q) => $q->ordered()])
+            // placeValues count powers the delete confirm's blast-radius warning.
+            ->with(['attributes' => fn ($q) => $q->ordered()->withCount('placeValues')])
             ->ordered()
             ->get();
     }

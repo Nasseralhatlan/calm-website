@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Requests\Host;
 
 use App\Http\Requests\Concerns\DerivesCanonicalContent;
+use App\Http\Requests\Concerns\ValidatesAmenityPhotoRules;
 use App\Models\Place;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
@@ -12,6 +13,7 @@ use Illuminate\Validation\Validator;
 class StorePlaceRequest extends FormRequest
 {
     use DerivesCanonicalContent;
+    use ValidatesAmenityPhotoRules;
 
     public function authorize(): bool
     {
@@ -48,7 +50,11 @@ class StorePlaceRequest extends FormRequest
             'rules_en' => ['nullable', 'string', 'max:10000'],
             // A map link the host pastes (Google Maps, etc.); required on submit,
             // only revealed to the guest once their booking is confirmed.
-            'location_url' => ['required', 'string', 'url', 'max:2048'],
+            'location_url' => ['required_without:latitude', 'nullable', 'string', 'url', 'max:2048'],
+            // The map pin (decimal degrees). Optional — but always as a pair,
+            // and it can replace the pasted URL (the server derives one).
+            'latitude' => ['nullable', 'required_with:longitude', 'numeric', 'between:-90,90'],
+            'longitude' => ['nullable', 'required_with:latitude', 'numeric', 'between:-180,180'],
 
             'attributes' => ['nullable', 'array'],
             'attributes.*.attribute_id' => ['required', 'uuid', 'exists:attributes,id'],
@@ -76,14 +82,7 @@ class StorePlaceRequest extends FormRequest
 
     public function withValidator(Validator $validator): void
     {
-        $validator->after(function (Validator $validator): void {
-            $total = collect($this->input('attribute_image_paths', []))->flatten()->filter()->count()
-                + collect($this->input('extra_image_paths', []))->filter()->count();
-
-            if ($total < 5) {
-                $validator->errors()->add('images', __('A place must have at least :min images.', ['min' => 5]));
-            }
-        });
+        $validator->after(fn (Validator $validator) => $this->enforceAmenityPhotoRules($validator));
     }
 
     /**

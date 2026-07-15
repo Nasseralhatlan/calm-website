@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Services\Place;
 
+use App\Enums\AttributePhotoRule;
 use App\Enums\PlaceReviewStatus;
 use App\Enums\PlaceStatus;
 use App\Models\Attribute;
+use App\Models\City;
 use App\Models\CityArea;
 use App\Models\Place;
 use App\Models\PlaceAttribute;
@@ -27,7 +29,7 @@ final class PlaceService
         private readonly OwnerNotifier $owner,
     ) {}
 
-    public function paginate(?int $perPage = null, ?string $search = null): LengthAwarePaginator
+    public function paginate(?int $perPage = null, ?string $search = null, ?string $cityId = null): LengthAwarePaginator
     {
         return Place::query()
             ->with(['host', 'type', 'cityArea.city', 'coverPhoto'])
@@ -42,6 +44,7 @@ final class PlaceService
                 $q->where('id', $term)
                     ->orWhereHas('host', fn ($h) => $h->where('phone', 'like', '%'.$phone.'%'));
             }))
+            ->when($cityId, fn ($q, string $city) => $q->whereHas('cityArea', fn ($a) => $a->where('city_id', $city)))
             ->latest()
             ->paginate($perPage ?? config('pagination.per_page'))
             ->withQueryString();
@@ -55,12 +58,14 @@ final class PlaceService
      *
      * @return array{places: LengthAwarePaginator<int, Place>, counts: array<string,int>, nextReview: ?Place}
      */
-    public function indexData(?string $search = null, ?int $perPage = null): array
+    public function indexData(?string $search = null, ?string $cityId = null, ?int $perPage = null): array
     {
         return [
-            'places' => $this->paginate($perPage, $search),
+            'places' => $this->paginate($perPage, $search, $cityId),
             'counts' => $this->statusCounts(),
             'nextReview' => $this->nextPendingReview(),
+            // For the index page's city filter dropdown.
+            'cities' => City::query()->orderBy('name_en')->get(['id', 'name_ar', 'name_en']),
         ];
     }
 
@@ -214,6 +219,12 @@ final class PlaceService
 
         $data = self::dayPricesToZero($data);
 
+        // A map pin can replace the pasted link: when the host set coords but
+        // no URL, derive the canonical Google Maps link from the pin.
+        if (! empty($data['latitude']) && ! empty($data['longitude']) && empty($data['location_url'])) {
+            $data['location_url'] = sprintf('https://maps.google.com/?q=%s,%s', $data['latitude'], $data['longitude']);
+        }
+
         $payload = [
             ...$data,
             'host_user_id' => $host->id,
@@ -306,6 +317,20 @@ final class PlaceService
 
         $attributePaths = $photos['attribute_paths'] ?? [];
         $extraPaths = $photos['extra_paths'] ?? [];
+
+        // Authoritative photo_rule guard: photos under a none-rule amenity are
+        // never persisted, regardless of what the client sent. (Validation
+        // already excludes them from the 5-image minimum.)
+        if ($attributePaths !== []) {
+            $noPhotoIds = Attribute::query()
+                ->whereIn('id', array_map(strval(...), array_keys($attributePaths)))
+                ->where('photo_rule', AttributePhotoRule::None)
+                ->pluck('id')
+                ->all();
+
+            $attributePaths = array_diff_key($attributePaths, array_flip($noPhotoIds));
+        }
+
         /** @var list<string> $featured Ordered keys shown outside (first = cover). */
         $featured = array_values($photos['featured'] ?? []);
 
@@ -453,6 +478,12 @@ final class PlaceService
     public function updateDetailsForHost(Place $place, array $data, array $attributes = [], array $photos = []): Place
     {
         $place = DB::transaction(function () use ($place, $data, $attributes, $photos): Place {
+            // Same pin→URL derivation as create: coords without a pasted link
+            // produce the canonical Google Maps link.
+            if (! empty($data['latitude']) && ! empty($data['longitude']) && empty($data['location_url'])) {
+                $data['location_url'] = sprintf('https://maps.google.com/?q=%s,%s', $data['latitude'], $data['longitude']);
+            }
+
             $place->update([
                 ...self::dayPricesToZero($data),
                 'status' => PlaceStatus::Inactive->value,
@@ -514,7 +545,7 @@ final class PlaceService
      */
     public function editableForHost(Place $place): Place
     {
-        return $place->load(['attributeValues', 'photos', 'cityArea:id,city_id']);
+        return $place->load(['attributeValues', 'photos.attribute:id,photo_rule', 'cityArea:id,city_id']);
     }
 
     public function setReviewStatus(Place $place, PlaceReviewStatus $status): Place
@@ -565,7 +596,7 @@ final class PlaceService
      */
     public function eagerHomeFields(mixed $query, ?User $viewer = null): mixed
     {
-        $query->with(['type', 'cityArea.city', 'coverPhoto', 'photos'])
+        $query->with(['type', 'cityArea.city', 'coverPhoto', 'photos.attribute:id,photo_rule'])
             ->withCount('likes')
             ->withCount('publishedReviews')
             ->withAvg('publishedReviews', 'rate');
@@ -599,7 +630,7 @@ final class PlaceService
             'host',
             'type',
             'cityArea.city',
-            'photos',
+            'photos.attribute:id,photo_rule',
             'coverPhoto',
             'attributeValues.attribute.group',
             'publishedReviews' => fn ($q) => $q->with('guest')->latest()->limit(10),

@@ -72,15 +72,30 @@ final class PlaceReviewService
     }
 
     /**
-     * Oldest pending row not matching the one we're currently looking at.
-     * Used as the post-action redirect target.
+     * The next pending row AFTER the current one in queue order
+     * (updated_at, id), wrapping to the front when nothing lies ahead.
+     * The forward cursor is what makes "skip" walk 1→2→3→1 — always
+     * restarting from the oldest would bounce the admin back to the first
+     * skipped place after every skip. Approve/reject bump the current row's
+     * updated_at to now, so for them the cursor naturally wraps to the
+     * oldest pending — same target as before.
      */
     public function nextAfter(Place $place): ?Place
     {
-        return Place::query()
+        $pending = Place::query()
             ->where('review_status', PlaceReviewStatus::PendingReview->value)
-            ->whereKeyNot($place->id)
-            ->oldest('updated_at')
+            ->whereKeyNot($place->id);
+
+        $ahead = (clone $pending)
+            ->where(fn ($q) => $q
+                ->where('updated_at', '>', $place->updated_at)
+                ->orWhere(fn ($tie) => $tie
+                    ->where('updated_at', $place->updated_at)
+                    ->where('id', '>', $place->id)))
+            ->orderBy('updated_at')
+            ->orderBy('id')
             ->first();
+
+        return $ahead ?? (clone $pending)->orderBy('updated_at')->orderBy('id')->first();
     }
 }

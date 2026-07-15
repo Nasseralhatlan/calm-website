@@ -50,6 +50,8 @@ class SaveDraftRequest extends FormRequest
             // Map link (Google Maps, etc.) — optional while drafting. Not
             // url-validated here so a partial paste doesn't block auto-save.
             'location_url' => ['nullable', 'string', 'max:2048'],
+            'latitude' => ['nullable', 'required_with:longitude', 'numeric', 'between:-90,90'],
+            'longitude' => ['nullable', 'required_with:latitude', 'numeric', 'between:-180,180'],
             'last_step' => ['nullable', 'integer', 'min:1', 'max:20'],
 
             // Attributes — host's selected facilities. Sent as an array of objects

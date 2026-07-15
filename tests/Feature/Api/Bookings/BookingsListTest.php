@@ -132,7 +132,7 @@ it('reveals the place location link only for confirmed and completed bookings', 
     $url = 'https://maps.google.com/?q=24.7,46.6';
     $guest = User::factory()->create(['phone' => '519000040']);
     $host = User::factory()->create(['phone' => '519000041']);
-    $place = listPlace($host, ['location_url' => $url]);
+    $place = listPlace($host, ['location_url' => $url, 'latitude' => 24.7135517, 'longitude' => 46.6752957]);
 
     // Sort order: pending_payment → confirmed → completed → cancelled.
     listBooking($place, $guest, ['booking_status' => BookingStatus::PendingPayment->value]);
@@ -145,12 +145,16 @@ it('reveals the place location link only for confirmed and completed bookings', 
         ->assertOk()
         ->assertJsonPath('data.items.0.status', 'pending_payment')
         ->assertJsonPath('data.items.0.place.location_url', null)   // hidden before payment
+        ->assertJsonPath('data.items.0.place.latitude', null)       // exact pin hidden too
         ->assertJsonPath('data.items.1.status', 'confirmed')
         ->assertJsonPath('data.items.1.place.location_url', $url)   // unlocked
+        ->assertJsonPath('data.items.1.place.latitude', 24.7135517) // exact pin unlocked
+        ->assertJsonPath('data.items.1.place.longitude', 46.6752957)
         ->assertJsonPath('data.items.2.status', 'completed')
         ->assertJsonPath('data.items.2.place.location_url', $url)   // unlocked
         ->assertJsonPath('data.items.3.status', 'canceled_by_host')
-        ->assertJsonPath('data.items.3.place.location_url', null);  // hidden after cancellation
+        ->assertJsonPath('data.items.3.place.location_url', null)   // hidden after cancellation
+        ->assertJsonPath('data.items.3.place.latitude', null);
 });
 
 it('only returns the authenticated guest\'s bookings', function (): void {

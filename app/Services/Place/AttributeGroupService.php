@@ -39,6 +39,9 @@ final class AttributeGroupService
      */
     public function create(array $data): AttributeGroup
     {
+        // An unchecked admin checkbox sends nothing — default explicitly.
+        $data['is_standalone'] ??= false;
+
         return AttributeGroup::query()->create($data);
     }
 
@@ -47,9 +50,18 @@ final class AttributeGroupService
      */
     public function update(AttributeGroup $group, array $data): AttributeGroup
     {
+        $data['is_standalone'] ??= false;
+
         $group->update($data);
 
         return $group->refresh();
+    }
+
+    public function toggleStandalone(AttributeGroup $group): bool
+    {
+        $group->update(['is_standalone' => ! $group->is_standalone]);
+
+        return (bool) $group->is_standalone;
     }
 
     public function delete(AttributeGroup $group): void

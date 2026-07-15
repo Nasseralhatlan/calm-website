@@ -165,7 +165,7 @@ class AttributeSeeder extends Seeder
                 'name_en' => 'Privacy',
                 'name_ar' => 'الخصوصية',
                 'attributes' => [
-                    ['emoji' => '🔒', 'name_en' => 'Fully Private',              'name_ar' => 'خصوصية كاملة',     'photo' => 'required'],
+                    ['emoji' => '🔒', 'name_en' => 'Fully Private',              'name_ar' => 'خصوصية كاملة',     'photo' => 'none'],
                     ['emoji' => '🚪', 'name_en' => 'Private Entrance',           'name_ar' => 'مدخل خاص',         'photo' => 'optional'],
                     ['emoji' => '🏊', 'name_en' => 'Private Pool',               'name_ar' => 'مسبح خاص',         'photo' => 'required'],
                     ['emoji' => '👩', 'name_en' => "Separate Women's Section",   'name_ar' => 'قسم نسائي مستقل',  'photo' => 'optional'],

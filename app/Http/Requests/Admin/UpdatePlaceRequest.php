@@ -7,6 +7,7 @@ namespace App\Http\Requests\Admin;
 use App\Enums\PlaceReviewStatus;
 use App\Enums\PlaceStatus;
 use App\Http\Requests\Concerns\DerivesCanonicalContent;
+use App\Http\Requests\Concerns\ValidatesAmenityPhotoRules;
 use App\Models\Place;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -15,6 +16,7 @@ use Illuminate\Validation\Validator;
 class UpdatePlaceRequest extends FormRequest
 {
     use DerivesCanonicalContent;
+    use ValidatesAmenityPhotoRules;
 
     public function authorize(): bool
     {
@@ -53,7 +55,11 @@ class UpdatePlaceRequest extends FormRequest
             'rules_en' => ['nullable', 'string', 'max:10000'],
             // A map link the host pastes (Google Maps, etc.); only revealed to
             // the guest once their booking is confirmed.
-            'location_url' => ['required', 'string', 'url', 'max:2048'],
+            'location_url' => ['required_without:latitude', 'nullable', 'string', 'url', 'max:2048'],
+            // The map pin (decimal degrees). Optional — but always as a pair,
+            // and it can replace the pasted URL (the server derives one).
+            'latitude' => ['nullable', 'required_with:longitude', 'numeric', 'between:-90,90'],
+            'longitude' => ['nullable', 'required_with:latitude', 'numeric', 'between:-180,180'],
             'status' => ['required', Rule::enum(PlaceStatus::class)],
             'review_status' => ['required', Rule::enum(PlaceReviewStatus::class)],
             // Admin can edit / clear the rejection feedback directly.
@@ -90,20 +96,13 @@ class UpdatePlaceRequest extends FormRequest
 
     public function withValidator(Validator $validator): void
     {
-        // Only enforce the 5-image minimum when the edit actually re-submits
-        // photos — a details-only edit leaves the existing gallery untouched.
+        // Only enforce photo rules when the edit actually re-submits photos —
+        // a details-only edit leaves the existing gallery untouched.
         if (! $this->has('attribute_image_paths') && ! $this->has('extra_image_paths')) {
             return;
         }
 
-        $validator->after(function (Validator $validator): void {
-            $total = collect($this->input('attribute_image_paths', []))->flatten()->filter()->count()
-                + collect($this->input('extra_image_paths', []))->filter()->count();
-
-            if ($total < 5) {
-                $validator->errors()->add('images', __('A place must have at least :min images.', ['min' => 5]));
-            }
-        });
+        $validator->after(fn (Validator $validator) => $this->enforceAmenityPhotoRules($validator));
     }
 
     /**

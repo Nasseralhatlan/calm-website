@@ -51,15 +51,24 @@
 
     {{-- ── Search + Start review row ── --}}
     <div class="flex items-center justify-between flex-wrap" style="margin-bottom: 16px; gap: 10px;">
-        <form method="GET" action="{{ route('admin.places.index') }}" class="flex items-center bg-white" style="gap: 0; border-radius: 14px; padding: 4px; min-width: 320px; flex: 1; max-width: 480px;">
+        <form method="GET" action="{{ route('admin.places.index') }}" class="flex items-center bg-white" style="gap: 0; border-radius: 14px; padding: 4px; min-width: 320px; flex: 1; max-width: 620px;">
             <input type="text" name="q" value="{{ $search }}" placeholder="{{ $isRtl ? 'ابحث برقم المكان أو جوال المضيف' : 'Search by place UUID or host phone' }}"
                    class="flex-1 bg-transparent text-[14px] text-[#222] focus:outline-none {{ $isRtl ? 'font-arabic' : '' }}"
                    style="padding: 8px 14px;" dir="auto">
+            {{-- City filter — auto-applies on change, survives pagination via withQueryString(). --}}
+            <select name="city" onchange="this.form.submit()"
+                    class="bg-[#fafafa] border border-[#ebebeb] text-[13px] text-[#222] focus:outline-none {{ $isRtl ? 'font-arabic' : '' }}"
+                    style="padding: 8px 10px; border-radius: 10px; margin-inline-end: 6px; max-width: 160px;">
+                <option value="">{{ $isRtl ? 'كل المدن' : 'All cities' }}</option>
+                @foreach($cities as $city)
+                    <option value="{{ $city->id }}" @selected($cityId === $city->id)>{{ $isRtl ? $city->name_ar : $city->name_en }}</option>
+                @endforeach
+            </select>
             <button type="submit" class="font-semibold text-white bg-[#222] hover:bg-black {{ $isRtl ? 'font-arabic' : '' }}"
                     style="padding: 8px 16px; border-radius: 10px; font-size: 13px;">
                 {{ $isRtl ? 'بحث' : 'Search' }}
             </button>
-            @if($search)
+            @if($search || $cityId)
                 <a href="{{ route('admin.places.index') }}" class="text-[13px] text-[#717171] hover:text-[#222] {{ $isRtl ? 'font-arabic' : '' }}" style="padding: 0 12px;">
                     {{ $isRtl ? '✕ مسح' : '✕ Clear' }}
                 </a>

@@ -141,6 +141,9 @@ Route::middleware(['auth:api', 'admin'])
             ->parameters(['place-types' => 'placeType']);
         // Attribute groups: store/update/destroy only — driven inline (JSON)
         // from the merged attributes page (no standalone group screen).
+        // The literal `standalone` toggle registers before the resource so it
+        // isn't captured as an {attributeGroup} route parameter.
+        Route::post('attribute-groups/{attributeGroup}/standalone', [AttributeGroupsController::class, 'toggleStandalone'])->name('attribute-groups.standalone');
         Route::resource('attribute-groups', AttributeGroupsController::class)
             ->only(['store', 'update', 'destroy'])
             ->parameters(['attribute-groups' => 'attributeGroup']);

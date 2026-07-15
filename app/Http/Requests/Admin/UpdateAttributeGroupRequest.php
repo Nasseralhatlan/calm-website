@@ -21,6 +21,8 @@ class UpdateAttributeGroupRequest extends FormRequest
         return [
             'name_ar' => ['required', 'string', 'max:255'],
             'name_en' => ['required', 'string', 'max:255'],
+            // Unchecked checkboxes send nothing — the service defaults false.
+            'is_standalone' => ['sometimes', 'boolean'],
         ];
     }
 }

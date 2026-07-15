@@ -3,9 +3,15 @@
 declare(strict_types=1);
 
 use App\Enums\AttributeType;
+use App\Enums\PlaceReviewStatus;
+use App\Enums\PlaceStatus;
 use App\Enums\UserRole;
 use App\Models\Attribute;
 use App\Models\AttributeGroup;
+use App\Models\CityArea;
+use App\Models\Place;
+use App\Models\PlaceAttribute;
+use App\Models\PlaceType;
 use App\Models\User;
 
 beforeEach(function (): void {
@@ -100,6 +106,46 @@ it('toggles highlight via the JSON endpoint', function (): void {
     expect($attr->refresh()->is_highlighted)->toBeFalse();
 });
 
+it('exposes places_count per attribute so the delete confirm can warn', function (): void {
+    $this->seed();
+    $used = Attribute::query()->create(attrPayload(['name_en' => 'Pool']));
+    $unused = Attribute::query()->create(attrPayload(['name_en' => 'Sauna']));
+
+    $host = User::factory()->create(['phone' => '517200001']);
+    $place = Place::query()->create([
+        'host_user_id' => $host->id,
+        'place_type_id' => PlaceType::query()->first()->id,
+        'city_area_id' => CityArea::query()->first()->id,
+        'title' => 'Count me',
+        'description' => 'x',
+        'price' => 500,
+        'check_in_time' => '15:00',
+        'check_out_time' => '12:00',
+        'max_guests' => 4,
+        'status' => PlaceStatus::Active->value,
+        'review_status' => PlaceReviewStatus::Approved->value,
+    ]);
+    PlaceAttribute::query()->create(['place_id' => $place->id, 'attribute_id' => $used->id, 'value' => '1']);
+
+    $init = $this->get('/admin/attributes')->assertOk()->viewData('init');
+    $attrs = collect($init['groups'])->firstWhere('id', $this->group->id)['attributes'];
+
+    expect(collect($attrs)->firstWhere('id', $used->id)['places_count'])->toBe(1)
+        ->and(collect($attrs)->firstWhere('id', $unused->id)['places_count'])->toBe(0);
+});
+
+it('toggles a group\'s standalone flag via the JSON endpoint', function (): void {
+    $this->postJson("/admin/attribute-groups/{$this->group->id}/standalone")
+        ->assertOk()
+        ->assertJsonPath('is_standalone', true);
+    expect($this->group->refresh()->is_standalone)->toBeTrue();
+
+    $this->postJson("/admin/attribute-groups/{$this->group->id}/standalone")
+        ->assertOk()
+        ->assertJsonPath('is_standalone', false);
+    expect($this->group->refresh()->is_standalone)->toBeFalse();
+});
+
 it('creates, updates and deletes an attribute over JSON', function (): void {
     // Create
     $created = $this->postJson('/admin/attributes', attrPayload(['name_en' => 'Sauna', 'is_highlighted' => true]))
@@ -167,4 +213,23 @@ it('rejects a reorder payload with an unknown group id', function (): void {
 
     $this->post('/admin/attributes/reorder', ['payload' => $payload])
         ->assertSessionHasErrors('groups.0.id');
+});
+
+it('persists the standalone flag on groups and defaults it off when omitted', function (): void {
+    // Create with the flag on.
+    $id = $this->postJson('/admin/attribute-groups', [
+        'name_ar' => 'الجلسات الخارجية', 'name_en' => 'Outdoor seating', 'is_standalone' => true,
+    ])
+        ->assertCreated()
+        ->assertJsonPath('group.is_standalone', true)
+        ->json('group.id');
+
+    expect(AttributeGroup::query()->find($id)->is_standalone)->toBeTrue();
+
+    // Updating WITHOUT the field (unchecked checkbox) flips it back off.
+    $this->putJson("/admin/attribute-groups/{$id}", ['name_ar' => 'الجلسات', 'name_en' => 'Seating'])
+        ->assertOk()
+        ->assertJsonPath('group.is_standalone', false);
+
+    expect(AttributeGroup::query()->find($id)->is_standalone)->toBeFalse();
 });

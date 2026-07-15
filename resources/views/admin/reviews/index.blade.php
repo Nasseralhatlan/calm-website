@@ -66,7 +66,7 @@
                                 <span class="text-[14px] tabular-nums text-[#f59e0b]">{{ str_repeat('★', (int) $review->rate) }}{{ str_repeat('☆', 5 - (int) $review->rate) }}</span>
                             </div>
                             <div class="text-[12px] text-[#717171] {{ $fa }}" style="margin-top: 2px;">
-                                {{ $review->guest?->name ?: ($isRtl ? 'ضيف' : 'Guest') }} · {{ $review->created_at?->diffForHumans() }}
+                                {{ $review->guest?->name ?: ($review->reviewer_name ?: ($isRtl ? 'ضيف' : 'Guest')) }} · {{ $review->created_at?->diffForHumans() }}
                             </div>
                             @if($review->comment)
                                 <p class="text-[14px] text-[#222] {{ $fa }}" style="margin-top: 10px; white-space: pre-line;">{{ $review->comment }}</p>

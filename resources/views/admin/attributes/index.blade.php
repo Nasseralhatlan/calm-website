@@ -36,6 +36,8 @@
                     <span x-sort:handle class="text-[#bbb] text-[18px] leading-none select-none cursor-grab">⠿</span>
                     <span class="font-semibold text-[#222] {{ $fa }}" x-text="label(group)"></span>
                     <span class="text-[12px] text-[#717171]" x-text="'· ' + group.attributes.length"></span>
+                    {{-- Standalone star — same quick-toggle pattern as the attribute highlight star. --}}
+                    <button type="button" @click.stop="toggleStandalone(group)" class="text-[14px] leading-none" :title="group.is_standalone ? '{{ $isRtl ? 'قسم مستقل' : 'Standalone section' }}' : '{{ $isRtl ? 'اجعله قسمًا مستقلًا' : 'Make standalone section' }}'" x-text="group.is_standalone ? '⭐' : '☆'"></button>
                     <div class="flex items-center" style="margin-inline-start: auto; gap: 14px;">
                         <button type="button" @click="openCreateAttribute(group.id)" class="text-[13px] font-semibold text-[#222] hover:underline {{ $fa }}">{{ $isRtl ? '+ خاصية' : '+ Attribute' }}</button>
                         <button type="button" @click="openEditGroup(group)" class="text-[13px] font-semibold text-[#717171] hover:text-[#222] {{ $fa }}">{{ $isRtl ? 'تعديل' : 'Edit' }}</button>
@@ -88,6 +90,10 @@
                                 <input type="text" x-model="modal.data.name_en" dir="ltr" class="w-full bg-[#fafafa] border border-[#ebebeb] focus:border-[#222] text-[15px] focus:outline-none" style="padding: 11px 14px; border-radius: 12px;">
                                 <template x-if="modal.errors.name_en"><p class="text-[12px] text-[#dc2626]" style="margin-top: 4px;" x-text="modal.errors.name_en[0]"></p></template>
                             </div>
+                            <label class="sm:col-span-2">
+                                <input type="checkbox" x-model="modal.data.is_standalone">
+                                {{ $isRtl ? 'قسم مستقل — يظهر في التطبيق كقسم منفصل عن قائمة المرافق' : 'Standalone section — appears in the app as its own section, outside the amenities list' }}
+                            </label>
                         </div>
                     </template>
 
@@ -146,9 +152,9 @@
                                 <label class="block text-[13px] font-semibold text-[#222]" style="margin-bottom: 6px;">{{ $isRtl ? 'الخيارات (سطر لكل خيار)' : 'Options (one per line)' }}</label>
                                 <textarea x-model="modal.data.options_text" rows="4" class="w-full bg-[#fafafa] border border-[#ebebeb] focus:border-[#222] text-[15px] focus:outline-none font-mono" style="padding: 11px 14px; border-radius: 12px;"></textarea>
                             </div>
-                            <label class="flex items-center cursor-pointer" style="gap: 10px;">
-                                <input type="checkbox" x-model="modal.data.is_highlighted" class="w-4 h-4 accent-[#F88379]">
-                                <span class="text-[14px] text-[#222] {{ $fa }}">{{ $isRtl ? 'مميّزة — تظهر في قسم منفصل' : 'Highlight — show in a separate section' }}</span>
+                            <label>
+                                <input type="checkbox" x-model="modal.data.is_highlighted">
+                                {{ $isRtl ? 'مميّزة — تظهر في قسم منفصل' : 'Highlight — show in a separate section' }}
                             </label>
                         </div>
                     </template>
@@ -200,8 +206,8 @@
                     is_highlighted: attr.is_highlighted,
                 } };
             },
-            openCreateGroup() { this.modal = { kind: 'group', mode: 'create', errors: {}, saving: false, data: { id: null, name_ar: '', name_en: '' } }; },
-            openEditGroup(group) { this.modal = { kind: 'group', mode: 'edit', errors: {}, saving: false, data: { id: group.id, name_ar: group.name_ar, name_en: group.name_en } }; },
+            openCreateGroup() { this.modal = { kind: 'group', mode: 'create', errors: {}, saving: false, data: { id: null, name_ar: '', name_en: '', is_standalone: false } }; },
+            openEditGroup(group) { this.modal = { kind: 'group', mode: 'edit', errors: {}, saving: false, data: { id: group.id, name_ar: group.name_ar, name_en: group.name_en, is_standalone: !!group.is_standalone } }; },
             closeModal() { this.modal = null; },
 
             submitModal() { return this.modal.kind === 'attribute' ? this.saveAttribute() : this.saveGroup(); },
@@ -227,7 +233,7 @@
                 if (res.status === 422) { m.errors = ((await res.json()).data || {}).errors || {}; m.saving = false; return; }
                 if (!res.ok) { m.saving = false; alert('Save failed'); return; }
                 const group = (await res.json()).group;
-                if (isEdit) { const g = this.groups.find(x => x.id === group.id); if (g) { g.name_ar = group.name_ar; g.name_en = group.name_en; } }
+                if (isEdit) { const g = this.groups.find(x => x.id === group.id); if (g) { g.name_ar = group.name_ar; g.name_en = group.name_en; g.is_standalone = group.is_standalone; } }
                 else { this.groups.push({ ...group, attributes: [] }); }
                 this.closeModal();
                 this.persistOrder();
@@ -237,13 +243,33 @@
                 const res = await this.req('POST', `/admin/attributes/${attr.id}/highlight`);
                 if (res.ok) attr.is_highlighted = (await res.json()).is_highlighted;
             },
+            async toggleStandalone(group) {
+                const res = await this.req('POST', `/admin/attribute-groups/${group.id}/standalone`);
+                if (res.ok) group.is_standalone = (await res.json()).is_standalone;
+            },
             async deleteAttribute(group, attr) {
-                if (!confirm(isRtl ? 'حذف هذه الخاصية؟' : 'Delete this attribute?')) return;
+                // Deleting cascades: the amenity disappears from every place using
+                // it, and its section photos become general photos — warn with the
+                // blast radius when it's actually in use.
+                const n = attr.places_count || 0;
+                const msg = n > 0
+                    ? (isRtl
+                        ? `حذف «${this.label(attr)}»؟ مستخدمة في ${n} ${n === 1 ? 'مكان' : 'أماكن'} — ستُحذف منها وستتحول صورها إلى صور عامة.`
+                        : `Delete "${this.label(attr)}"? Used by ${n} place${n === 1 ? '' : 's'} — it will be removed from them and its section photos become general photos.`)
+                    : (isRtl ? 'حذف هذه الخاصية؟' : 'Delete this attribute?');
+                if (!confirm(msg)) return;
                 const res = await this.req('DELETE', `/admin/attributes/${attr.id}`);
                 if (res.ok) group.attributes = group.attributes.filter(a => a.id !== attr.id);
             },
             async deleteGroup(group) {
-                if (!confirm(isRtl ? 'حذف هذه المجموعة وكل خصائصها؟' : 'Delete this group and all its attributes?')) return;
+                const m = group.attributes.length;
+                const n = group.attributes.reduce((sum, a) => sum + (a.places_count || 0), 0);
+                const msg = n > 0
+                    ? (isRtl
+                        ? `حذف «${this.label(group)}» وخصائصها الـ${m}؟ مستخدمة في ${n} ${n === 1 ? 'مكان' : 'أماكن'} إجمالًا — ستُحذف منها وستتحول صورها إلى صور عامة.`
+                        : `Delete "${this.label(group)}" and its ${m} attribute${m === 1 ? '' : 's'}? Used by ${n} place${n === 1 ? '' : 's'} in total — they will be removed from them and their section photos become general photos.`)
+                    : (isRtl ? 'حذف هذه المجموعة وكل خصائصها؟' : 'Delete this group and all its attributes?');
+                if (!confirm(msg)) return;
                 const res = await this.req('DELETE', `/admin/attribute-groups/${group.id}`);
                 if (res.ok) this.groups = this.groups.filter(g => g.id !== group.id);
             },

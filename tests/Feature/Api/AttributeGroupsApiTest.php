@@ -6,7 +6,7 @@ use App\Models\Attribute;
 use App\Models\AttributeGroup;
 
 it('returns the amenity catalog publicly: groups + nested attributes in admin order', function (): void {
-    $second = AttributeGroup::query()->create(['name_ar' => 'عام', 'name_en' => 'General', 'sort_order' => 2]);
+    $second = AttributeGroup::query()->create(['name_ar' => 'عام', 'name_en' => 'General', 'sort_order' => 2, 'is_standalone' => true]);
     $first = AttributeGroup::query()->create(['name_ar' => 'مرافق', 'name_en' => 'Facilities', 'sort_order' => 1]);
 
     Attribute::query()->create([
@@ -37,6 +37,10 @@ it('returns the amenity catalog publicly: groups + nested attributes in admin or
         // Groups follow the admin-controlled sort_order.
         ->assertJsonPath('data.0.name_en', 'Facilities')
         ->assertJsonPath('data.1.name_en', 'General')
+        // Standalone flag rides on the GROUP — the app splits such sections
+        // out of the general amenities list.
+        ->assertJsonPath('data.0.is_standalone', false)
+        ->assertJsonPath('data.1.is_standalone', true)
         // Attributes nest inside their group, also in admin order.
         ->assertJsonCount(2, 'data.0.attributes')
         ->assertJsonPath('data.0.attributes.0.name_en', 'WiFi')

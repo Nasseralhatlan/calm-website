@@ -112,10 +112,60 @@ it('returns photo_groups ordered by the host gallery arrangement', function (): 
         ->assertJsonPath('data.photo_groups.0.photos.1.sort_order', 1);
 });
 
+it('hides legacy photos tied to a none-rule amenity from every photo payload', function (): void {
+    $place = detailPlace();
+
+    $group = AttributeGroup::query()->create(['name_en' => 'Amenities', 'name_ar' => 'مرافق']);
+    // A none-rule amenity can still own photo rows from before its rule was
+    // flipped to none — those must never reach the API.
+    $wifi = Attribute::query()->create([
+        'group_id' => $group->id, 'name_en' => 'WiFi', 'name_ar' => 'واي فاي',
+        'icon' => '📶', 'type' => 'boolean', 'photo_rule' => 'none',
+    ]);
+    $pool = Attribute::query()->create([
+        'group_id' => $group->id, 'name_en' => 'Pool', 'name_ar' => 'مسبح',
+        'icon' => '🏊', 'type' => 'boolean', 'photo_rule' => 'optional',
+    ]);
+    PlaceAttribute::query()->create(['place_id' => $place->id, 'attribute_id' => $wifi->id, 'value' => '1']);
+    PlaceAttribute::query()->create(['place_id' => $place->id, 'attribute_id' => $pool->id, 'value' => '1']);
+
+    foreach ([
+        ['attr' => $wifi->id, 'path' => 'places/uploads/wifi.jpg', 'sort' => 0, 'featured' => 0], // legacy, even featured as cover
+        ['attr' => $pool->id, 'path' => 'places/uploads/pool.jpg', 'sort' => 1, 'featured' => 1],
+        ['attr' => null, 'path' => 'places/uploads/general.jpg', 'sort' => 2, 'featured' => null],
+    ] as $r) {
+        PlacePhoto::query()->create([
+            'place_id' => $place->id,
+            'place_attribute_id' => $r['attr'],
+            'path' => $r['path'],
+            'sort_order' => $r['sort'],
+            'featured_order' => $r['featured'],
+        ]);
+    }
+
+    $response = $this->getJson('/api/places/'.$place->id)->assertOk();
+
+    // Flat gallery + grouped gallery + showcase all skip the WiFi photo.
+    $response->assertJsonCount(2, 'data.photos')
+        ->assertJsonPath('data.photos.0.attribute_id', $pool->id)
+        ->assertJsonPath('data.photos.1.attribute_id', null)
+        ->assertJsonCount(2, 'data.photo_groups')
+        ->assertJsonPath('data.photo_groups.0.attribute.id', $pool->id)
+        ->assertJsonPath('data.photo_groups.1.attribute_id', null)
+        ->assertJsonCount(1, 'data.featured_photos')
+        ->assertJsonPath('data.featured_photos.0.attribute_id', $pool->id);
+
+    // Even the cover skips it: WiFi held featured_order 0, but the cover
+    // falls through to the next visible showcase photo.
+    expect($response->json('data.cover_photo_url'))
+        ->toContain('pool.jpg')
+        ->not->toContain('wifi.jpg');
+});
+
 it('returns attributes grouped with their definition + group', function (): void {
     $place = detailPlace();
 
-    $group = AttributeGroup::query()->create(['name_en' => 'Indoor', 'name_ar' => 'داخلي']);
+    $group = AttributeGroup::query()->create(['name_en' => 'Indoor', 'name_ar' => 'داخلي', 'is_standalone' => true]);
     $attribute = Attribute::query()->create([
         'group_id' => $group->id,
         'name_en' => 'WiFi',
@@ -137,7 +187,9 @@ it('returns attributes grouped with their definition + group', function (): void
         ->assertJsonPath('data.attributes.0.description', 'Fast fiber.')
         ->assertJsonPath('data.attributes.0.attribute.name_en', 'WiFi')
         ->assertJsonPath('data.attributes.0.attribute.icon', '📶')
-        ->assertJsonPath('data.attributes.0.attribute.group.name_en', 'Indoor');
+        ->assertJsonPath('data.attributes.0.attribute.group.name_en', 'Indoor')
+        // The app splits standalone groups into their own section from this flag.
+        ->assertJsonPath('data.attributes.0.attribute.group.is_standalone', true);
 });
 
 it('orders attributes by the admin sort_order and exposes is_highlighted', function (): void {

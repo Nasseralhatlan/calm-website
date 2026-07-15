@@ -29,7 +29,9 @@ class PlaceReviewResource extends JsonResource
             'rate' => (int) $this->rate,
             'comment' => $this->comment,
             'status' => $this->status?->value,
-            'reviewer_name' => Str::of((string) $this->guest?->name)->trim()->explode(' ')->first() ?: null,
+            // Registered guest's first name; imported (no-account) reviews
+            // fall back to the name stored on the review row itself.
+            'reviewer_name' => Str::of((string) ($this->guest?->name ?? $this->reviewer_name))->trim()->explode(' ')->first() ?: null,
             'reviewer_avatar_url' => $this->guest?->avatar_url,
             'place' => $this->whenLoaded('place', fn (): array => [
                 'id' => $this->place?->id,
