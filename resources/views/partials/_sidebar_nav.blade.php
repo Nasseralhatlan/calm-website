@@ -39,6 +39,7 @@
                 ['route' => 'admin.countries.index',        'label_ar' => 'الدول',             'label_en' => 'Countries',        'icon' => 'globe'],
                 ['route' => 'admin.cities.index',           'label_ar' => 'المدن',             'label_en' => 'Cities',           'icon' => 'building'],
                 ['route' => 'admin.city-areas.index',       'label_ar' => 'الأحياء',           'label_en' => 'City areas',       'icon' => 'map'],
+                ['route' => 'admin.faqs.index',             'label_ar' => 'الأسئلة الشائعة',   'label_en' => 'FAQs',             'icon' => 'help'],
                 ['route' => 'admin.settings.index',         'label_ar' => 'الإعدادات',         'label_en' => 'Settings',         'icon' => 'gear'],
             ],
         ];
