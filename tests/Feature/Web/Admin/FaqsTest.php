@@ -79,7 +79,7 @@ it('shows both audiences as two sections on one public page, each in sort order'
     Faq::query()->create(faqPayload(['audience' => 'host', 'question_ar' => 'سؤال للمضيفين']));
 
     // Guests section first (with its FAQs ordered), hosts section below.
-    $this->get('/faq')
+    $this->get('/faqs')
         ->assertOk()
         ->assertSeeInOrder(['الأول للضيوف', 'الثاني للضيوف', 'سؤال للمضيفين'], escape: false)
         ->assertSee('id="guest"', escape: false)

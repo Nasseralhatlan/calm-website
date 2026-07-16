@@ -53,7 +53,7 @@ Route::get('/community-standards', [PageController::class, 'community'])->name('
 // Public support page — contact details rendered from admin settings.
 Route::get('/support', [PageController::class, 'support'])->name('pages.support');
 // Public FAQ page — admin-curated Q&A, guests + hosts as two sections on one page.
-Route::get('/faq', [PageController::class, 'faq'])->name('pages.faq');
+Route::get('/faqs', [PageController::class, 'faq'])->name('pages.faq');
 
 // Per-place iCal export — polled anonymously by Airbnb/Gathern/Google after
 // the host pastes the URL there. The secret {token} is the whole credential;
