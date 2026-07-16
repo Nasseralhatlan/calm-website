@@ -9,6 +9,7 @@ use App\Http\Controllers\Admin\CitiesController;
 use App\Http\Controllers\Admin\CityAreasController;
 use App\Http\Controllers\Admin\CountriesController;
 use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\FaqsController;
 // use App\Http\Controllers\Admin\NotificationsController; // notifications temporarily disabled
 use App\Http\Controllers\Admin\FinanceDocumentPdfController;
 use App\Http\Controllers\Admin\PlaceListsController;
@@ -51,6 +52,8 @@ Route::get('/cancellation-policy', [PageController::class, 'cancellation'])->nam
 Route::get('/community-standards', [PageController::class, 'community'])->name('pages.community');
 // Public support page — contact details rendered from admin settings.
 Route::get('/support', [PageController::class, 'support'])->name('pages.support');
+// Public FAQ page — admin-curated Q&A, guests + hosts as two sections on one page.
+Route::get('/faqs', [PageController::class, 'faq'])->name('pages.faq');
 
 // Per-place iCal export — polled anonymously by Airbnb/Gathern/Google after
 // the host pastes the URL there. The secret {token} is the whole credential;
@@ -190,6 +193,9 @@ Route::middleware(['auth:api', 'admin'])
         // Places + settings
         Route::resource('places', PlacesController::class)->except(['create', 'store']);
         Route::resource('settings', SettingsController::class)->except(['show', 'create']);
+
+        // FAQs — admin-curated Q&A shown on the public /faq page.
+        Route::resource('faqs', FaqsController::class)->except(['show']);
 
         // Users — list + edit. Self-registration handles creation; deletion is
         // intentionally not exposed here.

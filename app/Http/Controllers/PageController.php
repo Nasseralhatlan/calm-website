@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Services\Content\FaqService;
 use App\Services\Place\SettingService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
@@ -42,6 +43,16 @@ class PageController extends Controller
             'supportPhone' => $values['support_phone'] ?? null,
             'supportEmail' => $values['support_email'] ?? null,
         ]);
+    }
+
+    /**
+     * Public FAQ page (legal chrome, WebView-friendly). Both audiences on one
+     * page as two static sections — guests first, hosts below (anchors
+     * #guest / #host for deep links).
+     */
+    public function faq(FaqService $faqs): View
+    {
+        return view('pages.faq', ['faqs' => $faqs->grouped()]);
     }
 
     public function about(): View
