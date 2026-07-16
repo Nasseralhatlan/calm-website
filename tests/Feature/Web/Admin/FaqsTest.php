@@ -71,27 +71,17 @@ it('is admin-only', function (): void {
 
 // ─── public /faq page ────────────────────────────────────────────────────────
 
-it('shows only the selected audience on the public page, in sort order', function (): void {
+it('shows both audiences as two sections on one public page, each in sort order', function (): void {
+    auth('api')->logout(); // page must be public
+
     Faq::query()->create(faqPayload(['question_ar' => 'الثاني للضيوف', 'sort_order' => 5]));
     Faq::query()->create(faqPayload(['question_ar' => 'الأول للضيوف', 'sort_order' => 1]));
-    Faq::query()->create(faqPayload(['audience' => 'host', 'question_ar' => 'سؤال للمضيفين فقط']));
+    Faq::query()->create(faqPayload(['audience' => 'host', 'question_ar' => 'سؤال للمضيفين']));
 
+    // Guests section first (with its FAQs ordered), hosts section below.
     $this->get('/faq')
         ->assertOk()
-        ->assertSeeInOrder(['الأول للضيوف', 'الثاني للضيوف'], escape: false)
-        ->assertDontSee('سؤال للمضيفين فقط', escape: false);
-
-    $this->get('/faq?audience=host')
-        ->assertOk()
-        ->assertSee('سؤال للمضيفين فقط', escape: false)
-        ->assertDontSee('الأول للضيوف', escape: false);
-});
-
-it('falls back to the guest tab on an unknown audience and is public', function (): void {
-    auth('api')->logout();
-    Faq::query()->create(faqPayload(['question_ar' => 'سؤال عام']));
-
-    $this->get('/faq?audience=whatever')
-        ->assertOk()
-        ->assertSee('سؤال عام', escape: false);
+        ->assertSeeInOrder(['الأول للضيوف', 'الثاني للضيوف', 'سؤال للمضيفين'], escape: false)
+        ->assertSee('id="guest"', escape: false)
+        ->assertSee('id="host"', escape: false);
 });

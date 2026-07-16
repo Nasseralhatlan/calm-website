@@ -4,11 +4,9 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
-use App\Enums\FaqAudience;
 use App\Services\Content\FaqService;
 use App\Services\Place\SettingService;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 /**
@@ -48,18 +46,13 @@ class PageController extends Controller
     }
 
     /**
-     * Public FAQ page (legal chrome, WebView-friendly). One tab per audience;
-     * ?audience=guest|host picks the active tab (guest by default) so the app
-     * can deep-link hosts straight to their questions.
+     * Public FAQ page (legal chrome, WebView-friendly). Both audiences on one
+     * page as two static sections — guests first, hosts below (anchors
+     * #guest / #host for deep links).
      */
-    public function faq(Request $request, FaqService $faqs): View
+    public function faq(FaqService $faqs): View
     {
-        $audience = FaqAudience::tryFrom((string) $request->query('audience')) ?? FaqAudience::Guest;
-
-        return view('pages.faq', [
-            'audience' => $audience,
-            'faqs' => $faqs->forAudience($audience),
-        ]);
+        return view('pages.faq', ['faqs' => $faqs->grouped()]);
     }
 
     public function about(): View

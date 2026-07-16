@@ -29,7 +29,7 @@
             <div class="flex items-center" style="gap: 10px; margin-bottom: 14px;">
                 <h2 class="text-[16px] font-bold text-[#222] {{ $isRtl ? 'font-arabic' : '' }}">{{ $section['label'] }}</h2>
                 <span class="text-[12px] text-[#717171] tabular-nums">· {{ $section['items']->count() }}</span>
-                <a href="{{ route('pages.faq', ['audience' => $key]) }}" target="_blank" rel="noopener"
+                <a href="{{ route('pages.faq') }}#{{ $key }}" target="_blank" rel="noopener"
                    class="text-[12px] text-[#717171] hover:text-[#222]" style="margin-inline-start: auto;">
                     {{ $isRtl ? 'معاينة ↗' : 'Preview ↗' }}
                 </a>

@@ -52,7 +52,7 @@ Route::get('/cancellation-policy', [PageController::class, 'cancellation'])->nam
 Route::get('/community-standards', [PageController::class, 'community'])->name('pages.community');
 // Public support page — contact details rendered from admin settings.
 Route::get('/support', [PageController::class, 'support'])->name('pages.support');
-// Public FAQ page — admin-curated Q&A, one tab per audience (?audience=guest|host).
+// Public FAQ page — admin-curated Q&A, guests + hosts as two sections on one page.
 Route::get('/faq', [PageController::class, 'faq'])->name('pages.faq');
 
 // Per-place iCal export — polled anonymously by Airbnb/Gathern/Google after
