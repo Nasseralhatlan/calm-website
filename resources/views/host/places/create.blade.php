@@ -1543,15 +1543,27 @@ function registerWizard() {
 
             if (!window.imageCompression) return work;
             try {
+                // Safari cannot encode WebP in canvas — asking for it there
+                // silently yields PNG, which ignores the quality knob, so the
+                // size cap can never engage (we shipped 1.3 MB "webp" PNGs).
+                // Feature-detect once and fall back to JPEG, which every
+                // browser encodes with real quality control.
+                if (this._webpOk === undefined) {
+                    this._webpOk = document.createElement('canvas').toDataURL('image/webp').startsWith('data:image/webp');
+                }
+                const wantType = this._webpOk ? 'image/webp' : 'image/jpeg';
                 const out = await window.imageCompression(work, {
-                    maxSizeMB: 0.3,           // ~300 KB cap — web-optimized, keeps photos sharp
+                    maxSizeMB: 0.35,          // ~350 KB cap — web-optimized, keeps photos sharp
                     maxWidthOrHeight: 2048,   // plenty for full-screen on real devices
-                    initialQuality: 0.82,     // crisp WebP; the lib only drops further if over the cap
-                    fileType: 'image/webp',
+                    initialQuality: 0.82,     // crisp; the lib only drops further if over the cap
+                    fileType: wantType,
                     useWebWorker: true,       // off the main thread → UI stays responsive
                 });
-                const webp = new File([out], work.name.replace(/\.[^.]+$/, '') + '.webp', { type: 'image/webp' });
-                return webp.size < work.size ? webp : work; // never end up bigger
+                // Trust the ACTUAL output type, never the requested one — if the
+                // encoder fell back anyway, name + mime must match the bytes.
+                const ext = { 'image/webp': '.webp', 'image/jpeg': '.jpg', 'image/png': '.png' }[out.type] || '.jpg';
+                const compressed = new File([out], work.name.replace(/\.[^.]+$/, '') + ext, { type: out.type });
+                return compressed.size < work.size ? compressed : work; // never end up bigger
             } catch (e) {
                 console.warn('[upload] compression failed, using', work === file ? 'original' : 'converted', e);
                 return work; // a converted HEIC is at least a displayable JPEG
