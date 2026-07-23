@@ -17,6 +17,7 @@ use App\Models\PlaceType;
 use App\Models\User;
 use App\Services\Notification\NotificationService;
 use App\Services\Notification\OwnerNotifier;
+use App\Services\User\UserService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
@@ -27,6 +28,7 @@ final class PlaceService
     public function __construct(
         private readonly NotificationService $notifications,
         private readonly OwnerNotifier $owner,
+        private readonly UserService $users,
     ) {}
 
     public function paginate(?int $perPage = null, ?string $search = null, ?string $cityId = null): LengthAwarePaginator
@@ -485,10 +487,26 @@ final class PlaceService
      * @param  array<string, mixed>  $photos
      * @param  list<string>  $lists
      */
-    public function updateByAdmin(Place $place, array $data, array $attributes, array $photos, array $lists): Place
+    public function updateByAdmin(Place $place, array $data, array $attributes, array $photos, array $lists, ?string $hostPhone = null): Place
     {
-        return DB::transaction(function () use ($place, $data, $attributes, $photos, $lists): Place {
+        // Reassign to a (possibly new) owner by phone — same resolve rules as
+        // the admin create flow (existing user, else a shell account). Only an
+        // actual owner CHANGE triggers the transfer + notification below.
+        $newHost = null;
+        if ($hostPhone !== null && trim($hostPhone) !== '') {
+            $candidate = $this->users->findOrCreateByPhone(trim($hostPhone));
+            if ($candidate->id !== $place->host_user_id) {
+                $newHost = $candidate;
+            }
+        }
+
+        $place = DB::transaction(function () use ($place, $data, $attributes, $photos, $lists, $newHost): Place {
             $units = self::pullUnits($data);
+
+            if ($newHost !== null) {
+                $data['host_user_id'] = $newHost->id;
+            }
+
             $place->update(self::dayPricesToZero($data));
             $this->syncUnits($place, $units);
 
@@ -505,6 +523,14 @@ final class PlaceService
 
             return $place->refresh();
         });
+
+        // The new owner hears about "their" listing exactly like a first
+        // submission (SMS + push + in-app), fired after commit.
+        if ($newHost !== null) {
+            $this->notifications->placeSubmitted($place);
+        }
+
+        return $place;
     }
 
     /**

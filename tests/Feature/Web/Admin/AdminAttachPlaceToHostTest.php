@@ -8,6 +8,7 @@ use App\Models\CityArea;
 use App\Models\Place;
 use App\Models\PlaceType;
 use App\Models\User;
+use App\Models\UserNotification;
 
 beforeEach(function (): void {
     $this->seed();
@@ -134,4 +135,108 @@ it('attaches an admin draft auto-save to the resolved host from the first save',
     $draft = Place::query()->latest('created_at')->first();
     expect($draft->host_user_id)->toBe($newHost->id);
     expect($draft->review_status)->toBe(PlaceReviewStatus::Draft);
+});
+
+// ─── owner reassignment via admin EDIT ───────────────────────────────────────
+
+/**
+ * Minimal valid admin-edit payload (details-only: no photo fields, so the
+ * 5-image minimum guard stays out of the way).
+ *
+ * @return array<string, mixed>
+ */
+function adminEditPayload(Place $place, array $overrides = []): array
+{
+    return array_merge([
+        'title_ar' => $place->title_ar ?: 'مكان',
+        'place_type_id' => $place->place_type_id,
+        'city_area_id' => $place->city_area_id,
+        'price' => 500,
+        'check_in_time' => '15:00',
+        'check_out_time' => '12:00',
+        'max_guests' => 4,
+        'location_url' => 'https://maps.google.com/?q=24.7,46.6',
+        'status' => 'inactive',
+        'review_status' => 'pending_review',
+    ], $overrides);
+}
+
+function adminOwnedPlace(User $owner): Place
+{
+    return Place::query()->create([
+        'host_user_id' => $owner->id,
+        'place_type_id' => PlaceType::query()->first()->id,
+        'city_area_id' => CityArea::query()->first()->id,
+        'title' => 'Reassign me',
+        'title_ar' => 'مكان للنقل',
+        'description' => 'x',
+        'price' => 500,
+        'check_in_time' => '15:00',
+        'check_out_time' => '12:00',
+        'max_guests' => 4,
+        'status' => 'inactive',
+        'review_status' => 'pending_review',
+    ]);
+}
+
+it('reassigns the place to a new owner phone on admin edit and notifies them like a first submission', function (): void {
+    $admin = User::factory()->create(['role' => UserRole::Admin->value, 'phone' => '599888001']);
+    $newOwner = User::factory()->create(['phone' => '512345900']);
+    $place = adminOwnedPlace($admin);
+
+    $this->actingAs($admin, 'api')
+        ->put(route('admin.places.update', $place), adminEditPayload($place, ['host_phone' => '512345900']))
+        ->assertRedirect();
+
+    expect($place->refresh()->host_user_id)->toBe($newOwner->id)
+        // The new owner hears about it exactly like a first submission.
+        ->and(UserNotification::query()
+            ->where('user_id', $newOwner->id)
+            ->where('type', 'place_submitted')
+            ->count())->toBe(1);
+});
+
+it('keeps the owner and stays silent when the phone is unchanged on edit', function (): void {
+    $admin = User::factory()->create(['role' => UserRole::Admin->value, 'phone' => '599888002']);
+    $owner = User::factory()->create(['phone' => '512345901']);
+    $place = adminOwnedPlace($owner);
+
+    $this->actingAs($admin, 'api')
+        ->put(route('admin.places.update', $place), adminEditPayload($place, ['host_phone' => '512345901']))
+        ->assertRedirect();
+
+    expect($place->refresh()->host_user_id)->toBe($owner->id)
+        ->and(UserNotification::query()
+            ->where('user_id', $owner->id)
+            ->where('type', 'place_submitted')
+            ->count())->toBe(0);
+});
+
+it('creates a shell account when the edit phone is unknown and transfers to it', function (): void {
+    $admin = User::factory()->create(['role' => UserRole::Admin->value, 'phone' => '599888003']);
+    $place = adminOwnedPlace($admin);
+
+    $this->actingAs($admin, 'api')
+        ->put(route('admin.places.update', $place), adminEditPayload($place, ['host_phone' => '512345902']))
+        ->assertRedirect();
+
+    $shell = User::query()->where('phone', '512345902')->first();
+    expect($shell)->not->toBeNull()
+        ->and($place->refresh()->host_user_id)->toBe($shell->id)
+        ->and(UserNotification::query()
+            ->where('user_id', $shell->id)
+            ->where('type', 'place_submitted')
+            ->count())->toBe(1);
+});
+
+it('leaves the owner untouched when host_phone is blank on edit', function (): void {
+    $admin = User::factory()->create(['role' => UserRole::Admin->value, 'phone' => '599888004']);
+    $owner = User::factory()->create(['phone' => '512345903']);
+    $place = adminOwnedPlace($owner);
+
+    $this->actingAs($admin, 'api')
+        ->put(route('admin.places.update', $place), adminEditPayload($place, ['host_phone' => '']))
+        ->assertRedirect();
+
+    expect($place->refresh()->host_user_id)->toBe($owner->id);
 });

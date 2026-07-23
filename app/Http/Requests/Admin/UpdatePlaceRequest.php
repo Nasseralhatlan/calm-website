@@ -40,6 +40,9 @@ class UpdatePlaceRequest extends FormRequest
     public function rules(): array
     {
         $rules = [
+            // Reassign the place to this owner's phone (existing user or a
+            // shell account, same as the create flow). Blank = keep owner.
+            'host_phone' => ['nullable', 'string', 'regex:/^5\d{8}$/'],
             'title_ar' => ['nullable', 'required_without:title_en', 'string', 'max:255'],
             'title_en' => ['nullable', 'required_without:title_ar', 'string', 'max:255'],
             'description_ar' => ['nullable', 'string', 'max:10000'],
@@ -131,7 +134,7 @@ class UpdatePlaceRequest extends FormRequest
     public function placeData(): array
     {
         $data = collect($this->validated())
-            ->except(['attributes', 'attribute_image_paths', 'extra_image_paths', 'featured', 'lists'])
+            ->except(['host_phone', 'attributes', 'attribute_image_paths', 'extra_image_paths', 'featured', 'lists'])
             ->toArray();
 
         return $this->withCanonicalContent($data);

@@ -90,6 +90,8 @@
         'check_out_time' => $draft->check_out_time,
         'checkout_next_day' => (bool) $draft->checkout_next_day,
         'max_guests' => $draft->max_guests,
+        // Current owner's phone — prefills the admin's owner field on edit.
+        'host_phone' => $draft->host?->phone,
         // Identical units for the repeater (empty = classic single-unit).
         'units' => $draft->units->map(fn ($u) => ['id' => $u->id, 'name' => $u->name])->values(),
         'rules_ar' => $draft->rules_ar ?? $draft->rules,
@@ -249,11 +251,11 @@
                      submit; the same Alpine field is also sent on every draft
                      auto-save (see saveDraft() payload). Non-admins never see
                      the input AND the server-side rule ignores any post anyway. --}}
-                @if(auth()->user()?->isAdmin() && ! $editing)
+                @if(auth()->user()?->isAdmin())
                     <div class="r-ios-lg bg-amber-50 border border-amber-200 {{ $fa }}"
                          style="padding: 18px 20px; margin-bottom: 24px;">
                         <label class="block text-[13px] font-bold text-[#222]" style="margin-bottom: 6px;">
-                            {{ $isRtl ? 'إضافة لرقم المضيف' : 'Attach to host phone' }}
+                            {{ $isRtl ? 'رقم جوال المضيف (المالك)' : 'Owner (host) phone' }}
                         </label>
                         <input type="tel" name="host_phone" x-model="hostPhone"
                                placeholder="5XXXXXXXX" dir="ltr" maxlength="9"
@@ -261,9 +263,15 @@
                                class="w-full bg-white border border-[#ebebeb] focus:border-[#222] text-[15px] tabular-nums focus:outline-none"
                                style="padding: 11px 14px; border-radius: 12px;">
                         <p class="text-[12px] text-[#717171] {{ $fa }}" style="margin-top: 6px;">
-                            {{ $isRtl
-                                ? '٩ أرقام تبدأ بـ 5. إن لم يكن المستخدم موجوداً يُنشأ تلقائياً.'
-                                : '9-digit national format (5XXXXXXXX). If no user has this phone, a shell account is created automatically.' }}
+                            @if($editing)
+                                {{ $isRtl
+                                    ? 'تغيير الرقم ينقل المكان إلى هذا المضيف ويصله إشعار المراجعة كما في أول تقديم. إن لم يكن المستخدم موجوداً يُنشأ تلقائياً.'
+                                    : 'Changing the number transfers the place to that host and sends them the review notice like a first submission. Unknown numbers create a shell account.' }}
+                            @else
+                                {{ $isRtl
+                                    ? '٩ أرقام تبدأ بـ 5. إن لم يكن المستخدم موجوداً يُنشأ تلقائياً.'
+                                    : '9-digit national format (5XXXXXXXX). If no user has this phone, a shell account is created automatically.' }}
+                            @endif
                         </p>
                     </div>
                 @endif
@@ -1146,6 +1154,7 @@ function registerWizard() {
                 this.checkOutTime = init.draft.check_out_time || '12:00';
                 this.checkoutNextDay = init.draft.checkout_next_day ?? true;
                 this.maxGuests    = init.draft.max_guests || 1;
+                this.hostPhone    = init.draft.host_phone || '';
                 this.units        = (init.draft.units || []).map((u) => ({ id: u.id, name: u.name }));
                 this.rulesAr      = init.draft.rules_ar || '';
                 this.rulesEn      = init.draft.rules_en || '';
