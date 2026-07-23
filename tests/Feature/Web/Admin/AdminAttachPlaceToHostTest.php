@@ -105,17 +105,24 @@ it('attaches the place to the admin themselves when host_phone is omitted', func
     expect($place->host_user_id)->toBe($admin->id);
 });
 
-it('rejects an admin submit with a malformed host_phone', function (): void {
+it('accepts human phone formats on submit and rejects genuinely invalid ones', function (): void {
     $admin = User::factory()->create(['role' => UserRole::Admin->value, 'phone' => '599888777']);
 
-    // Leading 0 → invalid.
+    // Leading 0 normalizes to the national form and attaches correctly.
     $this->actingAs($admin, 'api')
         ->post('/host-register', placeSubmitPayload(['host_phone' => '0501203845']))
-        ->assertSessionHasErrors('host_phone');
+        ->assertSessionDoesntHaveErrors('host_phone');
+    expect(User::query()->where('phone', '501203845')->exists())->toBeTrue();
 
-    // International prefix → invalid.
+    // International prefix normalizes too.
     $this->actingAs($admin, 'api')
-        ->post('/host-register', placeSubmitPayload(['host_phone' => '+966501203845']))
+        ->post('/host-register', placeSubmitPayload(['host_phone' => '+966501203846', 'title' => 'Intl format']))
+        ->assertSessionDoesntHaveErrors('host_phone');
+    expect(User::query()->where('phone', '501203846')->exists())->toBeTrue();
+
+    // Not a Saudi mobile at all → still rejected on the field.
+    $this->actingAs($admin, 'api')
+        ->post('/host-register', placeSubmitPayload(['host_phone' => '412034859', 'title' => 'Bad phone']))
         ->assertSessionHasErrors('host_phone');
 });
 
@@ -239,4 +246,33 @@ it('leaves the owner untouched when host_phone is blank on edit', function (): v
         ->assertRedirect();
 
     expect($place->refresh()->host_user_id)->toBe($owner->id);
+});
+
+it('normalizes human phone formats before reassigning on edit', function (): void {
+    $admin = User::factory()->create(['role' => UserRole::Admin->value, 'phone' => '599888005']);
+    $ownerA = User::factory()->create(['phone' => '512345904']);
+    $ownerB = User::factory()->create(['phone' => '512345905']);
+
+    // Leading zero (the way everyone types it).
+    $placeA = adminOwnedPlace($admin);
+    $this->actingAs($admin, 'api')
+        ->put(route('admin.places.update', $placeA), adminEditPayload($placeA, ['host_phone' => '0512345904']))
+        ->assertRedirect()
+        ->assertSessionDoesntHaveErrors('host_phone');
+    expect($placeA->refresh()->host_user_id)->toBe($ownerA->id);
+
+    // Full international paste with spaces.
+    $placeB = adminOwnedPlace($admin);
+    $this->actingAs($admin, 'api')
+        ->put(route('admin.places.update', $placeB), adminEditPayload($placeB, ['host_phone' => '+966 51 234 5905']))
+        ->assertRedirect()
+        ->assertSessionDoesntHaveErrors('host_phone');
+    expect($placeB->refresh()->host_user_id)->toBe($ownerB->id);
+
+    // Genuinely wrong numbers still fail loudly on the field.
+    $placeC = adminOwnedPlace($admin);
+    $this->actingAs($admin, 'api')
+        ->put(route('admin.places.update', $placeC), adminEditPayload($placeC, ['host_phone' => '412345906']))
+        ->assertSessionHasErrors('host_phone');
+    expect($placeC->refresh()->host_user_id)->toBe($admin->id);
 });

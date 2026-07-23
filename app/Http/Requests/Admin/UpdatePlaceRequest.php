@@ -7,6 +7,7 @@ namespace App\Http\Requests\Admin;
 use App\Enums\PlaceReviewStatus;
 use App\Enums\PlaceStatus;
 use App\Http\Requests\Concerns\DerivesCanonicalContent;
+use App\Http\Requests\Concerns\NormalizesHostPhone;
 use App\Http\Requests\Concerns\ValidatesAmenityPhotoRules;
 use App\Models\Place;
 use Illuminate\Foundation\Http\FormRequest;
@@ -16,6 +17,7 @@ use Illuminate\Validation\Validator;
 class UpdatePlaceRequest extends FormRequest
 {
     use DerivesCanonicalContent;
+    use NormalizesHostPhone;
     use ValidatesAmenityPhotoRules;
 
     public function authorize(): bool
@@ -32,6 +34,8 @@ class UpdatePlaceRequest extends FormRequest
         if (! $this->has('lists')) {
             $this->merge(['lists' => []]);
         }
+
+        $this->normalizeHostPhone();
     }
 
     /**
