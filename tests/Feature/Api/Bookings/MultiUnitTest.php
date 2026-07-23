@@ -183,6 +183,28 @@ it('a host manual block closes the place even with free units', function (): voi
     expect($dates)->toContain($day);
 });
 
+it('carries the unit on the host dashboard highlights and calendar-day endpoints', function (): void {
+    $place = multiUnitPlace(2);
+    $unit = $place->units()->first();
+    // Arriving within the highlights window (next 7 days) and covering a
+    // fixed calendar day, so both endpoints pick it up.
+    unitBooking($place, [
+        'place_unit_id' => $unit->id,
+        'start_date' => now()->addDays(2)->toDateString(),
+        'end_date' => now()->addDays(4)->toDateString(),
+    ]);
+
+    $this->actingAs($place->host, 'api')
+        ->getJson('/api/host/bookings/highlights')
+        ->assertOk()
+        ->assertJsonPath('data.upcoming.0.unit.name', $unit->name);
+
+    $this->actingAs($place->host, 'api')
+        ->getJson('/api/host/calendar/day?date='.now()->addDays(3)->toDateString())
+        ->assertOk()
+        ->assertJsonPath('data.bookings.0.unit.name', $unit->name);
+});
+
 it('exposes the assigned unit to the host bookings list but not the guest list', function (): void {
     $place = multiUnitPlace(2);
     $unit = $place->units()->first();

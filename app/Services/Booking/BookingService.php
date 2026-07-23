@@ -491,7 +491,7 @@ final class BookingService
             ->where('host_user_id', $host->id)
             ->where('booking_status', BookingStatus::Confirmed->value)
             ->whereDate('start_date', '<=', $upcomingUntil->toDateString())
-            ->with(['place', 'place.coverPhoto', 'place.cityArea.city', 'place.type', 'guest'])
+            ->with(['place', 'place.coverPhoto', 'place.cityArea.city', 'place.type', 'guest', 'unit'])
             ->orderBy('start_date')
             ->get();
 

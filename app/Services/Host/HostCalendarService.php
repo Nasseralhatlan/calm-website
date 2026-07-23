@@ -34,7 +34,7 @@ final class HostCalendarService
     ];
 
     /** Eager-loads BookingResource needs on the host side. */
-    private const BOOKING_WITH = ['place', 'place.coverPhoto', 'place.cityArea.city', 'place.type', 'guest'];
+    private const BOOKING_WITH = ['place', 'place.coverPhoto', 'place.cityArea.city', 'place.type', 'guest', 'unit'];
 
     /**
      * Per-day summary across a date window for the scrollable calendar. Sparse —
