@@ -201,6 +201,9 @@ final class PlaceService
 
     private function upsertPlace(User $host, array $data, ?string $draftId, PlaceReviewStatus $reviewStatus): Place
     {
+        // `units` rides inside $data (same pattern as admin `lists`) — pull it
+        // out before the column update, sync after the row exists.
+        $units = self::pullUnits($data);
         $existing = null;
         if ($draftId !== null) {
             // Allow resuming Drafts AND Rejected places — Rejected rows are
@@ -240,11 +243,74 @@ final class PlaceService
 
         if ($existing) {
             $existing->update($payload);
+            $this->syncUnits($existing, $units);
 
             return $existing->refresh();
         }
 
-        return Place::query()->create($payload);
+        $place = Place::query()->create($payload);
+        $this->syncUnits($place, $units);
+
+        return $place;
+    }
+
+    /**
+     * Detach `units` from a wizard payload: null when the field was absent
+     * (older clients — leave existing units untouched), the array otherwise
+     * (the full desired state, [] meaning "remove all units").
+     *
+     * @param  array<string, mixed>  $data
+     * @return list<array<string, mixed>>|null
+     */
+    private static function pullUnits(array &$data): ?array
+    {
+        if (! array_key_exists('units', $data)) {
+            return null;
+        }
+
+        $units = $data['units'];
+        unset($data['units']);
+
+        return is_array($units) ? array_values($units) : [];
+    }
+
+    /**
+     * Replace the place's identical-unit list with the submitted state.
+     * Rows keep their id across renames/reorders (so assigned bookings stay
+     * pinned); removed units are deleted — their bookings survive label-less
+     * (place_unit_id nullOnDelete).
+     *
+     * @param  list<array<string, mixed>>|null  $units
+     */
+    private function syncUnits(Place $place, ?array $units): void
+    {
+        if ($units === null) {
+            return;
+        }
+
+        $keep = [];
+        $position = 0;
+
+        foreach ($units as $unit) {
+            $name = trim((string) ($unit['name'] ?? ''));
+            if ($name === '') {
+                continue;
+            }
+
+            $id = isset($unit['id']) ? (string) $unit['id'] : null;
+            $existing = $id !== null ? $place->units()->whereKey($id)->first() : null;
+
+            if ($existing !== null) {
+                $existing->update(['name' => $name, 'sort_order' => $position]);
+                $keep[] = $existing->id;
+            } else {
+                $keep[] = $place->units()->create(['name' => $name, 'sort_order' => $position])->id;
+            }
+
+            $position++;
+        }
+
+        $place->units()->whereNotIn('id', $keep)->delete();
     }
 
     /**
@@ -396,8 +462,10 @@ final class PlaceService
     {
         $lists = $data['lists'] ?? null;
         unset($data['lists']);
+        $units = self::pullUnits($data);
 
         $place->update(self::dayPricesToZero($data));
+        $this->syncUnits($place, $units);
 
         if (is_array($lists)) {
             $this->syncLists($place, $lists);
@@ -420,7 +488,9 @@ final class PlaceService
     public function updateByAdmin(Place $place, array $data, array $attributes, array $photos, array $lists): Place
     {
         return DB::transaction(function () use ($place, $data, $attributes, $photos, $lists): Place {
+            $units = self::pullUnits($data);
             $place->update(self::dayPricesToZero($data));
+            $this->syncUnits($place, $units);
 
             // An edit carries the full desired state — empty amenities means
             // "remove them all" rather than "leave untouched".
@@ -478,6 +548,8 @@ final class PlaceService
     public function updateDetailsForHost(Place $place, array $data, array $attributes = [], array $photos = []): Place
     {
         $place = DB::transaction(function () use ($place, $data, $attributes, $photos): Place {
+            $units = self::pullUnits($data);
+
             // Same pin→URL derivation as create: coords without a pasted link
             // produce the canonical Google Maps link.
             if (! empty($data['latitude']) && ! empty($data['longitude']) && empty($data['location_url'])) {
@@ -490,6 +562,7 @@ final class PlaceService
                 'review_status' => PlaceReviewStatus::PendingReview->value,
                 'rejection_reason' => null,
             ]);
+            $this->syncUnits($place, $units);
 
             // An edit is the full desired state: an empty set means the host
             // removed every amenity, so wipe rather than no-op (syncAttributes
@@ -545,7 +618,7 @@ final class PlaceService
      */
     public function editableForHost(Place $place): Place
     {
-        return $place->load(['attributeValues', 'photos.attribute:id,photo_rule', 'cityArea:id,city_id']);
+        return $place->load(['attributeValues', 'photos.attribute:id,photo_rule', 'cityArea:id,city_id', 'units']);
     }
 
     public function setReviewStatus(Place $place, PlaceReviewStatus $status): Place

@@ -99,8 +99,14 @@ final class BookingService
 
             $pricing = $quote['pricing'];
 
+            // Multi-unit places: hand the booking the first unit no overlapping
+            // active booking occupies (still under the place lock, so the last
+            // free unit can't be double-assigned). Null for classic places.
+            $unitId = $this->freeUnitId($locked, $quote['check_in'], $quote['check_out']);
+
             return Booking::query()->create([
                 'place_id' => $locked->id,
+                'place_unit_id' => $unitId,
                 'guest_user_id' => $user->id,
                 'host_user_id' => $locked->host_user_id,
                 'booking_status' => BookingStatus::PendingPayment->value,
@@ -167,6 +173,40 @@ final class BookingService
     }
 
     /**
+     * First unit (host order) not occupied by an overlapping active booking,
+     * or null for classic single-unit places. Same inclusive-day overlap
+     * convention as the availability capacity math. Caller must hold the
+     * place row lock. Legacy bookings with a null unit (created before the
+     * place became multi-unit) still count toward CAPACITY — they just don't
+     * pin a specific unit; the host maps those themselves.
+     */
+    private function freeUnitId(Place $place, string $checkIn, string $checkOut): ?string
+    {
+        $unitIds = $place->units()->pluck('id');
+
+        if ($unitIds->isEmpty()) {
+            return null;
+        }
+
+        $taken = $place->bookings()
+            ->activeHold()
+            ->whereNotNull('place_unit_id')
+            ->where('start_date', '<=', $checkOut)
+            ->where('end_date', '>=', $checkIn)
+            ->pluck('place_unit_id');
+
+        $free = $unitIds->diff($taken)->first();
+
+        // Capacity said the dates fit, so under the lock a unit must exist —
+        // this guard only fires on data drift (e.g. units removed mid-flight).
+        if ($free === null) {
+            abort(422, 'Those dates are no longer available.');
+        }
+
+        return (string) $free;
+    }
+
+    /**
      * Bookings this user made as a guest (their "My bookings" list), newest first.
      *
      * @return Collection<int, Booking>
@@ -191,7 +231,7 @@ final class BookingService
     {
         return Booking::query()
             ->where('host_user_id', $user->id)
-            ->with(['place', 'place.coverPhoto', 'guest'])
+            ->with(['place', 'place.coverPhoto', 'guest', 'unit'])
             ->latest()
             ->get();
     }
@@ -209,7 +249,7 @@ final class BookingService
         $term = $q !== null && trim($q) !== '' ? trim($q) : null;
 
         return Booking::query()
-            ->with(['place', 'place.coverPhoto', 'guest', 'host'])
+            ->with(['place', 'place.coverPhoto', 'guest', 'host', 'unit'])
             ->when($term, function ($query, string $term): void {
                 $phone = ltrim($term, '0'); // phones are stored without the leading 0
                 $query->where(function ($w) use ($term, $phone): void {
@@ -397,7 +437,7 @@ final class BookingService
         return Booking::query()
             ->where('host_user_id', $host->id)
             ->when($q !== null && $q !== '', fn ($query) => $this->applyHostBookingSearch($query, $q))
-            ->with(['place', 'place.coverPhoto', 'place.cityArea.city', 'place.type', 'guest'])
+            ->with(['place', 'place.coverPhoto', 'place.cityArea.city', 'place.type', 'guest', 'unit'])
             ->latest()
             ->paginate($perPage ?? config('pagination.per_page'))
             ->withQueryString();

@@ -90,6 +90,8 @@
         'check_out_time' => $draft->check_out_time,
         'checkout_next_day' => (bool) $draft->checkout_next_day,
         'max_guests' => $draft->max_guests,
+        // Identical units for the repeater (empty = classic single-unit).
+        'units' => $draft->units->map(fn ($u) => ['id' => $u->id, 'name' => $u->name])->values(),
         'rules_ar' => $draft->rules_ar ?? $draft->rules,
         'rules_en' => $draft->rules_en,
         'location_url' => $draft->location_url,
@@ -350,6 +352,29 @@
                             {{ $isRtl ? 'كم شخصاً يمكن أن يقيم في مكانك بشكل مريح؟' : 'How many guests can comfortably stay?' }}
                         </p>
                     </label>
+
+                    {{-- Identical units (optional): capacity = row count; a booking
+                         auto-lands in a free unit so the host knows which one. --}}
+                    <div class="mt-8">
+                        <span class="text-sm font-semibold text-[#222] {{ $fa }}">{{ $isRtl ? 'وحدات متطابقة (اختياري)' : 'Identical units (optional)' }}</span>
+                        <p class="mt-1 text-[12px] text-[#717171] {{ $fa }}">
+                            {{ $isRtl ? 'إذا كان لديك أكثر من وحدة بنفس المواصفات، أضف اسماً لكل وحدة — يظهر الإعلان مرة واحدة ولا يُحجز اليوم بالكامل إلا بعد امتلاء كل الوحدات، ويصلك كل حجز باسم الوحدة.' : 'If you have multiple units with the same spec, name each one — the listing shows once, a day only closes when all units are booked, and each booking arrives labeled with its unit.' }}
+                        </p>
+                        <template x-for="(u, idx) in units" :key="idx">
+                            <div class="mt-3 flex items-center" style="gap: 10px;">
+                                <input type="text" x-model="u.name" maxlength="100"
+                                       :placeholder="'{{ $isRtl ? 'اسم الوحدة، مثال: وحدة' : 'Unit name, e.g. Unit' }} ' + (idx + 1)"
+                                       class="flex-1 border border-[#dddddd] focus:border-[#222] transition-all bg-white shadow-card r-ios-lg outline-none text-[15px] text-[#222] {{ $fa }}"
+                                       style="padding: 13px 16px;">
+                                <button type="button" @click="units.splice(idx, 1)"
+                                        class="text-[#bbb] hover:text-[#dc2626] text-[18px] leading-none shrink-0" title="{{ $isRtl ? 'حذف الوحدة' : 'Remove unit' }}">✕</button>
+                            </div>
+                        </template>
+                        <button type="button" @click="units.push({ id: null, name: '' })"
+                                class="mt-3 text-[14px] font-semibold text-[#222] hover:underline {{ $fa }}">
+                            {{ $isRtl ? '+ إضافة وحدة' : '+ Add unit' }}
+                        </button>
+                    </div>
                 </section>
 
                 {{-- ── Step 3: city ── --}}
@@ -1066,6 +1091,8 @@ function registerWizard() {
         // Default to 1 — UI starts at the minimum so the +/− stepper has
         // something sensible to mutate. Required at final submit.
         maxGuests: 1,
+        // Identical units ({id, name}) — empty = classic single-unit place.
+        units: [],
         // Pre-filled default rules (both languages) for a new place; overridden
         // by saved rules on draft-resume / edit (see init.draft below).
         rulesAr: @js($defaultRulesAr),
@@ -1109,6 +1136,7 @@ function registerWizard() {
                 this.checkOutTime = init.draft.check_out_time || '12:00';
                 this.checkoutNextDay = init.draft.checkout_next_day ?? true;
                 this.maxGuests    = init.draft.max_guests || 1;
+                this.units        = (init.draft.units || []).map((u) => ({ id: u.id, name: u.name }));
                 this.rulesAr      = init.draft.rules_ar || '';
                 this.rulesEn      = init.draft.rules_en || '';
                 this.locationUrl  = init.draft.location_url || '';
@@ -1711,6 +1739,9 @@ function registerWizard() {
                 check_out_time: this.checkOutTime || '12:00',
                 checkout_next_day: this.checkoutNextDay,
                 max_guests: Number(this.maxGuests) || null,
+                units: this.units
+                    .filter((u) => (u.name || '').trim() !== '')
+                    .map((u) => ({ id: u.id || null, name: u.name.trim() })),
                 rules_ar: this.rulesAr || null,
                 rules_en: this.rulesEn || null,
                 location_url: this.locationUrl || null,

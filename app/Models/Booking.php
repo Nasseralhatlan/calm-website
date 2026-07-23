@@ -56,6 +56,7 @@ class Booking extends Model
 
     protected $fillable = [
         'place_id',
+        'place_unit_id',
         'guest_user_id',
         'host_user_id',
         'booking_status',
@@ -256,6 +257,12 @@ class Booking extends Model
     public function guest(): BelongsTo
     {
         return $this->belongsTo(User::class, 'guest_user_id');
+    }
+
+    /** The unit this booking occupies (multi-unit places; null otherwise). */
+    public function unit(): BelongsTo
+    {
+        return $this->belongsTo(PlaceUnit::class, 'place_unit_id');
     }
 
     public function host(): BelongsTo

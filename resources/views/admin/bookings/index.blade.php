@@ -104,7 +104,9 @@
                         </span>
 
                         <span class="flex-1 min-w-0">
-                            <span class="block font-bold text-[#222] text-[16px] truncate {{ $fa }}">{{ $b->place?->title ?? '—' }}</span>
+                            <span class="block font-bold text-[#222] text-[16px] truncate {{ $fa }}">
+                                {{ $b->place?->title ?? '—' }}@if($b->unit) <span class="text-[13px] font-semibold text-[#717171]">· {{ $b->unit->name }}</span>@endif
+                            </span>
                             <span class="inline-flex items-center font-bold tabular-nums" style="margin-top: 6px; background-color: #fff4f3; color: #F88379; padding: 3px 10px; border-radius: 8px; font-size: 12px; letter-spacing: 0.5px;" dir="ltr">{{ $b->reference }}</span>
                         </span>
 
