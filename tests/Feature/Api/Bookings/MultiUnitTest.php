@@ -205,6 +205,20 @@ it('carries the unit on the host dashboard highlights and calendar-day endpoints
         ->assertJsonPath('data.bookings.0.unit.name', $unit->name);
 });
 
+it('exposes units_count on the host listings so cards can badge multi-unit places', function (): void {
+    $multi = multiUnitPlace(4);
+    multiUnitPlace(0, ['host_user_id' => $multi->host_user_id, 'title' => 'Single-unit place']);
+
+    $items = $this->actingAs($multi->host, 'api')
+        ->getJson('/api/host/listings')
+        ->assertOk()
+        ->json('data.items');
+
+    $byTitle = collect($items)->keyBy('title');
+    expect($byTitle['Multi-unit place']['units_count'])->toBe(4)
+        ->and($byTitle['Single-unit place']['units_count'])->toBe(0);
+});
+
 it('exposes the assigned unit to the host bookings list but not the guest list', function (): void {
     $place = multiUnitPlace(2);
     $unit = $place->units()->first();

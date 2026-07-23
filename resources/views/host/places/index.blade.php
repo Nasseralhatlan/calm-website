@@ -96,6 +96,11 @@
                         <div style="padding-top: 12px;">
                             <h3 class="font-bold text-[#222] truncate {{ $start }} {{ $fa }}" style="font-size: 16px;">
                                 <span style="margin-inline-end: 6px;">{{ $place->type?->icon ?: '🏠' }}</span>{{ $place->title ?: ($isRtl ? '— بدون عنوان —' : '— Untitled —') }}
+                                @if(($place->units_count ?? 0) > 0)
+                                    <span class="inline-flex items-center font-bold text-white bg-[#222] tabular-nums {{ $fa }}" style="padding: 2px 10px; border-radius: 999px; font-size: 11px; vertical-align: 2px;">
+                                        {{ $isRtl ? $place->units_count.' وحدات' : $place->units_count.' units' }}
+                                    </span>
+                                @endif
                             </h3>
                             <p class="inline-flex items-center text-[14px] text-[#717171] truncate {{ $start }} {{ $fa }}" style="gap: 6px; margin-top: 3px;">
                                 <span>{{ $city?->avatar ?: '📍' }}</span>

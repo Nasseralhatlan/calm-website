@@ -111,6 +111,7 @@ final class PlaceService
         return Place::query()
             ->where('host_user_id', $host->id)
             ->with(['type', 'cityArea.city', 'coverPhoto'])
+            ->withCount('units')
             ->latest()
             ->paginate($perPage ?? config('pagination.per_page'))
             ->withQueryString();
@@ -629,7 +630,7 @@ final class PlaceService
             ->when($status === 'active', fn ($q) => $q->where('status', PlaceStatus::Active->value))
             ->when($status !== null && $status !== 'active', fn ($q) => $q->where('review_status', $status))
             ->with(['type', 'cityArea.city', 'coverPhoto'])
-            ->withCount(['likes', 'publishedReviews', 'bookings'])
+            ->withCount(['likes', 'publishedReviews', 'bookings', 'units'])
             ->withAvg('publishedReviews', 'rate')
             ->latest()
             ->get();
