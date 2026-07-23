@@ -43,10 +43,13 @@ class SendNotificationChannels implements ShouldQueue
 
     public function handle(SmsDeliveryContract $sms, PushDeliveryContract $push): void
     {
-        // SMS — phone always exists (it's the login identifier).
+        // SMS — phone always exists (it's the login identifier). Body ONLY:
+        // catalog bodies are self-contained sentences, and prepending the
+        // title just repeated the opening words while eating SMS length.
+        // Push/in-app keep the title — their UIs have a separate slot for it.
         if ($this->user->phone !== null && $this->user->phone !== '') {
             try {
-                $sms->send($this->user->phone, $this->title."\n".$this->body);
+                $sms->send($this->user->phone, $this->body);
             } catch (Throwable $e) {
                 Log::warning('[notify] SMS failed', ['user' => $this->user->id, 'error' => $e->getMessage()]);
             }
