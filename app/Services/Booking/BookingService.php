@@ -657,7 +657,7 @@ final class BookingService
 
         return $booking->load([
             'place', 'place.coverPhoto', 'place.type', 'place.cityArea.city',
-            'place.publishedReviews.guest', 'guest', 'host',
+            'place.publishedReviews.guest', 'guest', 'host', 'unit',
         ]);
     }
 
