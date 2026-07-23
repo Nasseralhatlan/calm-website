@@ -207,6 +207,15 @@ class Place extends Model
         return $this->hasMany(PlaceBlocking::class);
     }
 
+    /**
+     * Interchangeable units of a multi-unit listing, in host order. Empty =
+     * classic single-unit place. Capacity for availability = max(1, count).
+     */
+    public function units(): HasMany
+    {
+        return $this->hasMany(PlaceUnit::class)->orderBy('sort_order')->oldest('created_at');
+    }
+
     /** External iCal feeds (Airbnb/Gathern/…) imported into this place. */
     public function calendarFeeds(): HasMany
     {

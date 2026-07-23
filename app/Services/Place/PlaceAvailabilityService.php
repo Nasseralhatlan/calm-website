@@ -249,14 +249,26 @@ final class PlaceAvailabilityService
         }
 
         // Active bookings holding the calendar (confirmed + live pending holds).
+        // Multi-unit places (place_units rows) are capacity-counted: a day only
+        // blocks once EVERY unit is taken — N-1 overlapping bookings still
+        // leave it open. Classic places have capacity 1, i.e. the old rule.
+        $capacity = max(1, $place->units()->count());
+
         $bookings = $place->bookings()
             ->activeHold()
             ->where('start_date', '<=', $end->toDateString())
             ->where('end_date', '>=', $start->toDateString())
             ->get(['start_date', 'end_date']);
 
+        $counts = [];
         foreach ($bookings as $booking) {
-            $this->fillDays($set, $booking->start_date->toDateString(), $booking->end_date->toDateString(), $start, $end);
+            $this->countDays($counts, $booking->start_date->toDateString(), $booking->end_date->toDateString(), $start, $end);
+        }
+
+        foreach ($counts as $day => $held) {
+            if ($held >= $capacity) {
+                $set[$day] = true;
+            }
         }
 
         return $set;
@@ -282,6 +294,30 @@ final class PlaceAvailabilityService
 
         while ($cursor->lessThanOrEqualTo($clampEnd)) {
             $set[$cursor->toDateString()] = true;
+            $cursor = $cursor->addDay();
+        }
+    }
+
+    /**
+     * Same clamped walk as fillDays, but INCREMENTS a per-day counter instead
+     * of flagging — how many bookings hold each day (multi-unit capacity math).
+     *
+     * @param  array<string, int>  $counts
+     */
+    private function countDays(array &$counts, string $rangeStart, string $rangeEnd, CarbonImmutable $windowStart, CarbonImmutable $windowEnd): void
+    {
+        $cursor = CarbonImmutable::parse($rangeStart);
+        $clampEnd = CarbonImmutable::parse($rangeEnd);
+
+        if ($cursor->lessThan($windowStart)) {
+            $cursor = $windowStart;
+        }
+        if ($clampEnd->greaterThan($windowEnd)) {
+            $clampEnd = $windowEnd;
+        }
+
+        while ($cursor->lessThanOrEqualTo($clampEnd)) {
+            $counts[$cursor->toDateString()] = ($counts[$cursor->toDateString()] ?? 0) + 1;
             $cursor = $cursor->addDay();
         }
     }

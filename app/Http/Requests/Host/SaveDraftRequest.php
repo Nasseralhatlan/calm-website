@@ -62,6 +62,11 @@ class SaveDraftRequest extends FormRequest
             'attributes.*.value' => ['nullable', 'string', 'max:255'],
             'attributes.*.description' => ['nullable', 'string', 'max:1000'],
 
+            // Identical units ("وحدة ١"…): optional, full desired state.
+            'units' => ['nullable', 'array'],
+            'units.*.id' => ['nullable', 'uuid'],
+            'units.*.name' => ['required', 'string', 'max:100'],
+
             // Photos — uploaded paths already on S3 (via presigned PUT).
             'attribute_image_paths' => ['nullable', 'array'],
             // Cap each section at 10 even for drafts (the min-5 total is only

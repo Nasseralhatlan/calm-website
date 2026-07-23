@@ -36,7 +36,7 @@ class BookingsController extends Controller
     public function show(Booking $booking): View
     {
         $booking->load([
-            'place.coverPhoto', 'place.cityArea.city', 'place.type', 'place.publishedReviews.guest', 'guest', 'host',
+            'place.coverPhoto', 'place.cityArea.city', 'place.type', 'place.publishedReviews.guest', 'guest', 'host', 'unit',
             // The booking-centric finance panel: documents + money trail.
             'financialDocuments', 'financialMovements',
         ]);

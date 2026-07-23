@@ -106,7 +106,14 @@
             @endif
         </span>
         <div class="flex-1 min-w-0">
-            <span class="block font-bold text-[#222] text-[17px] truncate {{ $fa }}">{{ $place?->title ?: '—' }}</span>
+            <span class="block font-bold text-[#222] text-[17px] truncate {{ $fa }}">
+                {{ $place?->title ?: '—' }}
+                {{-- Which identical unit the booking landed in — host/admin
+                     operational info; guests book the place, not a unit. --}}
+                @if(! $isGuest && $booking->unit)
+                    <span class="inline-flex items-center font-bold text-white bg-[#222] {{ $fa }}" style="padding: 2px 12px; border-radius: 999px; font-size: 12px; vertical-align: 2px;">{{ $booking->unit->name }}</span>
+                @endif
+            </span>
             <span class="block text-[13px] text-[#717171] {{ $fa }}" style="margin-top: 2px;">
                 {{ $isRtl ? $place?->type?->name_ar : $place?->type?->name_en }}
                 @if($city) · {{ $isRtl ? $city->name_ar : $city->name_en }} @endif

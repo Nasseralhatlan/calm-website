@@ -17,6 +17,7 @@ use App\Models\PlaceType;
 use App\Models\User;
 use App\Services\Notification\NotificationService;
 use App\Services\Notification\OwnerNotifier;
+use App\Services\User\UserService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
@@ -27,6 +28,7 @@ final class PlaceService
     public function __construct(
         private readonly NotificationService $notifications,
         private readonly OwnerNotifier $owner,
+        private readonly UserService $users,
     ) {}
 
     public function paginate(?int $perPage = null, ?string $search = null, ?string $cityId = null): LengthAwarePaginator
@@ -109,6 +111,7 @@ final class PlaceService
         return Place::query()
             ->where('host_user_id', $host->id)
             ->with(['type', 'cityArea.city', 'coverPhoto'])
+            ->withCount('units')
             ->latest()
             ->paginate($perPage ?? config('pagination.per_page'))
             ->withQueryString();
@@ -201,6 +204,9 @@ final class PlaceService
 
     private function upsertPlace(User $host, array $data, ?string $draftId, PlaceReviewStatus $reviewStatus): Place
     {
+        // `units` rides inside $data (same pattern as admin `lists`) — pull it
+        // out before the column update, sync after the row exists.
+        $units = self::pullUnits($data);
         $existing = null;
         if ($draftId !== null) {
             // Allow resuming Drafts AND Rejected places — Rejected rows are
@@ -240,11 +246,74 @@ final class PlaceService
 
         if ($existing) {
             $existing->update($payload);
+            $this->syncUnits($existing, $units);
 
             return $existing->refresh();
         }
 
-        return Place::query()->create($payload);
+        $place = Place::query()->create($payload);
+        $this->syncUnits($place, $units);
+
+        return $place;
+    }
+
+    /**
+     * Detach `units` from a wizard payload: null when the field was absent
+     * (older clients — leave existing units untouched), the array otherwise
+     * (the full desired state, [] meaning "remove all units").
+     *
+     * @param  array<string, mixed>  $data
+     * @return list<array<string, mixed>>|null
+     */
+    private static function pullUnits(array &$data): ?array
+    {
+        if (! array_key_exists('units', $data)) {
+            return null;
+        }
+
+        $units = $data['units'];
+        unset($data['units']);
+
+        return is_array($units) ? array_values($units) : [];
+    }
+
+    /**
+     * Replace the place's identical-unit list with the submitted state.
+     * Rows keep their id across renames/reorders (so assigned bookings stay
+     * pinned); removed units are deleted — their bookings survive label-less
+     * (place_unit_id nullOnDelete).
+     *
+     * @param  list<array<string, mixed>>|null  $units
+     */
+    private function syncUnits(Place $place, ?array $units): void
+    {
+        if ($units === null) {
+            return;
+        }
+
+        $keep = [];
+        $position = 0;
+
+        foreach ($units as $unit) {
+            $name = trim((string) ($unit['name'] ?? ''));
+            if ($name === '') {
+                continue;
+            }
+
+            $id = isset($unit['id']) ? (string) $unit['id'] : null;
+            $existing = $id !== null ? $place->units()->whereKey($id)->first() : null;
+
+            if ($existing !== null) {
+                $existing->update(['name' => $name, 'sort_order' => $position]);
+                $keep[] = $existing->id;
+            } else {
+                $keep[] = $place->units()->create(['name' => $name, 'sort_order' => $position])->id;
+            }
+
+            $position++;
+        }
+
+        $place->units()->whereNotIn('id', $keep)->delete();
     }
 
     /**
@@ -396,8 +465,10 @@ final class PlaceService
     {
         $lists = $data['lists'] ?? null;
         unset($data['lists']);
+        $units = self::pullUnits($data);
 
         $place->update(self::dayPricesToZero($data));
+        $this->syncUnits($place, $units);
 
         if (is_array($lists)) {
             $this->syncLists($place, $lists);
@@ -417,10 +488,28 @@ final class PlaceService
      * @param  array<string, mixed>  $photos
      * @param  list<string>  $lists
      */
-    public function updateByAdmin(Place $place, array $data, array $attributes, array $photos, array $lists): Place
+    public function updateByAdmin(Place $place, array $data, array $attributes, array $photos, array $lists, ?string $hostPhone = null): Place
     {
-        return DB::transaction(function () use ($place, $data, $attributes, $photos, $lists): Place {
+        // Reassign to a (possibly new) owner by phone — same resolve rules as
+        // the admin create flow (existing user, else a shell account). Only an
+        // actual owner CHANGE triggers the transfer + notification below.
+        $newHost = null;
+        if ($hostPhone !== null && trim($hostPhone) !== '') {
+            $candidate = $this->users->findOrCreateByPhone(trim($hostPhone));
+            if ($candidate->id !== $place->host_user_id) {
+                $newHost = $candidate;
+            }
+        }
+
+        $place = DB::transaction(function () use ($place, $data, $attributes, $photos, $lists, $newHost): Place {
+            $units = self::pullUnits($data);
+
+            if ($newHost !== null) {
+                $data['host_user_id'] = $newHost->id;
+            }
+
             $place->update(self::dayPricesToZero($data));
+            $this->syncUnits($place, $units);
 
             // An edit carries the full desired state — empty amenities means
             // "remove them all" rather than "leave untouched".
@@ -435,6 +524,14 @@ final class PlaceService
 
             return $place->refresh();
         });
+
+        // The new owner hears about "their" listing exactly like a first
+        // submission (SMS + push + in-app), fired after commit.
+        if ($newHost !== null) {
+            $this->notifications->placeSubmitted($place);
+        }
+
+        return $place;
     }
 
     /**
@@ -478,6 +575,8 @@ final class PlaceService
     public function updateDetailsForHost(Place $place, array $data, array $attributes = [], array $photos = []): Place
     {
         $place = DB::transaction(function () use ($place, $data, $attributes, $photos): Place {
+            $units = self::pullUnits($data);
+
             // Same pin→URL derivation as create: coords without a pasted link
             // produce the canonical Google Maps link.
             if (! empty($data['latitude']) && ! empty($data['longitude']) && empty($data['location_url'])) {
@@ -490,6 +589,7 @@ final class PlaceService
                 'review_status' => PlaceReviewStatus::PendingReview->value,
                 'rejection_reason' => null,
             ]);
+            $this->syncUnits($place, $units);
 
             // An edit is the full desired state: an empty set means the host
             // removed every amenity, so wipe rather than no-op (syncAttributes
@@ -530,7 +630,7 @@ final class PlaceService
             ->when($status === 'active', fn ($q) => $q->where('status', PlaceStatus::Active->value))
             ->when($status !== null && $status !== 'active', fn ($q) => $q->where('review_status', $status))
             ->with(['type', 'cityArea.city', 'coverPhoto'])
-            ->withCount(['likes', 'publishedReviews', 'bookings'])
+            ->withCount(['likes', 'publishedReviews', 'bookings', 'units'])
             ->withAvg('publishedReviews', 'rate')
             ->latest()
             ->get();
@@ -545,7 +645,7 @@ final class PlaceService
      */
     public function editableForHost(Place $place): Place
     {
-        return $place->load(['attributeValues', 'photos.attribute:id,photo_rule', 'cityArea:id,city_id']);
+        return $place->load(['attributeValues', 'photos.attribute:id,photo_rule', 'cityArea:id,city_id', 'units']);
     }
 
     public function setReviewStatus(Place $place, PlaceReviewStatus $status): Place

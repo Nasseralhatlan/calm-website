@@ -62,6 +62,11 @@ class HostPlaceResource extends JsonResource
             // Owner sees the EXACT pin (edit/resume hydration).
             'latitude' => $this->latitude !== null ? (float) $this->latitude : null,
             'longitude' => $this->longitude !== null ? (float) $this->longitude : null,
+            // Identical units for the app's edit repeater (empty = single-unit).
+            'units' => $this->units->map(fn ($unit): array => [
+                'id' => $unit->id,
+                'name' => $unit->name,
+            ])->values()->all(),
             'attributes' => $this->attributeValues->map(fn (PlaceAttribute $value): array => [
                 'attribute_id' => $value->attribute_id,
                 'value' => $value->value,

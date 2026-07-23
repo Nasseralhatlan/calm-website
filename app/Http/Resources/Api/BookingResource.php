@@ -69,6 +69,13 @@ class BookingResource extends JsonResource
                     ] : null,
                 ] : null;
             }),
+            // Which identical unit this booking landed in — present when
+            // eager-loaded (the HOST list loads it; guests never see units).
+            // Null even when loaded for classic single-unit places.
+            'unit' => $this->whenLoaded('unit', fn () => $this->unit ? [
+                'id' => $this->unit->id,
+                'name' => $this->unit->name,
+            ] : null),
             // Who booked — present when eager-loaded (host's bookings list loads
             // it so the host can see/contact the guest; the guest's own list doesn't).
             'guest' => $this->whenLoaded('guest', fn () => [

@@ -77,6 +77,7 @@ class PlacesController extends Controller
             $request->attributesData(),
             $request->photosData(),
             $request->listsData(),
+            $request->validated('host_phone'),
         );
 
         return redirect()

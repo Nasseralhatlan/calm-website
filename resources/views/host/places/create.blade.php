@@ -90,6 +90,10 @@
         'check_out_time' => $draft->check_out_time,
         'checkout_next_day' => (bool) $draft->checkout_next_day,
         'max_guests' => $draft->max_guests,
+        // Current owner's phone — prefills the admin's owner field on edit.
+        'host_phone' => $draft->host?->phone,
+        // Identical units for the repeater (empty = classic single-unit).
+        'units' => $draft->units->map(fn ($u) => ['id' => $u->id, 'name' => $u->name])->values(),
         'rules_ar' => $draft->rules_ar ?? $draft->rules,
         'rules_en' => $draft->rules_en,
         'location_url' => $draft->location_url,
@@ -247,11 +251,11 @@
                      submit; the same Alpine field is also sent on every draft
                      auto-save (see saveDraft() payload). Non-admins never see
                      the input AND the server-side rule ignores any post anyway. --}}
-                @if(auth()->user()?->isAdmin() && ! $editing)
+                @if(auth()->user()?->isAdmin())
                     <div class="r-ios-lg bg-amber-50 border border-amber-200 {{ $fa }}"
                          style="padding: 18px 20px; margin-bottom: 24px;">
                         <label class="block text-[13px] font-bold text-[#222]" style="margin-bottom: 6px;">
-                            {{ $isRtl ? 'إضافة لرقم المضيف' : 'Attach to host phone' }}
+                            {{ $isRtl ? 'رقم جوال المضيف (المالك)' : 'Owner (host) phone' }}
                         </label>
                         <input type="tel" name="host_phone" x-model="hostPhone"
                                placeholder="5XXXXXXXX" dir="ltr" maxlength="9"
@@ -259,9 +263,15 @@
                                class="w-full bg-white border border-[#ebebeb] focus:border-[#222] text-[15px] tabular-nums focus:outline-none"
                                style="padding: 11px 14px; border-radius: 12px;">
                         <p class="text-[12px] text-[#717171] {{ $fa }}" style="margin-top: 6px;">
-                            {{ $isRtl
-                                ? '٩ أرقام تبدأ بـ 5. إن لم يكن المستخدم موجوداً يُنشأ تلقائياً.'
-                                : '9-digit national format (5XXXXXXXX). If no user has this phone, a shell account is created automatically.' }}
+                            @if($editing)
+                                {{ $isRtl
+                                    ? 'تغيير الرقم ينقل المكان إلى هذا المضيف ويصله إشعار المراجعة كما في أول تقديم. إن لم يكن المستخدم موجوداً يُنشأ تلقائياً.'
+                                    : 'Changing the number transfers the place to that host and sends them the review notice like a first submission. Unknown numbers create a shell account.' }}
+                            @else
+                                {{ $isRtl
+                                    ? '٩ أرقام تبدأ بـ 5. إن لم يكن المستخدم موجوداً يُنشأ تلقائياً.'
+                                    : '9-digit national format (5XXXXXXXX). If no user has this phone, a shell account is created automatically.' }}
+                            @endif
                         </p>
                     </div>
                 @endif
@@ -350,6 +360,7 @@
                             {{ $isRtl ? 'كم شخصاً يمكن أن يقيم في مكانك بشكل مريح؟' : 'How many guests can comfortably stay?' }}
                         </p>
                     </label>
+
                 </section>
 
                 {{-- ── Step 3: city ── --}}
@@ -881,6 +892,38 @@
                                       style="min-height: 140px; max-height: 70vh;"></textarea>
                         </div>
                     </label>
+
+                    {{-- Identical units (optional, last thing before submit):
+                         capacity = row count; each booking auto-lands in a free
+                         unit so the host knows which one it took. --}}
+                    <div class="mt-10 border-t border-[#ebebeb]" style="padding-top: 28px;">
+                        <div class="flex items-center flex-wrap" style="gap: 10px;">
+                            <span class="text-lg font-bold text-[#222] {{ $fa }}">{{ $isRtl ? 'هل لديك أكثر من وحدة متطابقة؟ (اختياري)' : 'Do you have multiple identical units? (optional)' }}</span>
+                            {{-- Live total so the host always knows the capacity they configured. --}}
+                            <span x-show="units.filter(u => (u.name || '').trim() !== '').length > 0" x-cloak
+                                  class="inline-flex items-center font-bold text-white bg-[#222] tabular-nums {{ $fa }}"
+                                  style="padding: 4px 14px; border-radius: 999px; font-size: 13px;"
+                                  x-text="'{{ $isRtl ? 'إجمالي الوحدات: ' : 'Total units: ' }}' + units.filter(u => (u.name || '').trim() !== '').length"></span>
+                        </div>
+                        <p class="mt-2 text-[14px] text-[#717171] leading-relaxed {{ $fa }}">
+                            {{ $isRtl ? 'إذا كان لديك عدة وحدات بنفس المواصفات، أضف اسماً لكل وحدة. يظهر إعلانك مرة واحدة، ولا يُقفل اليوم في التقويم إلا بعد امتلاء كل الوحدات، ويصلك كل حجز باسم الوحدة التي نزل فيها. اتركه فارغاً إذا كانت وحدة واحدة.' : 'If you have several units with the same spec, name each one. Your listing shows once, a day only closes when all units are booked, and every booking arrives labeled with its unit. Leave empty for a single unit.' }}
+                        </p>
+                        <template x-for="(u, idx) in units" :key="idx">
+                            <div class="mt-3 flex items-center" style="gap: 10px;">
+                                <input type="text" x-model="u.name" maxlength="100"
+                                       :placeholder="'{{ $isRtl ? 'اسم الوحدة، مثال: وحدة' : 'Unit name, e.g. Unit' }} ' + (idx + 1)"
+                                       class="flex-1 border border-[#dddddd] focus:border-[#222] transition-all bg-white shadow-card r-ios-lg outline-none text-[15px] text-[#222] {{ $fa }}"
+                                       style="padding: 13px 16px;">
+                                <button type="button" @click="units.splice(idx, 1)"
+                                        class="text-[#bbb] hover:text-[#dc2626] text-[18px] leading-none shrink-0" title="{{ $isRtl ? 'حذف الوحدة' : 'Remove unit' }}">✕</button>
+                            </div>
+                        </template>
+                        <button type="button" @click="units.push({ id: null, name: '' })"
+                                class="mt-4 inline-flex items-center border border-[#dddddd] hover:border-[#222] bg-white shadow-card r-ios-lg text-[14px] font-semibold text-[#222] transition-all {{ $fa }}"
+                                style="padding: 11px 20px; gap: 6px;">
+                            {{ $isRtl ? '+ إضافة وحدة' : '+ Add unit' }}
+                        </button>
+                    </div>
                 </section>
 
                 {{-- ── Admin settings step (admins only, edit mode) ── --}}
@@ -1066,6 +1109,8 @@ function registerWizard() {
         // Default to 1 — UI starts at the minimum so the +/− stepper has
         // something sensible to mutate. Required at final submit.
         maxGuests: 1,
+        // Identical units ({id, name}) — empty = classic single-unit place.
+        units: [],
         // Pre-filled default rules (both languages) for a new place; overridden
         // by saved rules on draft-resume / edit (see init.draft below).
         rulesAr: @js($defaultRulesAr),
@@ -1109,6 +1154,8 @@ function registerWizard() {
                 this.checkOutTime = init.draft.check_out_time || '12:00';
                 this.checkoutNextDay = init.draft.checkout_next_day ?? true;
                 this.maxGuests    = init.draft.max_guests || 1;
+                this.hostPhone    = init.draft.host_phone || '';
+                this.units        = (init.draft.units || []).map((u) => ({ id: u.id, name: u.name }));
                 this.rulesAr      = init.draft.rules_ar || '';
                 this.rulesEn      = init.draft.rules_en || '';
                 this.locationUrl  = init.draft.location_url || '';
@@ -1543,15 +1590,27 @@ function registerWizard() {
 
             if (!window.imageCompression) return work;
             try {
+                // Safari cannot encode WebP in canvas — asking for it there
+                // silently yields PNG, which ignores the quality knob, so the
+                // size cap can never engage (we shipped 1.3 MB "webp" PNGs).
+                // Feature-detect once and fall back to JPEG, which every
+                // browser encodes with real quality control.
+                if (this._webpOk === undefined) {
+                    this._webpOk = document.createElement('canvas').toDataURL('image/webp').startsWith('data:image/webp');
+                }
+                const wantType = this._webpOk ? 'image/webp' : 'image/jpeg';
                 const out = await window.imageCompression(work, {
-                    maxSizeMB: 0.3,           // ~300 KB cap — web-optimized, keeps photos sharp
+                    maxSizeMB: 0.35,          // ~350 KB cap — web-optimized, keeps photos sharp
                     maxWidthOrHeight: 2048,   // plenty for full-screen on real devices
-                    initialQuality: 0.82,     // crisp WebP; the lib only drops further if over the cap
-                    fileType: 'image/webp',
+                    initialQuality: 0.82,     // crisp; the lib only drops further if over the cap
+                    fileType: wantType,
                     useWebWorker: true,       // off the main thread → UI stays responsive
                 });
-                const webp = new File([out], work.name.replace(/\.[^.]+$/, '') + '.webp', { type: 'image/webp' });
-                return webp.size < work.size ? webp : work; // never end up bigger
+                // Trust the ACTUAL output type, never the requested one — if the
+                // encoder fell back anyway, name + mime must match the bytes.
+                const ext = { 'image/webp': '.webp', 'image/jpeg': '.jpg', 'image/png': '.png' }[out.type] || '.jpg';
+                const compressed = new File([out], work.name.replace(/\.[^.]+$/, '') + ext, { type: out.type });
+                return compressed.size < work.size ? compressed : work; // never end up bigger
             } catch (e) {
                 console.warn('[upload] compression failed, using', work === file ? 'original' : 'converted', e);
                 return work; // a converted HEIC is at least a displayable JPEG
@@ -1699,6 +1758,9 @@ function registerWizard() {
                 check_out_time: this.checkOutTime || '12:00',
                 checkout_next_day: this.checkoutNextDay,
                 max_guests: Number(this.maxGuests) || null,
+                units: this.units
+                    .filter((u) => (u.name || '').trim() !== '')
+                    .map((u) => ({ id: u.id || null, name: u.name.trim() })),
                 rules_ar: this.rulesAr || null,
                 rules_en: this.rulesEn || null,
                 location_url: this.locationUrl || null,

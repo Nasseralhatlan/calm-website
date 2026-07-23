@@ -61,6 +61,11 @@ class StorePlaceRequest extends FormRequest
             'attributes.*.value' => ['nullable', 'string', 'max:255'],
             'attributes.*.description' => ['nullable', 'string', 'max:1000'],
 
+            // Identical units ("وحدة ١"…): optional, full desired state.
+            'units' => ['nullable', 'array'],
+            'units.*.id' => ['nullable', 'uuid'],
+            'units.*.name' => ['required', 'string', 'max:100'],
+
             'attribute_image_paths' => ['nullable', 'array'],
             // Each section (per amenity) holds at most 10 images.
             'attribute_image_paths.*' => ['array', 'max:10'],

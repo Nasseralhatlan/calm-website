@@ -58,6 +58,11 @@ class UpdatePlaceDetailsRequest extends FormRequest
             'attributes.*.value' => ['nullable', 'string', 'max:255'],
             'attributes.*.description' => ['nullable', 'string', 'max:1000'],
 
+            // Identical units ("وحدة ١"…): optional, full desired state.
+            'units' => ['nullable', 'array'],
+            'units.*.id' => ['nullable', 'uuid'],
+            'units.*.name' => ['required', 'string', 'max:100'],
+
             // Photos — paths already uploaded to S3 via the presign endpoint.
             'attribute_image_paths' => ['nullable', 'array'],
             // Each section (per amenity) holds at most 10 images.
