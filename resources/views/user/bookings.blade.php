@@ -43,7 +43,12 @@
                         </span>
 
                         <span class="flex-1 min-w-0">
-                            <span class="block font-bold text-[#222] text-[16px] truncate {{ $fa }}">{{ $booking->place?->title ?? '—' }}</span>
+                            <span class="block font-bold text-[#222] text-[16px] truncate {{ $fa }}">
+                                {{ $booking->place?->title ?? '—' }}
+                                @if($booking->unit)
+                                    <span class="inline-flex items-center font-bold text-white bg-[#222] {{ $fa }}" style="padding: 2px 10px; border-radius: 999px; font-size: 11px; vertical-align: 2px;">{{ $booking->unit->name }}</span>
+                                @endif
+                            </span>
                             <span class="inline-flex items-center font-bold tabular-nums" style="margin-top: 6px; background-color: #fff4f3; color: #F88379; padding: 3px 10px; border-radius: 8px; font-size: 12px; letter-spacing: 0.5px;" dir="ltr">{{ $booking->reference }}</span>
                         </span>
 
