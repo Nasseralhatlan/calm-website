@@ -889,7 +889,14 @@
                          capacity = row count; each booking auto-lands in a free
                          unit so the host knows which one it took. --}}
                     <div class="mt-10 border-t border-[#ebebeb]" style="padding-top: 28px;">
-                        <span class="text-lg font-bold text-[#222] {{ $fa }}">{{ $isRtl ? 'هل لديك أكثر من وحدة متطابقة؟ (اختياري)' : 'Do you have multiple identical units? (optional)' }}</span>
+                        <div class="flex items-center flex-wrap" style="gap: 10px;">
+                            <span class="text-lg font-bold text-[#222] {{ $fa }}">{{ $isRtl ? 'هل لديك أكثر من وحدة متطابقة؟ (اختياري)' : 'Do you have multiple identical units? (optional)' }}</span>
+                            {{-- Live total so the host always knows the capacity they configured. --}}
+                            <span x-show="units.filter(u => (u.name || '').trim() !== '').length > 0" x-cloak
+                                  class="inline-flex items-center font-bold text-white bg-[#222] tabular-nums {{ $fa }}"
+                                  style="padding: 4px 14px; border-radius: 999px; font-size: 13px;"
+                                  x-text="'{{ $isRtl ? 'إجمالي الوحدات: ' : 'Total units: ' }}' + units.filter(u => (u.name || '').trim() !== '').length"></span>
+                        </div>
                         <p class="mt-2 text-[14px] text-[#717171] leading-relaxed {{ $fa }}">
                             {{ $isRtl ? 'إذا كان لديك عدة وحدات بنفس المواصفات، أضف اسماً لكل وحدة. يظهر إعلانك مرة واحدة، ولا يُقفل اليوم في التقويم إلا بعد امتلاء كل الوحدات، ويصلك كل حجز باسم الوحدة التي نزل فيها. اتركه فارغاً إذا كانت وحدة واحدة.' : 'If you have several units with the same spec, name each one. Your listing shows once, a day only closes when all units are booked, and every booking arrives labeled with its unit. Leave empty for a single unit.' }}
                         </p>
