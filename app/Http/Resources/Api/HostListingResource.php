@@ -31,9 +31,9 @@ class HostListingResource extends JsonResource
             'cover_photo_url' => $this->coverPhoto?->url,
             'price' => (int) $this->price,
             'max_guests' => $this->max_guests !== null ? (int) $this->max_guests : null,
-            // Identical units on this listing (0 = classic single-unit place).
-            // The app shows a "N وحدات" badge on the card when > 0.
-            'units_count' => (int) ($this->units_count ?? 0),
+            // Effective unit capacity — never below 1: classic single-unit
+            // places report 1 so the app's badge can always render a count.
+            'units_count' => max(1, (int) ($this->units_count ?? 0)),
             'type' => $this->whenLoaded('type', fn () => $this->type ? [
                 'id' => $this->type->id,
                 'name_en' => $this->type->name_en,

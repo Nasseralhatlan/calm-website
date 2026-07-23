@@ -215,8 +215,9 @@ it('exposes units_count on the host listings so cards can badge multi-unit place
         ->json('data.items');
 
     $byTitle = collect($items)->keyBy('title');
+    // Classic places report an effective capacity of 1, never 0.
     expect($byTitle['Multi-unit place']['units_count'])->toBe(4)
-        ->and($byTitle['Single-unit place']['units_count'])->toBe(0);
+        ->and($byTitle['Single-unit place']['units_count'])->toBe(1);
 });
 
 it('exposes the assigned unit to the host bookings list but not the guest list', function (): void {
