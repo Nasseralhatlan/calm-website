@@ -276,3 +276,34 @@ it('normalizes human phone formats before reassigning on edit', function (): voi
         ->assertSessionHasErrors('host_phone');
     expect($placeC->refresh()->host_user_id)->toBe($admin->id);
 });
+
+it('transfers ownership when the admin edits via the HOST flow (my-places) too', function (): void {
+    $admin = User::factory()->create(['role' => UserRole::Admin->value, 'phone' => '599888006']);
+    $newOwner = User::factory()->create(['phone' => '512345907']);
+    $place = adminOwnedPlace($admin);
+
+    // Admin-entered places live on the admin's account, so this is the edit
+    // path admins actually use day to day.
+    $this->actingAs($admin, 'api')
+        ->put(route('host.places.update', $place), adminEditPayload($place, ['host_phone' => '512345907']))
+        ->assertRedirect(route('user.places'));
+
+    expect($place->refresh()->host_user_id)->toBe($newOwner->id)
+        ->and(UserNotification::query()
+            ->where('user_id', $newOwner->id)
+            ->where('type', 'place_submitted')
+            ->count())->toBe(1);
+});
+
+it('ignores host_phone from a real (non-admin) host on the host edit flow', function (): void {
+    $host = User::factory()->create(['phone' => '512345908']);
+    $place = adminOwnedPlace($host);
+
+    $this->actingAs($host, 'api')
+        ->put(route('host.places.update', $place), adminEditPayload($place, ['host_phone' => '512345909']))
+        ->assertRedirect(route('user.places'));
+
+    // Owner unchanged; no shell account minted for the posted number.
+    expect($place->refresh()->host_user_id)->toBe($host->id)
+        ->and(User::query()->where('phone', '512345909')->exists())->toBeFalse();
+});

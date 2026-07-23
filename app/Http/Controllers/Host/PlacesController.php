@@ -224,6 +224,8 @@ class PlacesController extends Controller
             $request->placeData(),
             $request->attributesData(),
             $request->photosData(),
+            // Owner transfer is an admin-only power (validated as such).
+            $request->user()->isAdmin() ? $request->validated('host_phone') : null,
         );
 
         return redirect()

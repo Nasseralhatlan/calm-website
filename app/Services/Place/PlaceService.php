@@ -490,16 +490,7 @@ final class PlaceService
      */
     public function updateByAdmin(Place $place, array $data, array $attributes, array $photos, array $lists, ?string $hostPhone = null): Place
     {
-        // Reassign to a (possibly new) owner by phone — same resolve rules as
-        // the admin create flow (existing user, else a shell account). Only an
-        // actual owner CHANGE triggers the transfer + notification below.
-        $newHost = null;
-        if ($hostPhone !== null && trim($hostPhone) !== '') {
-            $candidate = $this->users->findOrCreateByPhone(trim($hostPhone));
-            if ($candidate->id !== $place->host_user_id) {
-                $newHost = $candidate;
-            }
-        }
+        $newHost = $this->resolveNewHost($place, $hostPhone);
 
         $place = DB::transaction(function () use ($place, $data, $attributes, $photos, $lists, $newHost): Place {
             $units = self::pullUnits($data);
@@ -532,6 +523,23 @@ final class PlaceService
         }
 
         return $place;
+    }
+
+    /**
+     * Reassign target for an admin-entered owner phone: resolved to an
+     * existing user or a fresh shell account (same rules as the admin create
+     * flow). Null when the field is blank OR resolves to the current owner —
+     * only an actual change triggers a transfer.
+     */
+    private function resolveNewHost(Place $place, ?string $hostPhone): ?User
+    {
+        if ($hostPhone === null || trim($hostPhone) === '') {
+            return null;
+        }
+
+        $candidate = $this->users->findOrCreateByPhone(trim($hostPhone));
+
+        return $candidate->id !== $place->host_user_id ? $candidate : null;
     }
 
     /**
@@ -572,15 +580,24 @@ final class PlaceService
      * @param  list<array<string, mixed>>  $attributes  [{attribute_id, value, description}, ...]
      * @param  array<string, mixed>  $photos  ['attribute_paths' => ..., 'extra_paths' => ..., 'featured' => [...]]
      */
-    public function updateDetailsForHost(Place $place, array $data, array $attributes = [], array $photos = []): Place
+    public function updateDetailsForHost(Place $place, array $data, array $attributes = [], array $photos = [], ?string $hostPhone = null): Place
     {
-        $place = DB::transaction(function () use ($place, $data, $attributes, $photos): Place {
+        // Admin-entered places live on the ADMIN's account, so admins usually
+        // edit them from their own "my places" — this flow must honor the
+        // owner-phone transfer too (controllers pass null for real hosts).
+        $newHost = $this->resolveNewHost($place, $hostPhone);
+
+        $place = DB::transaction(function () use ($place, $data, $attributes, $photos, $newHost): Place {
             $units = self::pullUnits($data);
 
             // Same pin→URL derivation as create: coords without a pasted link
             // produce the canonical Google Maps link.
             if (! empty($data['latitude']) && ! empty($data['longitude']) && empty($data['location_url'])) {
                 $data['location_url'] = sprintf('https://maps.google.com/?q=%s,%s', $data['latitude'], $data['longitude']);
+            }
+
+            if ($newHost !== null) {
+                $data['host_user_id'] = $newHost->id;
             }
 
             $place->update([
