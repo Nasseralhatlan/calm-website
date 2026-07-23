@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Requests\Host;
 
 use App\Http\Requests\Concerns\DerivesCanonicalContent;
+use App\Http\Requests\Concerns\NormalizesHostPhone;
 use App\Http\Requests\Concerns\ValidatesAmenityPhotoRules;
 use App\Models\Place;
 use Illuminate\Foundation\Http\FormRequest;
@@ -13,7 +14,13 @@ use Illuminate\Validation\Validator;
 class StorePlaceRequest extends FormRequest
 {
     use DerivesCanonicalContent;
+    use NormalizesHostPhone;
     use ValidatesAmenityPhotoRules;
+
+    protected function prepareForValidation(): void
+    {
+        $this->normalizeHostPhone();
+    }
 
     public function authorize(): bool
     {

@@ -258,10 +258,15 @@
                             {{ $isRtl ? 'رقم جوال المضيف (المالك)' : 'Owner (host) phone' }}
                         </label>
                         <input type="tel" name="host_phone" x-model="hostPhone"
-                               placeholder="5XXXXXXXX" dir="ltr" maxlength="9"
+                               placeholder="5XXXXXXXX" dir="ltr" maxlength="16"
                                value="{{ old('host_phone') }}"
-                               class="w-full bg-white border border-[#ebebeb] focus:border-[#222] text-[15px] tabular-nums focus:outline-none"
+                               class="w-full bg-white border {{ $errors->has('host_phone') ? 'border-[#dc2626]' : 'border-[#ebebeb]' }} focus:border-[#222] text-[15px] tabular-nums focus:outline-none"
                                style="padding: 11px 14px; border-radius: 12px;">
+                        @error('host_phone')
+                            <p class="text-[12px] text-[#dc2626] {{ $fa }}" style="margin-top: 6px;">
+                                {{ $isRtl ? 'رقم غير صالح — أدخل رقم جوال سعودي مثل 5XXXXXXXX.' : 'Invalid number — enter a Saudi mobile like 5XXXXXXXX.' }}
+                            </p>
+                        @enderror
                         <p class="text-[12px] text-[#717171] {{ $fa }}" style="margin-top: 6px;">
                             @if($editing)
                                 {{ $isRtl

@@ -113,10 +113,12 @@ it('writes one in-app row and fires SMS + push to every device', function (): vo
         ->and($row->title_en)->toBe('Title')
         ->and($row->read_at)->toBeNull();
 
-    // SMS once, in the user's language (ar).
+    // SMS once, in the user's language (ar) — BODY only, the title would
+    // just repeat the body's opening and eat SMS length.
     expect($sms->calls)->toHaveCount(1)
         ->and($sms->calls[0]['phone'])->toBe('513000001')
-        ->and($sms->calls[0]['message'])->toContain('عنوان');
+        ->and($sms->calls[0]['message'])->toContain('نص عربي')
+        ->and($sms->calls[0]['message'])->not->toContain('عنوان');
 
     // Push once to both tokens, Arabic title.
     expect($push->calls)->toHaveCount(1)
@@ -127,17 +129,17 @@ it('writes one in-app row and fires SMS + push to every device', function (): vo
 it('delivers SMS + push in the user\'s locale', function (): void {
     $sms = fakeSms();
 
-    // Arabic user (default) → Arabic.
+    // Arabic user (default) → Arabic body.
     $ar = User::factory()->create(['phone' => '513000002', 'locale' => 'ar']);
     $this->service->notify($ar, samplePayload());
-    expect($sms->calls[0]['message'])->toContain('عنوان')
-        ->and($sms->calls[0]['message'])->not->toContain('Title');
+    expect($sms->calls[0]['message'])->toContain('نص عربي')
+        ->and($sms->calls[0]['message'])->not->toContain('English body');
 
-    // English user → English.
+    // English user → English body.
     $en = User::factory()->create(['phone' => '513000003', 'locale' => 'en']);
     $this->service->notify($en, samplePayload());
-    expect($sms->calls[1]['message'])->toContain('Title')
-        ->and($sms->calls[1]['message'])->not->toContain('عنوان');
+    expect($sms->calls[1]['message'])->toContain('English body')
+        ->and($sms->calls[1]['message'])->not->toContain('نص عربي');
 });
 
 it('still delivers in-app + SMS when the user has no device token (push skipped)', function (): void {

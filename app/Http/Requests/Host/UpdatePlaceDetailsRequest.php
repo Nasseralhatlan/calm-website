@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Requests\Host;
 
 use App\Http\Requests\Concerns\DerivesCanonicalContent;
+use App\Http\Requests\Concerns\NormalizesHostPhone;
 use App\Http\Requests\Concerns\ValidatesAmenityPhotoRules;
 use App\Models\Place;
 use Illuminate\Foundation\Http\FormRequest;
@@ -18,7 +19,13 @@ use Illuminate\Validation\Validator;
 class UpdatePlaceDetailsRequest extends FormRequest
 {
     use DerivesCanonicalContent;
+    use NormalizesHostPhone;
     use ValidatesAmenityPhotoRules;
+
+    protected function prepareForValidation(): void
+    {
+        $this->normalizeHostPhone();
+    }
 
     public function authorize(): bool
     {
@@ -31,6 +38,12 @@ class UpdatePlaceDetailsRequest extends FormRequest
     public function rules(): array
     {
         $rules = [
+            // Admin editing via the host flow (their own "my places" list —
+            // where admin-entered places live) can transfer ownership by
+            // phone, same as the admin edit route. Ignored for real hosts.
+            'host_phone' => $this->user()?->isAdmin()
+                ? ['nullable', 'string', 'regex:/^5\d{8}$/']
+                : ['nullable'],
             'title_ar' => ['nullable', 'required_without:title_en', 'string', 'max:255'],
             'title_en' => ['nullable', 'required_without:title_ar', 'string', 'max:255'],
             'description_ar' => ['nullable', 'string', 'max:10000'],
@@ -113,7 +126,7 @@ class UpdatePlaceDetailsRequest extends FormRequest
     public function placeData(): array
     {
         $data = collect($this->validated())
-            ->except(['attributes', 'attribute_image_paths', 'extra_image_paths', 'featured'])
+            ->except(['host_phone', 'attributes', 'attribute_image_paths', 'extra_image_paths', 'featured'])
             ->toArray();
 
         return $this->withCanonicalContent($data);
