@@ -124,12 +124,6 @@
                         <input type="tel" x-model="phone" placeholder="5XXXXXXXX" dir="ltr" inputmode="numeric"
                                class="w-full bg-[#fafafa] border border-[#ebebeb] focus:border-[#222] text-[15px] tabular-nums focus:outline-none"
                                style="padding: 14px 16px; border-radius: 16px; margin-top: 10px;">
-                        <button type="button" @click="requestOtp()" :disabled="authBusy || !name.trim() || normPhone().length !== 9"
-                                class="w-full font-bold text-white bg-[#222] hover:bg-black disabled:bg-[#dddddd]"
-                                style="padding: 14px; border-radius: 16px; margin-top: 14px;">
-                            <span x-show="!authBusy">{{ $isRtl ? 'أرسل رمز التحقق' : 'Send verification code' }}</span>
-                            <span x-show="authBusy" x-cloak>{{ $isRtl ? 'جارٍ الإرسال…' : 'Sending…' }}</span>
-                        </button>
                     </div>
                 </template>
 
@@ -141,12 +135,6 @@
                         <input type="text" x-model="otp" maxlength="6" inputmode="numeric" autocomplete="one-time-code" dir="ltr"
                                class="w-full bg-[#fafafa] border border-[#ebebeb] focus:border-[#222] text-center tracking-[8px] font-bold text-[20px] tabular-nums focus:outline-none"
                                style="padding: 14px 16px; border-radius: 16px; margin-top: 10px;">
-                        <button type="button" @click="verifyOtp()" :disabled="authBusy || otp.length < 4"
-                                class="w-full font-bold text-white bg-[#222] hover:bg-black disabled:bg-[#dddddd]"
-                                style="padding: 14px; border-radius: 16px; margin-top: 14px;">
-                            <span x-show="!authBusy">{{ $isRtl ? 'تأكيد' : 'Verify' }}</span>
-                            <span x-show="authBusy" x-cloak>{{ $isRtl ? 'جارٍ التحقق…' : 'Verifying…' }}</span>
-                        </button>
                         <button type="button" @click="otpSent = false; otp = ''" class="w-full text-[13px] text-[#717171] hover:text-[#222]" style="margin-top: 12px;">
                             {{ $isRtl ? 'تغيير الرقم' : 'Change number' }}
                         </button>
@@ -233,10 +221,21 @@
                 <span x-text="quote ? '{{ $isRtl ? 'التالي' : 'Next' }} · SR ' + Number(quote.pricing.total).toLocaleString() : '{{ $isRtl ? 'اختر التواريخ أولاً' : 'Pick your dates first' }}'"></span>
             </button>
 
-            {{-- Step 2: hint (actions are inline in the card) --}}
-            <div x-show="step === 2" x-cloak class="flex-1 text-center text-[13px] text-[#999]" style="padding: 15px 0;">
-                {{ $isRtl ? 'أكمل التحقق للمتابعة' : 'Complete verification to continue' }}
-            </div>
+            {{-- Step 2: Next = send OTP, then Verify — both live in the bottom bar --}}
+            <button type="button" x-show="step === 2 && !otpSent" x-cloak @click="requestOtp()"
+                    :disabled="authBusy || !name.trim() || normPhone().length !== 9"
+                    class="flex-1 font-bold text-white bg-[#F88379] hover:bg-[#f56b60] disabled:bg-[#dddddd] disabled:cursor-not-allowed active:scale-[0.99] transition-all"
+                    style="padding: 15px; border-radius: 16px; font-size: 16px;">
+                <span x-show="!authBusy">{{ $isRtl ? 'التالي' : 'Next' }}</span>
+                <span x-show="authBusy" x-cloak>{{ $isRtl ? 'جارٍ إرسال الرمز…' : 'Sending the code…' }}</span>
+            </button>
+            <button type="button" x-show="step === 2 && otpSent" x-cloak @click="verifyOtp()"
+                    :disabled="authBusy || otp.length < 4"
+                    class="flex-1 font-bold text-white bg-[#F88379] hover:bg-[#f56b60] disabled:bg-[#dddddd] disabled:cursor-not-allowed active:scale-[0.99] transition-all"
+                    style="padding: 15px; border-radius: 16px; font-size: 16px;">
+                <span x-show="!authBusy">{{ $isRtl ? 'التالي' : 'Next' }}</span>
+                <span x-show="authBusy" x-cloak>{{ $isRtl ? 'جارٍ التحقق…' : 'Verifying…' }}</span>
+            </button>
 
             {{-- Step 3: Pay --}}
             <button type="button" x-show="step === 3" x-cloak @click="submit()" :disabled="submitting"
