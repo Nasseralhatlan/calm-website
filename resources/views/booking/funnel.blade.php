@@ -67,9 +67,9 @@
                 <p class="text-[#717171] text-[13px]" style="margin-top: 2px; min-height: 20px;" x-text="rangeSubtitle()"></p>
             </div>
 
-            {{-- Sticky weekday letters --}}
-            <div class="sticky bg-white z-10" style="top: 64px; padding: 10px 18px 8px;">
-                <div class="grid grid-cols-7 text-center text-[12px] font-medium text-[#b8b8b8]">
+            {{-- Weekday letters --}}
+            <div style="padding: 14px 18px 0;">
+                <div class="grid grid-cols-7 text-center" style="font-size: 12px; color: #b8b8b8; font-weight: 500;">
                     <template x-for="d in dayNames()"><span x-text="d"></span></template>
                 </div>
             </div>
@@ -81,17 +81,16 @@
                         <p class="font-bold text-[#222]" style="font-size: 18px; padding: 0 4px;" x-text="month.label"></p>
                         <div class="grid grid-cols-7" style="row-gap: 8px; margin-top: 10px;">
                             <template x-for="cell in month.cells" :key="cell.key">
-                                <div class="relative flex items-center justify-center" style="height: 46px;">
-                                    {{-- Range band — soft translucent strip behind the circles --}}
-                                    <div x-show="bandFor(cell.date)" class="absolute" :style="bandStyle(cell.date)"></div>
-                                    {{-- Fixed-size circular day indicator --}}
+                                {{-- All visual state is inline (one binding per element):
+                                     the wrapper paints the connected range band, the button
+                                     is the circular day indicator. --}}
+                                <div class="relative flex items-center justify-center" :style="cellStyle(cell)">
                                     <button type="button"
                                             x-text="cell.day || ''"
                                             :disabled="!cell.day || cell.disabled"
                                             @click="pickDay(cell.date)"
                                             class="relative tabular-nums select-none flex items-center justify-center transition-colors"
-                                            :class="dayClass(cell)"
-                                            style="width: 40px; height: 40px; border-radius: 999px; font-size: 15px;"></button>
+                                            :style="dayStyle(cell)"></button>
                                 </div>
                             </template>
                         </div>
@@ -122,11 +121,11 @@
             <template x-if="!otpSent">
                 <div style="margin-top: 18px;">
                     <input type="text" x-model="name" placeholder="{{ $isRtl ? 'الاسم' : 'Your name' }}"
-                           class="w-full bg-[#f5f5f6] focus:bg-[#efeff1] text-[15px] focus:outline-none"
-                           style="padding: 15px 16px; border-radius: 16px;">
+                           class="w-full text-[15px] focus:outline-none"
+                           style="background-color: #f5f5f6; padding: 15px 16px; border-radius: 16px;">
                     <input type="tel" x-model="phone" placeholder="5XXXXXXXX" dir="ltr" inputmode="numeric"
-                           class="w-full bg-[#f5f5f6] focus:bg-[#efeff1] text-[15px] tabular-nums focus:outline-none"
-                           style="padding: 15px 16px; border-radius: 16px; margin-top: 10px;">
+                           class="w-full text-[15px] tabular-nums focus:outline-none"
+                           style="background-color: #f5f5f6; padding: 15px 16px; border-radius: 16px; margin-top: 10px;">
                 </div>
             </template>
 
@@ -136,8 +135,8 @@
                         {{ $isRtl ? 'أدخل الرمز المرسل إلى' : 'Enter the code sent to' }} <span dir="ltr" class="font-bold" x-text="normPhone()"></span>
                     </p>
                     <input type="text" x-model="otp" maxlength="6" inputmode="numeric" autocomplete="one-time-code" dir="ltr"
-                           class="w-full bg-[#f5f5f6] focus:bg-[#efeff1] text-center tracking-[8px] font-bold text-[22px] tabular-nums focus:outline-none"
-                           style="padding: 15px 16px; border-radius: 16px; margin-top: 12px;">
+                           class="w-full text-center tracking-[8px] font-bold text-[22px] tabular-nums focus:outline-none"
+                           style="background-color: #f5f5f6; padding: 15px 16px; border-radius: 16px; margin-top: 12px;">
 
                     {{-- Resend countdown --}}
                     <div class="text-center text-[13px]" style="margin-top: 14px;">
@@ -222,18 +221,6 @@
     {{-- ── Sticky action bar ── --}}
     <div class="fixed bottom-0 inset-x-0 bg-white/95 backdrop-blur" style="padding: 10px 18px calc(14px + env(safe-area-inset-bottom)); box-shadow: 0 -8px 24px rgba(0,0,0,0.05);">
         <div class="mx-auto" style="max-width: 560px;">
-
-            {{-- Quick weekend chips (step 1, like the app) --}}
-            <div x-show="step === 1 && quickChips().length" class="flex items-stretch" style="gap: 8px; margin-bottom: 10px;">
-                <template x-for="chip in quickChips()" :key="chip.date">
-                    <button type="button" @click="pickQuick(chip.date)"
-                            class="flex-1 text-center border border-[#dddddd] hover:border-[#222] bg-white transition-colors"
-                            style="padding: 9px 6px; border-radius: 16px;">
-                        <span class="block font-bold text-[#222] text-[13px]" x-text="chip.label"></span>
-                        <span class="block text-[#999] text-[12px] tabular-nums" dir="ltr" x-text="chip.sub"></span>
-                    </button>
-                </template>
-            </div>
 
             <div class="flex items-center" style="gap: 10px;">
                 <button type="button" x-show="step > 1" x-cloak @click="back()"
@@ -370,28 +357,33 @@ function bookingFunnel(init) {
             while (cur < end) { if (this.unavailable.has(iso(cur))) return false; cur.setDate(cur.getDate() + 1); }
             return true;
         },
-        dayClass(cell) {
-            if (!cell.day) return '';
-            if (cell.disabled) return 'text-[#cfcfcf] line-through cursor-not-allowed font-normal';
-            if (cell.date === this.checkIn || cell.date === this.checkOut) return 'bg-[#222] text-white font-bold';
-            if (this.inRange(cell.date)) return 'text-[#222] font-semibold';
-            return 'text-[#444] font-normal hover:bg-[#f3f4f6]';
+        hasRange() {
+            return !!(this.checkIn && this.checkOut);
         },
-        inRange(date) {
-            return this.checkIn && this.checkOut && date > this.checkIn && date < this.checkOut;
+        cellStyle(cell) {
+            // The wrapper paints the connected band: full grey for in-between
+            // days, half grey (inward side only) under the endpoint circles.
+            // Physical sides are computed from the layout direction.
+            let css = 'height: 46px;';
+            if (!cell.date || !this.hasRange()) return css;
+            const BAND = 'rgba(0,0,0,0.05)';
+            const s = cell.date === this.checkIn, e = cell.date === this.checkOut;
+            const between = cell.date > this.checkIn && cell.date < this.checkOut;
+            // "toward checkout" = left in RTL, right in LTR.
+            const inward = this.isRtl ? 'left' : 'right';
+            const outward = this.isRtl ? 'right' : 'left';
+            if (between) css += `background-color: ${BAND};`;
+            else if (s && !e) css += `background: linear-gradient(to ${inward}, transparent 50%, ${BAND} 50%);`;
+            else if (e && !s) css += `background: linear-gradient(to ${outward}, transparent 50%, ${BAND} 50%);`;
+            return css;
         },
-        bandFor(date) {
-            if (!date || !this.checkIn || !this.checkOut) return false;
-            return date >= this.checkIn && date <= this.checkOut;
-        },
-        bandStyle(date) {
-            // Connected strip behind the circles. ALL properties live in this
-            // one binding — splitting them across the static style attribute
-            // proved unreliable. Logical insets flip automatically under RTL.
-            const s = date === this.checkIn, e = date === this.checkOut;
-            return 'top: 5px; bottom: 5px; background-color: rgba(0,0,0,0.055);'
-                + `inset-inline-start: ${s ? '50%' : '0'};`
-                + `inset-inline-end: ${e ? '50%' : '0'};`;
+        dayStyle(cell) {
+            let css = 'width: 40px; height: 40px; border-radius: 999px; font-size: 15px;';
+            if (!cell.day) return css;
+            if (cell.disabled) return css + 'color: #cfcfcf; text-decoration: line-through; cursor: default;';
+            if (cell.date === this.checkIn || cell.date === this.checkOut) return css + 'background-color: #222; color: #fff; font-weight: 700;';
+            if (this.hasRange() && cell.date > this.checkIn && cell.date < this.checkOut) return css + 'color: #222; font-weight: 600;';
+            return css + 'color: #444;';
         },
 
         // ── selection header + quick chips ──
@@ -407,27 +399,6 @@ function bookingFunnel(init) {
         },
         nights() {
             return Math.round((new Date(this.checkOut) - new Date(this.checkIn)) / 86400000);
-        },
-        quickChips() {
-            // Next Thu / Fri / Sat, only when that night is actually free.
-            const labels = this.isRtl ? { 4: 'الخميس الجاي', 5: 'الجمعة الجاي', 6: 'السبت الجاي' } : { 4: 'Next Thursday', 5: 'Next Friday', 6: 'Next Saturday' };
-            const short = new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric' });
-            const chips = [];
-            for (const dow of [4, 5, 6]) {
-                const d = new Date();
-                d.setDate(d.getDate() + ((dow - d.getDay() + 7) % 7 || 7));
-                const dIso = iso(d);
-                const next = new Date(d); next.setDate(next.getDate() + 1);
-                if (!this.unavailable.has(dIso)) chips.push({ date: dIso, label: labels[dow], sub: short.format(d) });
-            }
-            return chips;
-        },
-        pickQuick(date) {
-            const next = new Date(date); next.setDate(next.getDate() + 1);
-            this.checkIn = date;
-            this.checkOut = iso(next);
-            this.quoteError = '';
-            this.fetchQuote();
         },
 
         // ── step navigation ──
