@@ -29,14 +29,31 @@
 
     <main class="flex-1 mx-auto w-full flex flex-col" style="max-width: 560px; padding: 40px 22px 120px;">
 
-        {{-- ── Animation ── --}}
-        <div class="mx-auto" x-ref="anim" style="width: 170px; height: 170px;"></div>
+        {{-- ── Animation (static fallback shows unless Lottie mounts) ── --}}
+        <div class="mx-auto relative" style="width: clamp(120px, 38vw, 170px); height: clamp(120px, 38vw, 170px);">
+            <div x-ref="anim" class="absolute inset-0"></div>
+            <div x-show="!animReady" class="absolute inset-0 flex items-center justify-center">
+                <template x-if="state === 'pending'">
+                    <svg class="calm-spinner" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#c9ced6" stroke-width="2.6" stroke-linecap="round">
+                        <circle cx="12" cy="12" r="10" stroke-opacity="0.3"/><path d="M22 12a10 10 0 0 1-10 10"/>
+                    </svg>
+                </template>
+                <template x-if="state === 'confirmed'">
+                    <span class="flex items-center justify-center" style="width: 96px; height: 96px; border-radius: 999px; background-color: #28b463;">
+                        <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5l4.5 4.5L19.5 7"/></svg>
+                    </span>
+                </template>
+                <template x-if="state === 'dead'">
+                    <span class="flex items-center justify-center" style="width: 96px; height: 96px; border-radius: 999px; background-color: #ffb703; color: #fff; font-size: 46px; font-weight: 800;">!</span>
+                </template>
+            </div>
+        </div>
 
         {{-- ── Title + subtitle ── --}}
         <template x-if="state === 'pending'">
             <div class="text-center">
-                <h1 class="font-bold text-[#222]" style="font-size: 24px;">{{ $isRtl ? 'جاري تأكيد الدفع…' : 'Confirming your payment…' }}</h1>
-                <p class="text-[#717171]" style="font-size: 15px; margin-top: 8px; line-height: 1.9;">
+                <h1 class="font-bold text-[#222]" style="font-size: clamp(19px, 5.4vw, 24px);">{{ $isRtl ? 'جاري تأكيد الدفع…' : 'Confirming your payment…' }}</h1>
+                <p class="text-[#717171]" style="font-size: clamp(13px, 3.8vw, 15px); margin-top: 8px; line-height: 1.9;">
                     {{ $isRtl ? 'لحظات ويكتمل حجزك. لا تغلق الصفحة.' : 'Just a moment while we confirm your booking. Keep this page open.' }}
                 </p>
             </div>
@@ -44,8 +61,8 @@
 
         <template x-if="state === 'confirmed'">
             <div class="text-center">
-                <h1 class="font-bold text-[#222]" style="font-size: 26px;">{{ $isRtl ? 'تم تأكيد حجزك' : 'Booking confirmed' }}</h1>
-                <p class="text-[#717171]" style="font-size: 15px; margin-top: 8px; line-height: 1.9;">
+                <h1 class="font-bold text-[#222]" style="font-size: clamp(21px, 6vw, 26px);">{{ $isRtl ? 'تم تأكيد حجزك' : 'Booking confirmed' }}</h1>
+                <p class="text-[#717171]" style="font-size: clamp(13px, 3.8vw, 15px); margin-top: 8px; line-height: 1.9;">
                     {{ $isRtl
                         ? 'سيتواصل معك المضيف قبل وصولك. حمّل تطبيق كالم وسجّل بنفس رقم جوالك لمتابعة حجزك.'
                         : 'Your host will reach out before your arrival. Download the Calm app and sign in with the same number to manage your booking.' }}
@@ -55,8 +72,8 @@
 
         <template x-if="state === 'dead'">
             <div class="text-center">
-                <h1 class="font-bold text-[#222]" style="font-size: 24px;">{{ $isRtl ? 'لم يكتمل الحجز' : 'Booking not completed' }}</h1>
-                <p class="text-[#717171]" style="font-size: 15px; margin-top: 8px; line-height: 1.9;">
+                <h1 class="font-bold text-[#222]" style="font-size: clamp(19px, 5.4vw, 24px);">{{ $isRtl ? 'لم يكتمل الحجز' : 'Booking not completed' }}</h1>
+                <p class="text-[#717171]" style="font-size: clamp(13px, 3.8vw, 15px); margin-top: 8px; line-height: 1.9;">
                     {{ $isRtl ? 'انتهت صلاحية الحجز أو أُلغي قبل إتمام الدفع.' : 'The booking expired or was cancelled before payment completed.' }}
                 </p>
             </div>
@@ -69,7 +86,7 @@
                     <img src="{{ $place->coverPhoto->url }}" alt="" class="object-cover shrink-0" style="width: 84px; height: 84px; border-radius: 22px;">
                 @endif
                 <div class="min-w-0">
-                    <p class="font-bold text-[#222] truncate" style="font-size: 18px;">{{ $place?->title }}</p>
+                    <p class="font-bold text-[#222] truncate" style="font-size: clamp(15px, 4.6vw, 18px);">{{ $place?->title }}</p>
                     <p class="text-[#717171] text-[13px]" style="margin-top: 4px;">
                         <span style="color: #f5b50a;">★</span> {{ $ratingAvg }} ({{ $ratingCount }})
                         @if($city) · {{ $isRtl ? $city->name_ar : $city->name_en }} @endif
@@ -129,6 +146,7 @@ function bookingStatus(init) {
         state: init.state,
         tries: 0,
         anim: null,
+        animReady: false,
 
         async start() {
             await this.mountAnim();
@@ -149,35 +167,41 @@ function bookingStatus(init) {
             tick();
         },
 
-        // ── lottie: one file carries both the loader loop and the success pop ──
+        // ── lottie: one file carries both the loader loop and the success pop.
+        // The JSON is fetched inline (animationData) so playback starts
+        // synchronously — no renderer events to depend on; the static icon
+        // stays as fallback until the animation actually mounts. ──
         async mountAnim() {
             try {
-                const lottie = await window.loadLottie();
-                const load = (path, opts) => lottie.loadAnimation({
-                    container: this.$refs.anim, renderer: 'svg', path, ...opts,
+                const [lottie, res] = await Promise.all([
+                    window.loadLottie(),
+                    fetch(this.state === 'dead' ? init.pendingLottie : init.successLottie),
+                ]);
+                const animationData = await res.json();
+                if (this.anim) { this.anim.destroy(); this.anim = null; }
+                this.anim = lottie.loadAnimation({
+                    container: this.$refs.anim,
+                    renderer: 'svg',
+                    loop: this.state === 'pending',
+                    autoplay: false,
+                    animationData,
                 });
-                if (this.state === 'dead') {
-                    this.anim = load(init.pendingLottie, { loop: false, autoplay: true });
-                } else if (this.state === 'confirmed') {
-                    this.anim = load(init.successLottie, { loop: false, autoplay: false });
-                    this.anim.addEventListener('DOMLoaded', () => this.anim.playSegments([85, 145], true));
-                } else {
-                    this.anim = load(init.successLottie, { loop: true, autoplay: false });
-                    // Loop only the grey loader sweep; the green pop waits for
-                    // the webhook.
-                    this.anim.addEventListener('DOMLoaded', () => this.anim.playSegments([0, 85], true));
-                }
-            } catch (e) { /* animation is decoration — the page works without it */ }
+                if (this.state === 'dead') this.anim.play();
+                else if (this.state === 'confirmed') this.anim.playSegments([85, 145], true);
+                else this.anim.playSegments([0, 85], true); // grey loader sweep only
+                this.animReady = true;
+            } catch (e) { /* fallback icon stays — the page works without the animation */ }
         },
         toConfirmed() {
             this.state = 'confirmed';
-            if (this.anim) {
+            if (this.anim && this.animReady) {
                 this.anim.loop = false;
                 this.anim.playSegments([85, 145], true);
             }
         },
         toDead() {
             this.state = 'dead';
+            this.animReady = false;
             if (this.anim) { this.anim.destroy(); this.anim = null; }
             this.mountAnim();
         },
