@@ -20,6 +20,7 @@ use App\Http\Controllers\Admin\ReviewsController;
 use App\Http\Controllers\Admin\SettingsController;
 use App\Http\Controllers\Admin\UsersController;
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\BookingFunnelController;
 use App\Http\Controllers\CalendarFeedController;
 use App\Http\Controllers\Host\CalendarSyncController as HostCalendarSyncController;
 use App\Http\Controllers\Host\PlaceAvailabilityController as HostAvailabilityController;
@@ -36,6 +37,15 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', [LandingController::class, 'index'])->name('landing');
 Route::post('/locale/{locale}', [LandingController::class, 'switchLocale'])->name('locale.switch');
 Route::get('/places/{place}', [PlaceController::class, 'show'])->name('places.show');
+
+// Web booking funnel — the link hosts share ("احجز عبر الرابط"). The page is
+// public; creating the booking and the status page need the JWT cookie the
+// inline OTP login sets (same api guard as the dashboard).
+Route::get('/book/{place}', [BookingFunnelController::class, 'show'])->name('book.show');
+Route::middleware('auth:api')->group(function (): void {
+    Route::post('/book/{place}', [BookingFunnelController::class, 'store'])->name('book.store');
+    Route::get('/book/status/{booking}', [BookingFunnelController::class, 'status'])->name('book.status');
+});
 
 // Moyasar redirects the guest's payment WebView here. The mobile app matches
 // these URLs to know payment finished (after) or was abandoned (back), then

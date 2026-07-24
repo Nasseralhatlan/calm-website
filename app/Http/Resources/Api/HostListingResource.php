@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Resources\Api;
 
+use App\Enums\PlaceReviewStatus;
+use App\Enums\PlaceStatus;
 use App\Models\Place;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -34,6 +36,11 @@ class HostListingResource extends JsonResource
             // Effective unit capacity — never below 1: classic single-unit
             // places report 1 so the app's badge can always render a count.
             'units_count' => max(1, (int) ($this->units_count ?? 0)),
+            // Shareable web booking funnel (/book/{place}) — null until the
+            // listing is live, so the app only offers sharing when bookable.
+            'booking_link' => $this->status === PlaceStatus::Active && $this->review_status === PlaceReviewStatus::Approved
+                ? route('book.show', $this->resource)
+                : null,
             'type' => $this->whenLoaded('type', fn () => $this->type ? [
                 'id' => $this->type->id,
                 'name_en' => $this->type->name_en,

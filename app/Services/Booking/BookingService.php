@@ -60,7 +60,21 @@ final class BookingService
      * race onto the same dates. The Moyasar call happens AFTER commit so we
      * never hold a DB lock across an external HTTP request.
      */
-    public function create(User $user, Place $place, string $checkIn, string $checkOut, int $guests): Booking
+    /** Resolve the per-flow payer return URL (null = app defaults from config). */
+    private function resolveReturnUrl(array $options, Booking $booking): ?string
+    {
+        $returnUrl = $options['return_url'] ?? null;
+
+        return $returnUrl instanceof \Closure ? $returnUrl($booking) : $returnUrl;
+    }
+
+    /**
+     * @param  array{return_url?: string|\Closure(Booking): string}  $options  `return_url` sends the payer
+     *                                                                         back to a web page (funnel bookings) instead of the app's
+     *                                                                         /calm-after-payment routes; a Closure receives the created
+     *                                                                         booking (the URL usually embeds its id). Empty for app flow.
+     */
+    public function create(User $user, Place $place, string $checkIn, string $checkOut, int $guests, array $options = []): Booking
     {
         // Single base instant for both the date-hold and the invoice expiry so
         // they can't drift apart.
@@ -153,6 +167,10 @@ final class BookingService
                     'host_id' => (string) $booking->host_user_id,
                 ],
                 expiredAt: $invoiceExpiresAt,
+                // Web-funnel bookings return the payer to the web status page
+                // (success AND back) instead of the app's return routes.
+                successUrl: $returnUrl = $this->resolveReturnUrl($options, $booking),
+                backUrl: $returnUrl,
             );
         } catch (RuntimeException $e) {
             // Free the dates immediately — a hold is worthless without a payment.

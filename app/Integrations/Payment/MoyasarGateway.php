@@ -36,15 +36,17 @@ final class MoyasarGateway
      *
      * @throws RuntimeException when Moyasar rejects the request.
      */
-    public function createInvoice(int $amountMinor, string $description, string $callbackUrl, array $metadata = [], ?CarbonImmutable $expiredAt = null): MoyasarInvoice
+    public function createInvoice(int $amountMinor, string $description, string $callbackUrl, array $metadata = [], ?CarbonImmutable $expiredAt = null, ?string $successUrl = null, ?string $backUrl = null): MoyasarInvoice
     {
         $payload = [
             'amount' => $amountMinor,
             'currency' => 'SAR',
             'description' => $description,
             'callback_url' => $callbackUrl,
-            'success_url' => (string) config('moyasar.success_url'),
-            'back_url' => (string) config('moyasar.back_url'),
+            // Per-invoice overrides let web-funnel bookings return the payer
+            // to the web status page instead of the app's return routes.
+            'success_url' => $successUrl ?? (string) config('moyasar.success_url'),
+            'back_url' => $backUrl ?? (string) config('moyasar.back_url'),
             'expired_at' => ($expiredAt ?? CarbonImmutable::now()->addMinutes((int) config('moyasar.hold_minutes', 10)))->toIso8601String(),
         ];
 
