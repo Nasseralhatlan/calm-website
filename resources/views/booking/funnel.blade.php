@@ -68,8 +68,8 @@
             </div>
 
             {{-- Sticky weekday letters --}}
-            <div class="sticky bg-white z-10 border-b border-[#f0f0f0]" style="top: 64px; padding: 10px 18px 8px;">
-                <div class="grid grid-cols-7 text-center text-[12px] font-semibold text-[#999]">
+            <div class="sticky bg-white z-10 border-b border-[#f7f7f7]" style="top: 64px; padding: 10px 18px 8px;">
+                <div class="grid grid-cols-7 text-center text-[12px] font-medium text-[#b8b8b8]">
                     <template x-for="d in dayNames()"><span x-text="d"></span></template>
                 </div>
             </div>
@@ -79,19 +79,21 @@
                 <template x-for="month in months" :key="month.key">
                     <div style="margin-top: 18px;">
                         <p class="font-bold text-[#222]" style="font-size: 18px; padding: 0 4px;" x-text="month.label"></p>
-                        <div class="grid grid-cols-7" style="row-gap: 6px; margin-top: 10px;">
+                        <div class="grid grid-cols-7" style="row-gap: 8px; margin-top: 10px;">
                             <template x-for="cell in month.cells" :key="cell.key">
-                                <div class="relative flex items-center justify-center" style="aspect-ratio: 1;">
-                                    {{-- Range band (connected grey strip behind the circles) --}}
-                                    <div x-show="bandFor(cell.date)" class="absolute inset-y-1 bg-[#f0f0f1]"
+                                <div class="relative flex items-center justify-center" style="height: 46px;">
+                                    {{-- Range band — soft translucent strip behind the circles --}}
+                                    <div x-show="bandFor(cell.date)" class="absolute"
+                                         style="top: 5px; bottom: 5px; background-color: rgba(0,0,0,0.045);"
                                          :style="bandStyle(cell.date)"></div>
+                                    {{-- Fixed-size circular day indicator --}}
                                     <button type="button"
                                             x-text="cell.day || ''"
                                             :disabled="!cell.day || cell.disabled"
                                             @click="pickDay(cell.date)"
-                                            class="relative tabular-nums select-none w-full h-full flex items-center justify-center font-semibold transition-colors"
+                                            class="relative tabular-nums select-none flex items-center justify-center transition-colors"
                                             :class="dayClass(cell)"
-                                            style="border-radius: 999px; font-size: 16px;"></button>
+                                            style="width: 40px; height: 40px; border-radius: 999px; font-size: 15px;"></button>
                                 </div>
                             </template>
                         </div>
@@ -372,10 +374,10 @@ function bookingFunnel(init) {
         },
         dayClass(cell) {
             if (!cell.day) return '';
-            if (cell.disabled) return 'text-[#bbb] line-through cursor-not-allowed font-normal';
-            if (cell.date === this.checkIn || cell.date === this.checkOut) return 'bg-[#222] text-white';
-            if (this.inRange(cell.date)) return 'text-[#222]';
-            return 'text-[#222] hover:bg-[#f3f4f6]';
+            if (cell.disabled) return 'text-[#cfcfcf] line-through cursor-not-allowed font-normal';
+            if (cell.date === this.checkIn || cell.date === this.checkOut) return 'bg-[#222] text-white font-bold';
+            if (this.inRange(cell.date)) return 'text-[#222] font-semibold';
+            return 'text-[#444] font-normal hover:bg-[#f3f4f6]';
         },
         inRange(date) {
             return this.checkIn && this.checkOut && date > this.checkIn && date < this.checkOut;
