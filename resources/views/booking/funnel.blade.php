@@ -27,7 +27,7 @@
      class="min-h-screen {{ $fa }}" style="background-color: #fff;">
 
     {{-- ── Calm header ── --}}
-    <header class="w-full bg-white border-b border-[#ebebeb] sticky top-0 z-30 backdrop-blur" style="background-color: rgba(255,255,255,0.95);">
+    <header class="w-full bg-white sticky top-0 z-30 backdrop-blur" style="background-color: rgba(255,255,255,0.95);">
         <div class="px-5 h-16 flex items-center justify-between mx-auto" style="max-width: 560px;">
             <a href="{{ route('landing') }}" class="flex items-center">
                 <img src="/assets/logo/logo.png" alt="Calm" class="h-8 w-auto select-none" draggable="false">
@@ -68,7 +68,7 @@
             </div>
 
             {{-- Sticky weekday letters --}}
-            <div class="sticky bg-white z-10 border-b border-[#f7f7f7]" style="top: 64px; padding: 10px 18px 8px;">
+            <div class="sticky bg-white z-10" style="top: 64px; padding: 10px 18px 8px;">
                 <div class="grid grid-cols-7 text-center text-[12px] font-medium text-[#b8b8b8]">
                     <template x-for="d in dayNames()"><span x-text="d"></span></template>
                 </div>
@@ -83,9 +83,7 @@
                             <template x-for="cell in month.cells" :key="cell.key">
                                 <div class="relative flex items-center justify-center" style="height: 46px;">
                                     {{-- Range band — soft translucent strip behind the circles --}}
-                                    <div x-show="bandFor(cell.date)" class="absolute"
-                                         style="top: 5px; bottom: 5px; background-color: rgba(0,0,0,0.045);"
-                                         :style="bandStyle(cell.date)"></div>
+                                    <div x-show="bandFor(cell.date)" class="absolute" :style="bandStyle(cell.date)"></div>
                                     {{-- Fixed-size circular day indicator --}}
                                     <button type="button"
                                             x-text="cell.day || ''"
@@ -104,14 +102,14 @@
             <p x-show="quoteError" x-cloak class="text-[13px] text-[#dc2626] text-center" style="margin-top: 14px; padding: 0 18px;" x-text="quoteError"></p>
 
             {{-- Guests --}}
-            <div class="flex items-center justify-between border-t border-[#f0f0f0]" style="margin: 20px 18px 0; padding-top: 16px;">
+            <div class="flex items-center justify-between" style="margin: 24px 18px 0;">
                 <span class="text-[15px] font-semibold text-[#222]">{{ $isRtl ? 'عدد الضيوف' : 'Guests' }}</span>
                 <div class="inline-flex items-center" style="gap: 14px;">
                     <button type="button" @click="guests = Math.max(1, guests - 1)"
-                            class="w-10 h-10 font-bold text-[#222] border border-[#dddddd] hover:border-[#222]" style="border-radius: 999px;">−</button>
+                            class="w-10 h-10 font-bold text-[#222] bg-[#f3f4f6] hover:bg-[#e9eaec]" style="border-radius: 999px;">−</button>
                     <span class="font-bold text-[#222] tabular-nums" style="min-width: 22px; text-align: center; font-size: 16px;" x-text="guests"></span>
                     <button type="button" @click="guests = Math.min(maxGuests, guests + 1)"
-                            class="w-10 h-10 font-bold text-[#222] border border-[#dddddd] hover:border-[#222]" style="border-radius: 999px;">+</button>
+                            class="w-10 h-10 font-bold text-[#222] bg-[#f3f4f6] hover:bg-[#e9eaec]" style="border-radius: 999px;">+</button>
                 </div>
             </div>
         </div>
@@ -124,10 +122,10 @@
             <template x-if="!otpSent">
                 <div style="margin-top: 18px;">
                     <input type="text" x-model="name" placeholder="{{ $isRtl ? 'الاسم' : 'Your name' }}"
-                           class="w-full bg-[#fafafa] border border-[#ebebeb] focus:border-[#222] text-[15px] focus:outline-none"
+                           class="w-full bg-[#f5f5f6] focus:bg-[#efeff1] text-[15px] focus:outline-none"
                            style="padding: 15px 16px; border-radius: 16px;">
                     <input type="tel" x-model="phone" placeholder="5XXXXXXXX" dir="ltr" inputmode="numeric"
-                           class="w-full bg-[#fafafa] border border-[#ebebeb] focus:border-[#222] text-[15px] tabular-nums focus:outline-none"
+                           class="w-full bg-[#f5f5f6] focus:bg-[#efeff1] text-[15px] tabular-nums focus:outline-none"
                            style="padding: 15px 16px; border-radius: 16px; margin-top: 10px;">
                 </div>
             </template>
@@ -138,7 +136,7 @@
                         {{ $isRtl ? 'أدخل الرمز المرسل إلى' : 'Enter the code sent to' }} <span dir="ltr" class="font-bold" x-text="normPhone()"></span>
                     </p>
                     <input type="text" x-model="otp" maxlength="6" inputmode="numeric" autocomplete="one-time-code" dir="ltr"
-                           class="w-full bg-[#fafafa] border border-[#ebebeb] focus:border-[#222] text-center tracking-[8px] font-bold text-[22px] tabular-nums focus:outline-none"
+                           class="w-full bg-[#f5f5f6] focus:bg-[#efeff1] text-center tracking-[8px] font-bold text-[22px] tabular-nums focus:outline-none"
                            style="padding: 15px 16px; border-radius: 16px; margin-top: 12px;">
 
                     {{-- Resend countdown --}}
@@ -163,7 +161,7 @@
         <div x-show="step === 3" x-cloak style="padding: 22px 18px 0;">
             <h2 class="font-bold text-[#222] text-center" style="font-size: 19px;">{{ $isRtl ? 'تأكيد و دفع' : 'Confirm & pay' }}</h2>
 
-            <div class="bg-white border border-[#efefef]" style="border-radius: 24px; padding: 18px; margin-top: 16px; box-shadow: 0px 10px 30px 0px rgba(0,0,0,0.05);">
+            <div class="bg-white" style="border-radius: 24px; padding: 18px; margin-top: 16px; box-shadow: 0px 10px 30px 0px rgba(0,0,0,0.05);">
                 {{-- Place row --}}
                 <div class="flex items-center" style="gap: 12px;">
                     @if($place->coverPhoto?->url)
@@ -179,7 +177,7 @@
                 </div>
 
                 {{-- Arrival / departure --}}
-                <div class="border-t border-[#f2f2f2]" style="margin-top: 16px; padding-top: 14px;">
+                <div style="margin-top: 20px;">
                     <div class="flex items-start justify-between">
                         <div>
                             <p class="font-bold text-[#222] text-[15px]">{{ $isRtl ? 'الوصول' : 'Arrival' }}</p>
@@ -201,7 +199,7 @@
                 </div>
 
                 {{-- Money --}}
-                <div class="border-t border-[#f2f2f2] text-[14px]" style="margin-top: 16px; padding-top: 12px; line-height: 2.4;">
+                <div class="text-[14px]" style="margin-top: 20px; line-height: 2.4;">
                     <div class="flex items-center justify-between">
                         <span class="text-[#717171]">{{ $isRtl ? 'الإقامة' : 'Stay' }} · <span x-text="nightsLabel()"></span></span>
                         <span class="font-bold text-[#222] tabular-nums" dir="ltr"><span x-text="fmtMoney(quote?.pricing.subtotal)"></span> SR</span>
@@ -210,7 +208,7 @@
                         <span class="text-[#717171]">{{ $isRtl ? 'ضريبة القيمة المضافة (15%)' : 'VAT (15%)' }}</span>
                         <span class="font-bold text-[#222] tabular-nums" dir="ltr"><span x-text="fmtMoney(quote?.pricing.vat)"></span> SR</span>
                     </div>
-                    <div class="flex items-center justify-between border-t border-[#f2f2f2]" style="margin-top: 6px; padding-top: 8px;">
+                    <div class="flex items-center justify-between" style="margin-top: 8px;">
                         <span class="font-bold text-[#222]" style="font-size: 16px;">{{ $isRtl ? 'الإجمالي' : 'Total' }}</span>
                         <span class="font-bold text-[#222] tabular-nums" style="font-size: 17px;" dir="ltr"><span x-text="fmtMoney(quote?.pricing.total)"></span> SR</span>
                     </div>
@@ -222,7 +220,7 @@
     </main>
 
     {{-- ── Sticky action bar ── --}}
-    <div class="fixed bottom-0 inset-x-0 bg-white/95 backdrop-blur border-t border-[#f0f0f0]" style="padding: 10px 18px calc(14px + env(safe-area-inset-bottom));">
+    <div class="fixed bottom-0 inset-x-0 bg-white/95 backdrop-blur" style="padding: 10px 18px calc(14px + env(safe-area-inset-bottom)); box-shadow: 0 -8px 24px rgba(0,0,0,0.05);">
         <div class="mx-auto" style="max-width: 560px;">
 
             {{-- Quick weekend chips (step 1, like the app) --}}
@@ -387,13 +385,13 @@ function bookingFunnel(init) {
             return date >= this.checkIn && date <= this.checkOut;
         },
         bandStyle(date) {
-            // Connected strip: full-bleed across cells, rounded only at the
-            // range ends (logical sides flip automatically under RTL).
+            // Connected strip behind the circles. ALL properties live in this
+            // one binding — splitting them across the static style attribute
+            // proved unreliable. Logical insets flip automatically under RTL.
             const s = date === this.checkIn, e = date === this.checkOut;
-            let css = 'inset-inline-start: 0; inset-inline-end: 0;';
-            if (s) css += 'inset-inline-start: 50%;';
-            if (e) css += 'inset-inline-end: 50%;';
-            return css;
+            return 'top: 5px; bottom: 5px; background-color: rgba(0,0,0,0.055);'
+                + `inset-inline-start: ${s ? '50%' : '0'};`
+                + `inset-inline-end: ${e ? '50%' : '0'};`;
         },
 
         // ── selection header + quick chips ──
