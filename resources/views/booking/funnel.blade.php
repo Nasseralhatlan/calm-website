@@ -230,7 +230,7 @@
                 {{-- Step 1: Next --}}
                 <button type="button" x-show="step === 1" @click="goDetails()" :disabled="!quote"
                         class="flex-1 font-bold text-white bg-[#222] hover:bg-black disabled:bg-[#dddddd] disabled:cursor-not-allowed active:scale-[0.99] transition-all"
-                        style="padding: 17px; border-radius: 999px; font-size: 16px;">
+                        style="padding: 17px; border-radius: 18px; font-size: 16px;">
                     <span x-text="quote ? '{{ $isRtl ? 'التالي' : 'Next' }}' : '{{ $isRtl ? 'اختر التواريخ' : 'Pick your dates' }}'"></span>
                 </button>
 
@@ -238,14 +238,16 @@
                 <button type="button" x-show="step === 2 && !otpSent" x-cloak @click="requestOtp()"
                         :disabled="authBusy || !name.trim() || normPhone().length !== 9"
                         class="flex-1 font-bold text-white bg-[#222] hover:bg-black disabled:bg-[#dddddd] disabled:cursor-not-allowed active:scale-[0.99] transition-all"
-                        style="padding: 17px; border-radius: 999px; font-size: 16px;">
+                        style="padding: 17px; border-radius: 18px; font-size: 16px;">
+                    <svg x-show="authBusy" x-cloak class="calm-spinner inline-block align-middle" style="margin-inline-end: 8px;" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><circle cx="12" cy="12" r="10" stroke-opacity="0.3"/><path d="M22 12a10 10 0 0 1-10 10"/></svg>
                     <span x-show="!authBusy">{{ $isRtl ? 'التالي' : 'Next' }}</span>
                     <span x-show="authBusy" x-cloak>{{ $isRtl ? 'جارٍ إرسال الرمز…' : 'Sending the code…' }}</span>
                 </button>
                 <button type="button" x-show="step === 2 && otpSent" x-cloak @click="verifyOtp()"
                         :disabled="authBusy || otp.length < 4"
                         class="flex-1 font-bold text-white bg-[#222] hover:bg-black disabled:bg-[#dddddd] disabled:cursor-not-allowed active:scale-[0.99] transition-all"
-                        style="padding: 17px; border-radius: 999px; font-size: 16px;">
+                        style="padding: 17px; border-radius: 18px; font-size: 16px;">
+                    <svg x-show="authBusy" x-cloak class="calm-spinner inline-block align-middle" style="margin-inline-end: 8px;" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><circle cx="12" cy="12" r="10" stroke-opacity="0.3"/><path d="M22 12a10 10 0 0 1-10 10"/></svg>
                     <span x-show="!authBusy">{{ $isRtl ? 'التالي' : 'Next' }}</span>
                     <span x-show="authBusy" x-cloak>{{ $isRtl ? 'جارٍ التحقق…' : 'Verifying…' }}</span>
                 </button>
@@ -253,7 +255,8 @@
                 {{-- Step 3: Pay --}}
                 <button type="button" x-show="step === 3" x-cloak @click="submit()" :disabled="submitting"
                         class="flex-1 font-bold text-white bg-[#222] hover:bg-black disabled:bg-[#dddddd] active:scale-[0.99] transition-all"
-                        style="padding: 17px; border-radius: 999px; font-size: 16px;">
+                        style="padding: 17px; border-radius: 18px; font-size: 16px;">
+                    <svg x-show="submitting" x-cloak class="calm-spinner inline-block align-middle" style="margin-inline-end: 8px;" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><circle cx="12" cy="12" r="10" stroke-opacity="0.3"/><path d="M22 12a10 10 0 0 1-10 10"/></svg>
                     <span x-show="!submitting">{{ $isRtl ? 'متابعة للدفع' : 'Continue to payment' }}</span>
                     <span x-show="submitting" x-cloak>{{ $isRtl ? 'جارٍ التحويل للدفع…' : 'Heading to payment…' }}</span>
                 </button>
@@ -274,7 +277,7 @@ function bookingFunnel(init) {
     const EN_DAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
     const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     const todayIso = iso(new Date());
-    const MONTHS_AHEAD = 6;
+    const MONTHS_AHEAD = 12; // a full year of dates ahead
 
     const gregFmt = new Intl.DateTimeFormat(init.isRtl ? 'ar' : 'en', { weekday: 'long', day: 'numeric', month: 'long' });
     let hijriFmt = null;
@@ -343,7 +346,14 @@ function bookingFunnel(init) {
                 this.checkIn = date; this.checkOut = null; this.quote = null; this.quoteError = '';
                 return;
             }
-            if (date <= this.checkIn) { this.checkIn = date; return; }
+            if (date === this.checkIn) {
+                // Same day tapped twice = a one-day stay (arrive and leave per
+                // the place's times; server quotes equal dates as one day).
+                this.checkOut = date;
+                this.fetchQuote();
+                return;
+            }
+            if (date < this.checkIn) { this.checkIn = date; return; }
             if (!this.rangeFree(this.checkIn, date)) {
                 this.quoteError = this.isRtl ? 'يوجد ليالٍ محجوزة ضمن المدى المختار — اختر تواريخ أخرى.' : 'Some nights in that range are booked — pick different dates.';
                 this.checkIn = date; this.checkOut = null; this.quote = null;
@@ -390,15 +400,16 @@ function bookingFunnel(init) {
         rangeTitle() {
             if (!this.checkIn || !this.checkOut) return this.isRtl ? 'اختر التواريخ' : 'Pick your dates';
             const n = this.nights();
-            if (!this.isRtl) return n === 1 ? '1 night' : `${n} nights`;
-            return n === 1 ? 'ليلة واحدة' : (n === 2 ? 'ليلتان' : `${n} أيام`);
+            if (!this.isRtl) return n === 1 ? '1 day' : `${n} days`;
+            return n === 1 ? 'يوم واحد' : (n === 2 ? 'يومان' : `${n} أيام`);
         },
         rangeSubtitle() {
             if (!this.checkIn || !this.checkOut || !hijriFmt) return '';
             try { return `${hijriFmt.format(new Date(this.checkIn))} – ${hijriFmt.format(new Date(this.checkOut))}`; } catch (e) { return ''; }
         },
         nights() {
-            return Math.round((new Date(this.checkOut) - new Date(this.checkIn)) / 86400000);
+            // Inclusive DAY count (app semantics: Jul 26 → Jul 31 = 6 أيام).
+            return Math.round((new Date(this.checkOut) - new Date(this.checkIn)) / 86400000) + 1;
         },
 
         // ── step navigation ──
@@ -437,8 +448,8 @@ function bookingFunnel(init) {
         nightsLabel() {
             if (!this.quote) return '';
             const n = this.quote.days;
-            if (!this.isRtl) return n === 1 ? '1 night' : `${n} nights`;
-            return n === 1 ? 'ليلة واحدة' : (n === 2 ? 'ليلتان' : `${n} أيام`);
+            if (!this.isRtl) return n === 1 ? '1 day' : `${n} days`;
+            return n === 1 ? 'يوم واحد' : (n === 2 ? 'يومان' : `${n} أيام`);
         },
         fmtMoney(v) { return v == null ? '' : Number(v).toLocaleString(); },
         fmtDay(dateStr) {

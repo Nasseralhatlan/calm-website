@@ -121,7 +121,7 @@
             @if($place)
                 <a href="{{ route('book.show', $place) }}"
                    class="inline-block font-bold text-white bg-[#222] hover:bg-black"
-                   style="padding: 15px 34px; border-radius: 999px;">
+                   style="padding: 15px 34px; border-radius: 18px;">
                     {{ $isRtl ? 'احجز من جديد' : 'Book again' }}
                 </a>
             @endif
@@ -133,7 +133,7 @@
         <div class="mx-auto" style="max-width: 560px;">
             <a href="{{ route('landing') }}"
                class="block w-full text-center font-bold text-white bg-[#222] hover:bg-black active:scale-[0.99] transition-all"
-               style="padding: 16px; border-radius: 999px; font-size: 16px;">
+               style="padding: 16px; border-radius: 18px; font-size: 16px;">
                 {{ $isRtl ? 'العودة للرئيسية' : 'Return home' }}
             </a>
         </div>
