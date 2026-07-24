@@ -18,6 +18,7 @@
         "alpinejs": "^3.15.12",
         "browser-image-compression": "^2.0.2",
         "heic2any": "^0.0.4",
+        "lottie-web": "^5.13.0",
         "sortablejs": "^1.15.7"
     }
 }

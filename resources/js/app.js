@@ -19,6 +19,9 @@ window.Sortable = Sortable;
 // when an iPhone HEIC/HEIF file is actually picked.
 window.imageCompression = imageCompression;
 window.loadHeic2any = () => import('heic2any').then((m) => m.default);
+// Lottie renders the booking status animations (loader→success, pending);
+// lazy so only the pages that play animations pay for it.
+window.loadLottie = () => import('lottie-web').then((m) => m.default);
 
 /**
  * Global submit-loading handler.

@@ -150,6 +150,14 @@
                                class="inline-flex items-center gap-1 text-[13px] font-bold text-[#F88379] hover:text-[#f56b60] {{ $fa }}">
                                 {{ $isRtl ? '📅 التواريخ' : '📅 Dates' }}
                             </a>
+                            @if($place->status === \App\Enums\PlaceStatus::Active)
+                                {{-- Shareable web booking funnel — copies /book/{place}. --}}
+                                <button type="button"
+                                        onclick="navigator.clipboard.writeText('{{ route('book.show', $place) }}').then(() => { this.textContent = '{{ $isRtl ? '✓ نُسخ' : '✓ Copied' }}'; setTimeout(() => { this.textContent = '{{ $isRtl ? '🔗 رابط الحجز' : '🔗 Booking link' }}'; }, 1600); })"
+                                        class="inline-flex items-center gap-1 text-[13px] font-bold text-[#0d9488] hover:text-[#0f766e] {{ $fa }}">
+                                    {{ $isRtl ? '🔗 رابط الحجز' : '🔗 Booking link' }}
+                                </button>
+                            @endif
                         @endif
                         <form method="POST" action="{{ route('host.places.destroy', $place) }}" class="inline m-0" style="margin-inline-start: auto;"
                               onsubmit="return confirm('{{ $isRtl ? 'حذف هذا المكان؟ يمكن استعادته لاحقاً.' : 'Delete this place? It can be restored later.' }}');">
