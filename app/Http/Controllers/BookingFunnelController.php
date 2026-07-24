@@ -61,6 +61,9 @@ class BookingFunnelController extends Controller
         abort_unless($booking->guest_user_id === $request->user()->id, 404);
 
         $booking->load(['place.coverPhoto', 'place.type', 'place.cityArea.city']);
+        // Rating for the app-style summary card (★ 4.80 (12)).
+        $booking->place?->loadCount('publishedReviews');
+        $booking->place?->loadAvg('publishedReviews', 'rate');
 
         return view('booking.status', ['booking' => $booking]);
     }
