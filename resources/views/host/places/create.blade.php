@@ -1679,7 +1679,10 @@ function registerWizard() {
             });
             if (!putRes.ok) throw new Error(`Upload to storage failed (${putRes.status})`);
 
-            return { path: ticket.path, url: ticket.public_url };
+            // Preview from the CONVERTED bytes — raw HEIC never renders in <img>.
+            const displayPreview = await this._readPreview(file);
+
+            return { path: ticket.path, url: ticket.public_url, preview: displayPreview };
         },
         async onAttributeFiles(event, attributeId) {
             let files = Array.from(event.target.files || []);
@@ -1691,14 +1694,16 @@ function registerWizard() {
             if (!files.length) return;
 
             for (const file of files) {
-                const preview = await this._readPreview(file);
+                const preview = /\.(heic|heif)$/i.test(file.name)
+                    ? 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="%23f3f4f6"/></svg>'
+                    : await this._readPreview(file);
                 const id = ++this.uploadCounter;
                 this.attributeUploads[attributeId].push({
                     id, name: file.name, status: 'uploading', preview, path: null, url: null,
                 });
                 this._uploadOne(file).then((r) => {
                     const row = (this.attributeUploads[attributeId] || []).find((u) => u.id === id);
-                    if (row) { row.path = r.path; row.url = r.url; row.status = 'done'; }
+                    if (row) { row.path = r.path; row.url = r.url; if (r.preview) row.preview = r.preview; row.status = 'done'; }
                 }).catch((err) => {
                     const row = (this.attributeUploads[attributeId] || []).find((u) => u.id === id);
                     if (row) { row.status = 'failed'; row.error = err.message || 'Upload failed'; }
@@ -1714,14 +1719,16 @@ function registerWizard() {
             if (!files.length) return;
 
             for (const file of files) {
-                const preview = await this._readPreview(file);
+                const preview = /\.(heic|heif)$/i.test(file.name)
+                    ? 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="%23f3f4f6"/></svg>'
+                    : await this._readPreview(file);
                 const id = ++this.uploadCounter;
                 this.extraUploads.push({
                     id, name: file.name, status: 'uploading', preview, path: null, url: null,
                 });
                 this._uploadOne(file).then((r) => {
                     const row = this.extraUploads.find((u) => u.id === id);
-                    if (row) { row.path = r.path; row.url = r.url; row.status = 'done'; }
+                    if (row) { row.path = r.path; row.url = r.url; if (r.preview) row.preview = r.preview; row.status = 'done'; }
                 }).catch((err) => {
                     const row = this.extraUploads.find((u) => u.id === id);
                     if (row) { row.status = 'failed'; row.error = err.message || 'Upload failed'; }
