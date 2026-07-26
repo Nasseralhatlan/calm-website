@@ -60,6 +60,13 @@ class BookingFunnelController extends Controller
     {
         abort_unless($booking->guest_user_id === $request->user()->id, 404);
 
+        // Moyasar's in-page back button lands with ?back=1: settle truthfully
+        // (race-paid → confirmed; still pending → hold released) instead of
+        // leaving the customer on an endless "confirming…" spinner.
+        if ($request->boolean('back')) {
+            $booking = $this->funnel->settleOnBack($booking);
+        }
+
         $booking->load(['place.coverPhoto', 'place.type', 'place.cityArea.city']);
         // Rating for the app-style summary card (★ 4.80 (12)).
         $booking->place?->loadCount('publishedReviews');

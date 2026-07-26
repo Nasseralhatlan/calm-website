@@ -19,6 +19,17 @@ final class BookingFunnelService
     public function __construct(private readonly BookingService $bookings) {}
 
     /**
+     * The payer backed out of (or returned to) the hosted payment page —
+     * settle truthfully: re-verify with Moyasar first (a race-paid booking
+     * confirms), otherwise release the still-pending hold. No-op on any
+     * already-settled booking, so refreshes are safe.
+     */
+    public function settleOnBack(Booking $booking): Booking
+    {
+        return $this->bookings->cancelIfPending($booking);
+    }
+
+    /**
      * @param  array{check_in: string, check_out: string, guests: int, name?: ?string}  $data
      */
     public function book(User $guest, Place $place, array $data): Booking
@@ -36,7 +47,12 @@ final class BookingFunnelService
             $data['check_in'],
             $data['check_out'],
             (int) $data['guests'],
-            ['return_url' => fn (Booking $booking): string => route('book.status', $booking)],
+            [
+                'return_url' => fn (Booking $booking): string => route('book.status', $booking),
+                // Moyasar's in-page back lands here — the status page releases
+                // the hold instead of polling a payment that will never come.
+                'back_url' => fn (Booking $booking): string => route('book.status', ['booking' => $booking, 'back' => 1]),
+            ],
         );
     }
 }

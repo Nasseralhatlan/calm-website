@@ -51,6 +51,14 @@ final class BookingService
         // not a real cancellation. bookingCancelled() stays for a future cancel flow.
     }
 
+    /** Resolve a per-flow payer URL option (null = app defaults from config). */
+    private function resolveUrlOption(array $options, string $key, Booking $booking): ?string
+    {
+        $url = $options[$key] ?? null;
+
+        return $url instanceof \Closure ? $url($booking) : $url;
+    }
+
     /**
      * "Click book": re-run the availability + pricing quote as the server-side
      * source of truth, hold the dates with a pending_payment booking, then open
@@ -59,20 +67,11 @@ final class BookingService
      * The quote + insert run under a row lock on the place so two guests can't
      * race onto the same dates. The Moyasar call happens AFTER commit so we
      * never hold a DB lock across an external HTTP request.
-     */
-    /** Resolve the per-flow payer return URL (null = app defaults from config). */
-    private function resolveReturnUrl(array $options, Booking $booking): ?string
-    {
-        $returnUrl = $options['return_url'] ?? null;
-
-        return $returnUrl instanceof \Closure ? $returnUrl($booking) : $returnUrl;
-    }
-
-    /**
-     * @param  array{return_url?: string|\Closure(Booking): string}  $options  `return_url` sends the payer
-     *                                                                         back to a web page (funnel bookings) instead of the app's
-     *                                                                         /calm-after-payment routes; a Closure receives the created
-     *                                                                         booking (the URL usually embeds its id). Empty for app flow.
+     *
+     * @param  array{return_url?: string|\Closure(Booking): string, back_url?: string|\Closure(Booking): string}  $options  Per-flow payer URLs
+     *                                                                                                                      (funnel bookings) instead of the app's /calm-*-payment routes: `return_url` on success,
+     *                                                                                                                      `back_url` when the payer backs out of the hosted page (defaults to return_url).
+     *                                                                                                                      Closures receive the created booking. Empty for app flow.
      */
     public function create(User $user, Place $place, string $checkIn, string $checkOut, int $guests, array $options = []): Booking
     {
@@ -168,9 +167,11 @@ final class BookingService
                 ],
                 expiredAt: $invoiceExpiresAt,
                 // Web-funnel bookings return the payer to the web status page
-                // (success AND back) instead of the app's return routes.
-                successUrl: $returnUrl = $this->resolveReturnUrl($options, $booking),
-                backUrl: $returnUrl,
+                // instead of the app's return routes. Back gets its OWN URL so
+                // the landing page can release the hold rather than sit there
+                // polling a payment that will never come.
+                successUrl: $returnUrl = $this->resolveUrlOption($options, 'return_url', $booking),
+                backUrl: $this->resolveUrlOption($options, 'back_url', $booking) ?? $returnUrl,
             );
         } catch (RuntimeException $e) {
             // Free the dates immediately — a hold is worthless without a payment.

@@ -56,6 +56,13 @@
                 <p class="text-[#717171]" style="font-size: clamp(13px, 3.8vw, 15px); margin-top: 8px; line-height: 1.9;">
                     {{ $isRtl ? 'لحظات ويكتمل حجزك. لا تغلق الصفحة.' : 'Just a moment while we confirm your booking. Keep this page open.' }}
                 </p>
+                {{-- Escape hatch after ~15s of polling: settle the booking
+                     truthfully (?back=1 re-verifies then releases the hold)
+                     instead of leaving the customer stuck on a spinner. --}}
+                <a x-show="tries >= 5" x-cloak href="{{ route('book.status', ['booking' => $booking, 'back' => 1]) }}"
+                   class="inline-block text-[13px] font-semibold text-[#717171] underline hover:text-[#222]" style="margin-top: 16px;">
+                    {{ $isRtl ? 'لم تُكمل الدفع؟ إلغاء والعودة' : "Didn't complete the payment? Cancel and go back" }}
+                </a>
             </div>
         </template>
 
