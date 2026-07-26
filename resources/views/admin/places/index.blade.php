@@ -160,6 +160,9 @@
                     <div class="flex items-center" style="margin-top: 12px; gap: 16px;">
                         <a href="{{ route('places.show', $place) }}" class="text-[13px] text-[#717171] font-semibold hover:text-[#222]">{{ $isRtl ? 'عرض' : 'View' }}</a>
                         <a href="{{ route('admin.places.edit', $place) }}" class="text-[13px] text-[#222] font-semibold hover:underline">{{ $isRtl ? 'تعديل' : 'Edit' }}</a>
+                        {{-- Block/unblock dates on any place — the shared availability
+                             page already authorizes admins. --}}
+                        <a href="{{ route('host.places.availability', $place) }}" class="text-[13px] text-[#F88379] font-semibold hover:underline">{{ $isRtl ? '📅 التواريخ' : '📅 Dates' }}</a>
                         <form method="POST" action="{{ route('admin.places.destroy', $place) }}" class="inline" style="margin-inline-start: auto;" onsubmit="return confirm('{{ $isRtl ? 'حذف هذا المكان؟ يمكن استعادته لاحقاً.' : 'Delete this place? It can be restored later.' }}');">
                             @csrf @method('DELETE')
                             <button type="submit" class="text-[13px] text-[#dc2626] font-semibold hover:underline">{{ $isRtl ? 'حذف' : 'Delete' }}</button>
