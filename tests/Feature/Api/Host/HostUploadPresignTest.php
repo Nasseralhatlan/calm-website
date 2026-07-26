@@ -53,3 +53,19 @@ it('requires authentication', function (): void {
     $this->postJson('/api/host/uploads/presign', ['filename' => 'a.jpg', 'mime' => 'image/jpeg'])
         ->assertStatus(401);
 });
+
+it('rejects non-displayable mimes — HEIC must be converted client-side', function (): void {
+    $host = User::factory()->create(['phone' => '512700902']);
+
+    foreach (['image/heic', 'image/heif', 'application/pdf'] as $mime) {
+        $this->actingAs($host, 'api')
+            ->postJson('/api/host/uploads/presign', ['filename' => 'photo.heic', 'mime' => $mime])
+            ->assertStatus(422)
+            ->assertJsonStructure(['data' => ['errors' => ['mime']]]);
+    }
+
+    // The converted output stays welcome.
+    $this->actingAs($host, 'api')
+        ->postJson('/api/host/uploads/presign', ['filename' => 'photo.webp', 'mime' => 'image/webp'])
+        ->assertOk();
+});

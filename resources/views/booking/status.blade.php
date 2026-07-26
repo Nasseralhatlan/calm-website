@@ -56,6 +56,13 @@
                 <p class="text-[#717171]" style="font-size: clamp(13px, 3.8vw, 15px); margin-top: 8px; line-height: 1.9;">
                     {{ $isRtl ? 'لحظات ويكتمل حجزك. لا تغلق الصفحة.' : 'Just a moment while we confirm your booking. Keep this page open.' }}
                 </p>
+                {{-- Escape hatch after ~15s of polling: settle the booking
+                     truthfully (?back=1 re-verifies then releases the hold)
+                     instead of leaving the customer stuck on a spinner. --}}
+                <a x-show="tries >= 5" x-cloak href="{{ route('book.status', ['booking' => $booking, 'back' => 1]) }}"
+                   class="inline-block text-[13px] font-semibold text-[#717171] underline hover:text-[#222]" style="margin-top: 16px;">
+                    {{ $isRtl ? 'لم تُكمل الدفع؟ إلغاء والعودة' : "Didn't complete the payment? Cancel and go back" }}
+                </a>
             </div>
         </template>
 
@@ -121,7 +128,7 @@
             @if($place)
                 <a href="{{ route('book.show', $place) }}"
                    class="inline-block font-bold text-white bg-[#222] hover:bg-black"
-                   style="padding: 15px 34px; border-radius: 999px;">
+                   style="padding: 15px 34px; border-radius: 18px;">
                     {{ $isRtl ? 'احجز من جديد' : 'Book again' }}
                 </a>
             @endif
@@ -133,7 +140,7 @@
         <div class="mx-auto" style="max-width: 560px;">
             <a href="{{ route('landing') }}"
                class="block w-full text-center font-bold text-white bg-[#222] hover:bg-black active:scale-[0.99] transition-all"
-               style="padding: 16px; border-radius: 999px; font-size: 16px;">
+               style="padding: 16px; border-radius: 18px; font-size: 16px;">
                 {{ $isRtl ? 'العودة للرئيسية' : 'Return home' }}
             </a>
         </div>

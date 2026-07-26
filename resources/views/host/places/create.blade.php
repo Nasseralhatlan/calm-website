@@ -643,7 +643,7 @@
                                     <div class="text-3xl" style="line-height: 1;">📷</div>
                                     <div class="mt-2 text-sm font-semibold text-[#222]">{{ $isRtl ? 'أضف صوراً' : 'Add photos' }}</div>
                                     <div class="mt-1 text-xs text-[#717171]">{{ $isRtl ? 'يمكنك اختيار أكثر من صورة' : 'You can pick more than one' }}</div>
-                                    <input type="file" accept="image/*" multiple
+                                    <input type="file" accept="image/*,.heic,.heif" multiple
                                            @change="onAttributeFiles($event, entry.id)"
                                            class="absolute inset-0 opacity-0 cursor-pointer">
                                 </label>
@@ -712,7 +712,7 @@
                             <div class="text-3xl" style="line-height: 1;">🖼️</div>
                             <div class="mt-2 text-sm font-semibold text-[#222]">{{ $isRtl ? 'أضف صوراً عامة' : 'Add general photos' }}</div>
                             <div class="mt-1 text-xs text-[#717171]">{{ $isRtl ? 'يمكنك اختيار أكثر من صورة' : 'You can pick more than one' }}</div>
-                            <input type="file" accept="image/*" multiple
+                            <input type="file" accept="image/*,.heic,.heif" multiple
                                    @change="onExtraFiles($event)"
                                    class="absolute inset-0 opacity-0 cursor-pointer">
                         </label>
@@ -1581,14 +1581,30 @@ function registerWizard() {
 
             let work = file;
             if (isHeic) {
+                // Two decoders: heic-to (libheif 1.19 — handles iOS 17/18 HDR
+                // HEICs) first, the older heic2any as fallback. If BOTH fail we
+                // throw so the tile shows a clear error — browsers can't
+                // display raw HEIC, so uploading the original is never useful.
+                let blob = null;
                 try {
-                    const heic2any = await window.loadHeic2any();
-                    const out = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.92 });
-                    const blob = Array.isArray(out) ? out[0] : out;
-                    work = new File([blob], file.name.replace(/\.(heic|heif)$/i, '.jpg'), { type: 'image/jpeg' });
-                } catch (e) {
-                    console.warn('[upload] HEIC convert failed, trying original', e);
+                    const heicTo = await window.loadHeicTo();
+                    blob = await heicTo({ blob: file, type: 'image/jpeg', quality: 0.9 });
+                } catch (e1) {
+                    console.warn('[upload] heic-to failed, trying heic2any', e1);
+                    try {
+                        const heic2any = await window.loadHeic2any();
+                        const out = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.92 });
+                        blob = Array.isArray(out) ? out[0] : out;
+                    } catch (e2) {
+                        console.warn('[upload] heic2any failed too', e2);
+                    }
                 }
+                if (!blob) {
+                    throw new Error(@js($isRtl
+                        ? 'تعذر معالجة هذه الصورة (HEIC). حوّلها إلى JPG وأعد المحاولة.'
+                        : 'Could not process this HEIC photo. Convert it to JPG and try again.'));
+                }
+                work = new File([blob], file.name.replace(/\.(heic|heif)$/i, '.jpg'), { type: 'image/jpeg' });
             } else if (file.size < 150 * 1024) {
                 return file; // already small (< 150 KB), non-HEIC — nothing to gain
             }
@@ -1663,7 +1679,10 @@ function registerWizard() {
             });
             if (!putRes.ok) throw new Error(`Upload to storage failed (${putRes.status})`);
 
-            return { path: ticket.path, url: ticket.public_url };
+            // Preview from the CONVERTED bytes — raw HEIC never renders in <img>.
+            const displayPreview = await this._readPreview(file);
+
+            return { path: ticket.path, url: ticket.public_url, preview: displayPreview };
         },
         async onAttributeFiles(event, attributeId) {
             let files = Array.from(event.target.files || []);
@@ -1675,14 +1694,16 @@ function registerWizard() {
             if (!files.length) return;
 
             for (const file of files) {
-                const preview = await this._readPreview(file);
+                const preview = /\.(heic|heif)$/i.test(file.name)
+                    ? 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="%23f3f4f6"/></svg>'
+                    : await this._readPreview(file);
                 const id = ++this.uploadCounter;
                 this.attributeUploads[attributeId].push({
                     id, name: file.name, status: 'uploading', preview, path: null, url: null,
                 });
                 this._uploadOne(file).then((r) => {
                     const row = (this.attributeUploads[attributeId] || []).find((u) => u.id === id);
-                    if (row) { row.path = r.path; row.url = r.url; row.status = 'done'; }
+                    if (row) { row.path = r.path; row.url = r.url; if (r.preview) row.preview = r.preview; row.status = 'done'; }
                 }).catch((err) => {
                     const row = (this.attributeUploads[attributeId] || []).find((u) => u.id === id);
                     if (row) { row.status = 'failed'; row.error = err.message || 'Upload failed'; }
@@ -1698,14 +1719,16 @@ function registerWizard() {
             if (!files.length) return;
 
             for (const file of files) {
-                const preview = await this._readPreview(file);
+                const preview = /\.(heic|heif)$/i.test(file.name)
+                    ? 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="%23f3f4f6"/></svg>'
+                    : await this._readPreview(file);
                 const id = ++this.uploadCounter;
                 this.extraUploads.push({
                     id, name: file.name, status: 'uploading', preview, path: null, url: null,
                 });
                 this._uploadOne(file).then((r) => {
                     const row = this.extraUploads.find((u) => u.id === id);
-                    if (row) { row.path = r.path; row.url = r.url; row.status = 'done'; }
+                    if (row) { row.path = r.path; row.url = r.url; if (r.preview) row.preview = r.preview; row.status = 'done'; }
                 }).catch((err) => {
                     const row = this.extraUploads.find((u) => u.id === id);
                     if (row) { row.status = 'failed'; row.error = err.message || 'Upload failed'; }

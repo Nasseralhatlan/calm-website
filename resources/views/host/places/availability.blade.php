@@ -50,10 +50,16 @@
 @section('heading', $isRtl ? 'إدارة التواريخ' : 'Manage availability')
 
 @section('header-action')
-    <a href="{{ route('user.places') }}"
+    @php
+        // Admins arrive from the admin places list (they can manage any
+        // place's dates) — send them back there, not to "my places".
+        $viewerIsForeignAdmin = auth('api')->user()?->isAdmin() && $place->host_user_id !== auth('api')->id();
+    @endphp
+    <a href="{{ $viewerIsForeignAdmin ? route('admin.places.index') : route('user.places') }}"
        class="inline-flex items-center font-semibold text-[#222] bg-white hover:bg-[#f7f7f7] border border-[#ebebeb] {{ $fa }}"
        style="padding: 10px 18px; gap: 8px; border-radius: 14px; font-size: 14px;">
-        <span>{{ $isRtl ? '→' : '←' }}</span><span>{{ $isRtl ? 'أماكني' : 'My places' }}</span>
+        <span>{{ $isRtl ? '→' : '←' }}</span>
+        <span>{{ $viewerIsForeignAdmin ? ($isRtl ? 'الأماكن' : 'Places') : ($isRtl ? 'أماكني' : 'My places') }}</span>
     </a>
 @endsection
 

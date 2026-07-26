@@ -123,9 +123,29 @@
                     <input type="text" x-model="name" placeholder="{{ $isRtl ? 'الاسم' : 'Your name' }}"
                            class="w-full text-[15px] focus:outline-none"
                            style="background-color: #f5f5f6; padding: 15px 16px; border-radius: 16px;">
-                    <input type="tel" x-model="phone" placeholder="5XXXXXXXX" dir="ltr" inputmode="numeric"
-                           class="w-full text-[15px] tabular-nums focus:outline-none"
-                           style="background-color: #f5f5f6; padding: 15px 16px; border-radius: 16px; margin-top: 10px;">
+                    {{-- Dial-code picker + phone, LTR so the prefix never flips
+                         (same pattern as the login page, funnel styling). --}}
+                    <div class="flex items-center" dir="ltr"
+                         style="background-color: #f5f5f6; border-radius: 16px; margin-top: 10px;">
+                        <select x-model="countryCode" aria-label="Country dial code"
+                                class="bg-transparent text-[15px] font-semibold text-[#222] tabular-nums shrink-0 focus:outline-none cursor-pointer"
+                                style="appearance: none; -webkit-appearance: none; -moz-appearance: none;
+                                       padding: 15px 26px 15px 14px;
+                                       border-right: 1px solid #e6e6e8;
+                                       background-image: url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2210%22 height=%2210%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%23222%22 stroke-width=%223%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22><polyline points=%226 9 12 15 18 9%22/></svg>');
+                                       background-repeat: no-repeat;
+                                       background-position: right 9px center;">
+                            @foreach($countries as $country)
+                                <option value="{{ $country->country_code }}">
+                                    {{ $country->avatar ? $country->avatar.'  ' : '' }}{{ $country->dial_code }}
+                                </option>
+                            @endforeach
+                        </select>
+                        <input type="tel" x-model="phone" placeholder="5XXXXXXXX" inputmode="numeric" maxlength="16"
+                               autocomplete="tel-national"
+                               class="flex-1 text-[15px] tabular-nums focus:outline-none bg-transparent"
+                               style="padding: 15px 16px; min-width: 0; letter-spacing: 0.5px;">
+                    </div>
                 </div>
             </template>
 
@@ -230,7 +250,7 @@
                 {{-- Step 1: Next --}}
                 <button type="button" x-show="step === 1" @click="goDetails()" :disabled="!quote"
                         class="flex-1 font-bold text-white bg-[#222] hover:bg-black disabled:bg-[#dddddd] disabled:cursor-not-allowed active:scale-[0.99] transition-all"
-                        style="padding: 17px; border-radius: 999px; font-size: 16px;">
+                        style="padding: 17px; border-radius: 18px; font-size: 16px;">
                     <span x-text="quote ? '{{ $isRtl ? 'التالي' : 'Next' }}' : '{{ $isRtl ? 'اختر التواريخ' : 'Pick your dates' }}'"></span>
                 </button>
 
@@ -238,14 +258,16 @@
                 <button type="button" x-show="step === 2 && !otpSent" x-cloak @click="requestOtp()"
                         :disabled="authBusy || !name.trim() || normPhone().length !== 9"
                         class="flex-1 font-bold text-white bg-[#222] hover:bg-black disabled:bg-[#dddddd] disabled:cursor-not-allowed active:scale-[0.99] transition-all"
-                        style="padding: 17px; border-radius: 999px; font-size: 16px;">
+                        style="padding: 17px; border-radius: 18px; font-size: 16px;">
+                    <svg x-show="authBusy" x-cloak class="calm-spinner inline-block align-middle" style="margin-inline-end: 8px;" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><circle cx="12" cy="12" r="10" stroke-opacity="0.3"/><path d="M22 12a10 10 0 0 1-10 10"/></svg>
                     <span x-show="!authBusy">{{ $isRtl ? 'التالي' : 'Next' }}</span>
                     <span x-show="authBusy" x-cloak>{{ $isRtl ? 'جارٍ إرسال الرمز…' : 'Sending the code…' }}</span>
                 </button>
                 <button type="button" x-show="step === 2 && otpSent" x-cloak @click="verifyOtp()"
                         :disabled="authBusy || otp.length < 4"
                         class="flex-1 font-bold text-white bg-[#222] hover:bg-black disabled:bg-[#dddddd] disabled:cursor-not-allowed active:scale-[0.99] transition-all"
-                        style="padding: 17px; border-radius: 999px; font-size: 16px;">
+                        style="padding: 17px; border-radius: 18px; font-size: 16px;">
+                    <svg x-show="authBusy" x-cloak class="calm-spinner inline-block align-middle" style="margin-inline-end: 8px;" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><circle cx="12" cy="12" r="10" stroke-opacity="0.3"/><path d="M22 12a10 10 0 0 1-10 10"/></svg>
                     <span x-show="!authBusy">{{ $isRtl ? 'التالي' : 'Next' }}</span>
                     <span x-show="authBusy" x-cloak>{{ $isRtl ? 'جارٍ التحقق…' : 'Verifying…' }}</span>
                 </button>
@@ -253,7 +275,8 @@
                 {{-- Step 3: Pay --}}
                 <button type="button" x-show="step === 3" x-cloak @click="submit()" :disabled="submitting"
                         class="flex-1 font-bold text-white bg-[#222] hover:bg-black disabled:bg-[#dddddd] active:scale-[0.99] transition-all"
-                        style="padding: 17px; border-radius: 999px; font-size: 16px;">
+                        style="padding: 17px; border-radius: 18px; font-size: 16px;">
+                    <svg x-show="submitting" x-cloak class="calm-spinner inline-block align-middle" style="margin-inline-end: 8px;" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><circle cx="12" cy="12" r="10" stroke-opacity="0.3"/><path d="M22 12a10 10 0 0 1-10 10"/></svg>
                     <span x-show="!submitting">{{ $isRtl ? 'متابعة للدفع' : 'Continue to payment' }}</span>
                     <span x-show="submitting" x-cloak>{{ $isRtl ? 'جارٍ التحويل للدفع…' : 'Heading to payment…' }}</span>
                 </button>
@@ -274,7 +297,7 @@ function bookingFunnel(init) {
     const EN_DAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
     const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     const todayIso = iso(new Date());
-    const MONTHS_AHEAD = 6;
+    const MONTHS_AHEAD = 12; // a full year of dates ahead
 
     const gregFmt = new Intl.DateTimeFormat(init.isRtl ? 'ar' : 'en', { weekday: 'long', day: 'numeric', month: 'long' });
     let hijriFmt = null;
@@ -296,7 +319,7 @@ function bookingFunnel(init) {
         quoteError: '',
         quoteSeq: 0,
 
-        name: '', phone: '', otp: '',
+        name: '', phone: '', otp: '', countryCode: 'SA',
         otpSent: false, authBusy: false, authError: '',
         resendIn: 0, resendTimer: null,
         submitting: false, submitError: '',
@@ -339,16 +362,27 @@ function bookingFunnel(init) {
         },
         pickDay(date) {
             this.submitError = '';
-            if (!this.checkIn || (this.checkIn && this.checkOut)) {
-                this.checkIn = date; this.checkOut = null; this.quote = null; this.quoteError = '';
+            this.quoteError = '';
+            const singleSelected = this.checkIn !== null && this.checkOut === this.checkIn;
+
+            // A one-day pick extends into a range by tapping a LATER day.
+            if (singleSelected && date > this.checkIn) {
+                if (!this.rangeFree(this.checkIn, date)) {
+                    this.quoteError = this.isRtl ? 'يوجد أيام محجوزة ضمن المدى المختار — اختر تواريخ أخرى.' : 'Some days in that range are booked — pick different dates.';
+                    this.checkIn = date; this.checkOut = date;
+                } else {
+                    this.checkOut = date;
+                }
+                this.fetchQuote();
                 return;
             }
-            if (date <= this.checkIn) { this.checkIn = date; return; }
-            if (!this.rangeFree(this.checkIn, date)) {
-                this.quoteError = this.isRtl ? 'يوجد ليالٍ محجوزة ضمن المدى المختار — اختر تواريخ أخرى.' : 'Some nights in that range are booked — pick different dates.';
-                this.checkIn = date; this.checkOut = null; this.quote = null;
-                return;
-            }
+
+            if (singleSelected && date === this.checkIn) return; // already picked
+
+            // Anything else (first pick, an earlier day, or a full range
+            // already selected): start fresh as a ONE-DAY stay — the Next
+            // button lights up from the very first tap.
+            this.checkIn = date;
             this.checkOut = date;
             this.fetchQuote();
         },
@@ -390,15 +424,21 @@ function bookingFunnel(init) {
         rangeTitle() {
             if (!this.checkIn || !this.checkOut) return this.isRtl ? 'اختر التواريخ' : 'Pick your dates';
             const n = this.nights();
-            if (!this.isRtl) return n === 1 ? '1 night' : `${n} nights`;
-            return n === 1 ? 'ليلة واحدة' : (n === 2 ? 'ليلتان' : `${n} أيام`);
+            if (!this.isRtl) return n === 1 ? '1 day' : `${n} days`;
+            return n === 1 ? 'يوم واحد' : (n === 2 ? 'يومان' : `${n} أيام`);
         },
         rangeSubtitle() {
-            if (!this.checkIn || !this.checkOut || !hijriFmt) return '';
+            if (!this.checkIn || !this.checkOut) return '';
+            if (this.checkIn === this.checkOut) {
+                const d = hijriFmt ? (() => { try { return hijriFmt.format(new Date(this.checkIn)); } catch (e) { return this.checkIn; } })() : this.checkIn;
+                return d + (this.isRtl ? ' — اضغط يوماً لاحقاً للتمديد' : ' — tap a later day to extend');
+            }
+            if (!hijriFmt) return '';
             try { return `${hijriFmt.format(new Date(this.checkIn))} – ${hijriFmt.format(new Date(this.checkOut))}`; } catch (e) { return ''; }
         },
         nights() {
-            return Math.round((new Date(this.checkOut) - new Date(this.checkIn)) / 86400000);
+            // Inclusive DAY count (app semantics: Jul 26 → Jul 31 = 6 أيام).
+            return Math.round((new Date(this.checkOut) - new Date(this.checkIn)) / 86400000) + 1;
         },
 
         // ── step navigation ──
@@ -437,8 +477,8 @@ function bookingFunnel(init) {
         nightsLabel() {
             if (!this.quote) return '';
             const n = this.quote.days;
-            if (!this.isRtl) return n === 1 ? '1 night' : `${n} nights`;
-            return n === 1 ? 'ليلة واحدة' : (n === 2 ? 'ليلتان' : `${n} أيام`);
+            if (!this.isRtl) return n === 1 ? '1 day' : `${n} days`;
+            return n === 1 ? 'يوم واحد' : (n === 2 ? 'يومان' : `${n} أيام`);
         },
         fmtMoney(v) { return v == null ? '' : Number(v).toLocaleString(); },
         fmtDay(dateStr) {

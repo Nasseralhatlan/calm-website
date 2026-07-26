@@ -8,6 +8,7 @@ use App\Enums\PlaceReviewStatus;
 use App\Enums\PlaceStatus;
 use App\Http\Requests\StoreFunnelBookingRequest;
 use App\Models\Booking;
+use App\Models\Country;
 use App\Models\Place;
 use App\Services\Booking\BookingFunnelService;
 use Illuminate\Http\JsonResponse;
@@ -35,7 +36,16 @@ class BookingFunnelController extends Controller
 
         $place->load(['type', 'cityArea.city', 'coverPhoto']);
 
-        return view('booking.funnel', ['place' => $place]);
+        // Active countries drive the dial-code picker (same source as the
+        // login page). Saudi first — it's the default market.
+        $countries = Country::query()
+            ->active()
+            ->whereNotNull('dial_code')
+            ->orderByRaw("country_code = 'SA' desc")
+            ->orderBy('name_en')
+            ->get(['id', 'country_code', 'dial_code', 'avatar', 'name_ar', 'name_en']);
+
+        return view('booking.funnel', ['place' => $place, 'countries' => $countries]);
     }
 
     public function store(StoreFunnelBookingRequest $request, Place $place): JsonResponse
@@ -59,6 +69,13 @@ class BookingFunnelController extends Controller
     public function status(Request $request, Booking $booking): View
     {
         abort_unless($booking->guest_user_id === $request->user()->id, 404);
+
+        // Moyasar's in-page back button lands with ?back=1: settle truthfully
+        // (race-paid → confirmed; still pending → hold released) instead of
+        // leaving the customer on an endless "confirming…" spinner.
+        if ($request->boolean('back')) {
+            $booking = $this->funnel->settleOnBack($booking);
+        }
 
         $booking->load(['place.coverPhoto', 'place.type', 'place.cityArea.city']);
         // Rating for the app-style summary card (★ 4.80 (12)).

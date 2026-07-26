@@ -72,7 +72,8 @@ it('creates a pending booking and returns the payment url, with the web return_u
         ->and($response->json('payment_url'))->toBe('https://moyasar.test/pay/inv_funnel_1')
         ->and($response->json('status_url'))->toBe(route('book.status', $booking));
 
-    // Moyasar got OUR web status page as the payer return, both ways.
+    // Moyasar got OUR web status page on success; back gets its own
+    // settling URL (?back=1).
     Http::assertSent(function ($request) use ($booking): bool {
         if (! str_contains($request->url(), 'invoices')) {
             return false;
@@ -80,7 +81,7 @@ it('creates a pending booking and returns the payment url, with the web return_u
         $data = $request->data();
 
         return ($data['success_url'] ?? null) === route('book.status', $booking)
-            && ($data['back_url'] ?? null) === route('book.status', $booking);
+            && ($data['back_url'] ?? null) === route('book.status', ['booking' => $booking, 'back' => 1]);
     });
 });
 
@@ -162,4 +163,44 @@ it('keeps the app return urls when no return_url option is passed', function ():
         return ($data['success_url'] ?? null) === config('moyasar.success_url')
             && ($data['back_url'] ?? null) === config('moyasar.back_url');
     });
+});
+
+it('gives Moyasar a distinct back url that releases the hold on return', function (): void {
+    $place = funnelPlace();
+    $guest = User::factory()->create(['phone' => '518400907']);
+
+    $this->actingAs($guest, 'api')
+        ->postJson(route('book.store', $place), [
+            'check_in' => now()->addDays(12)->toDateString(),
+            'check_out' => now()->addDays(13)->toDateString(),
+            'guests' => 1,
+        ])->assertOk();
+
+    $booking = Booking::query()->where('place_id', $place->id)->sole();
+
+    // The invoice got success → status page, back → status page + ?back=1.
+    Http::assertSent(function ($request) use ($booking): bool {
+        if (! str_contains($request->url(), 'invoices')) {
+            return false;
+        }
+        $data = $request->data();
+
+        return ($data['success_url'] ?? null) === route('book.status', $booking)
+            && ($data['back_url'] ?? null) === route('book.status', ['booking' => $booking, 'back' => 1]);
+    });
+
+    // Backing out lands on the status page, which settles the booking:
+    // still unpaid (gateway says initiated) → the hold is released as
+    // Expired (same as the app: an abandoned hold, not a cancellation).
+    $this->actingAs($guest, 'api')
+        ->get(route('book.status', ['booking' => $booking, 'back' => 1]))
+        ->assertOk();
+
+    expect($booking->refresh()->booking_status)->toBe(BookingStatus::Expired);
+
+    // Refreshing the back URL is harmless — already settled, no-op.
+    $this->actingAs($guest, 'api')
+        ->get(route('book.status', ['booking' => $booking, 'back' => 1]))
+        ->assertOk();
+    expect($booking->refresh()->booking_status)->toBe(BookingStatus::Expired);
 });
