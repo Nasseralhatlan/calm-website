@@ -21,6 +21,9 @@
         BookingStatus::Expired => 'منتهي',
         BookingStatus::CanceledByHost => 'ملغى (المضيف)',
         BookingStatus::CanceledByGuest => 'ملغى',
+        BookingStatus::CanceledByAdmin => 'ملغى (الإدارة)',
+        // Future statuses must never 500 a guest page — fall back to the raw value.
+        default => str_replace('_', ' ', $s->value),
     } : str_replace('_', ' ', $s->value);
 @endphp
 
