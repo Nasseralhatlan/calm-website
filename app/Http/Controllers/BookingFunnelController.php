@@ -8,6 +8,7 @@ use App\Enums\PlaceReviewStatus;
 use App\Enums\PlaceStatus;
 use App\Http\Requests\StoreFunnelBookingRequest;
 use App\Models\Booking;
+use App\Models\Country;
 use App\Models\Place;
 use App\Services\Booking\BookingFunnelService;
 use Illuminate\Http\JsonResponse;
@@ -35,7 +36,16 @@ class BookingFunnelController extends Controller
 
         $place->load(['type', 'cityArea.city', 'coverPhoto']);
 
-        return view('booking.funnel', ['place' => $place]);
+        // Active countries drive the dial-code picker (same source as the
+        // login page). Saudi first — it's the default market.
+        $countries = Country::query()
+            ->active()
+            ->whereNotNull('dial_code')
+            ->orderByRaw("country_code = 'SA' desc")
+            ->orderBy('name_en')
+            ->get(['id', 'country_code', 'dial_code', 'avatar', 'name_ar', 'name_en']);
+
+        return view('booking.funnel', ['place' => $place, 'countries' => $countries]);
     }
 
     public function store(StoreFunnelBookingRequest $request, Place $place): JsonResponse
