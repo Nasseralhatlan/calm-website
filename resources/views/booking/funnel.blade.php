@@ -342,23 +342,27 @@ function bookingFunnel(init) {
         },
         pickDay(date) {
             this.submitError = '';
-            if (!this.checkIn || (this.checkIn && this.checkOut)) {
-                this.checkIn = date; this.checkOut = null; this.quote = null; this.quoteError = '';
-                return;
-            }
-            if (date === this.checkIn) {
-                // Same day tapped twice = a one-day stay (arrive and leave per
-                // the place's times; server quotes equal dates as one day).
-                this.checkOut = date;
+            this.quoteError = '';
+            const singleSelected = this.checkIn !== null && this.checkOut === this.checkIn;
+
+            // A one-day pick extends into a range by tapping a LATER day.
+            if (singleSelected && date > this.checkIn) {
+                if (!this.rangeFree(this.checkIn, date)) {
+                    this.quoteError = this.isRtl ? 'يوجد أيام محجوزة ضمن المدى المختار — اختر تواريخ أخرى.' : 'Some days in that range are booked — pick different dates.';
+                    this.checkIn = date; this.checkOut = date;
+                } else {
+                    this.checkOut = date;
+                }
                 this.fetchQuote();
                 return;
             }
-            if (date < this.checkIn) { this.checkIn = date; return; }
-            if (!this.rangeFree(this.checkIn, date)) {
-                this.quoteError = this.isRtl ? 'يوجد ليالٍ محجوزة ضمن المدى المختار — اختر تواريخ أخرى.' : 'Some nights in that range are booked — pick different dates.';
-                this.checkIn = date; this.checkOut = null; this.quote = null;
-                return;
-            }
+
+            if (singleSelected && date === this.checkIn) return; // already picked
+
+            // Anything else (first pick, an earlier day, or a full range
+            // already selected): start fresh as a ONE-DAY stay — the Next
+            // button lights up from the very first tap.
+            this.checkIn = date;
             this.checkOut = date;
             this.fetchQuote();
         },
@@ -404,7 +408,12 @@ function bookingFunnel(init) {
             return n === 1 ? 'يوم واحد' : (n === 2 ? 'يومان' : `${n} أيام`);
         },
         rangeSubtitle() {
-            if (!this.checkIn || !this.checkOut || !hijriFmt) return '';
+            if (!this.checkIn || !this.checkOut) return '';
+            if (this.checkIn === this.checkOut) {
+                const d = hijriFmt ? (() => { try { return hijriFmt.format(new Date(this.checkIn)); } catch (e) { return this.checkIn; } })() : this.checkIn;
+                return d + (this.isRtl ? ' — اضغط يوماً لاحقاً للتمديد' : ' — tap a later day to extend');
+            }
+            if (!hijriFmt) return '';
             try { return `${hijriFmt.format(new Date(this.checkIn))} – ${hijriFmt.format(new Date(this.checkOut))}`; } catch (e) { return ''; }
         },
         nights() {
