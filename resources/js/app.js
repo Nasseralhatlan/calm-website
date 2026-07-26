@@ -19,6 +19,9 @@ window.Sortable = Sortable;
 // when an iPhone HEIC/HEIF file is actually picked.
 window.imageCompression = imageCompression;
 window.loadHeic2any = () => import('heic2any').then((m) => m.default);
+// Modern HEIC decoder (libheif 1.19) — handles the iOS 17/18 HDR HEICs the
+// older heic2any build chokes on. heic2any stays as the fallback.
+window.loadHeicTo = () => import('heic-to').then((m) => m.heicTo);
 // Lottie renders the booking status animations (loader→success, pending);
 // lazy so only the pages that play animations pay for it.
 window.loadLottie = () => import('lottie-web').then((m) => m.default);
