@@ -28,11 +28,14 @@ class PlacesController extends Controller
     {
         $search = trim((string) $request->query('q', '')) ?: null;
         $cityId = trim((string) $request->query('city', '')) ?: null;
+        // Area only means something within its city.
+        $areaId = $cityId ? (trim((string) $request->query('area', '')) ?: null) : null;
 
         return view('admin.places.index', [
-            ...$this->service->indexData($search, $cityId),
+            ...$this->service->indexData($search, $cityId, $areaId),
             'search' => $search,
             'cityId' => $cityId,
+            'areaId' => $areaId,
         ]);
     }
 

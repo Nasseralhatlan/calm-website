@@ -19,6 +19,7 @@ use App\Services\Notification\NotificationService;
 use App\Services\Notification\OwnerNotifier;
 use App\Services\User\UserService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -31,11 +32,23 @@ final class PlaceService
         private readonly UserService $users,
     ) {}
 
-    public function paginate(?int $perPage = null, ?string $search = null, ?string $cityId = null): LengthAwarePaginator
+    public function paginate(?int $perPage = null, ?string $search = null, ?string $cityId = null, ?string $areaId = null): LengthAwarePaginator
     {
-        return Place::query()
+        return $this->applyIndexFilters(Place::query(), $search, $cityId, $areaId)
             ->with(['host', 'type', 'cityArea.city', 'coverPhoto'])
             ->withCount(['photos', 'attributeValues'])
+            ->latest()
+            ->paginate($perPage ?? config('pagination.per_page'))
+            ->withQueryString();
+    }
+
+    /**
+     * The admin index filter set — shared by the list AND the stats cards so
+     * the numbers always describe exactly what the admin is looking at.
+     */
+    private function applyIndexFilters(Builder $query, ?string $search, ?string $cityId, ?string $areaId): Builder
+    {
+        return $query
             ->when($search, fn ($q, string $term) => $q->where(function ($q) use ($term): void {
                 // Search is exact-match on the place uuid or LIKE on the host
                 // phone. Phone variants the admin might paste are normalized:
@@ -47,9 +60,7 @@ final class PlaceService
                     ->orWhereHas('host', fn ($h) => $h->where('phone', 'like', '%'.$phone.'%'));
             }))
             ->when($cityId, fn ($q, string $city) => $q->whereHas('cityArea', fn ($a) => $a->where('city_id', $city)))
-            ->latest()
-            ->paginate($perPage ?? config('pagination.per_page'))
-            ->withQueryString();
+            ->when($areaId, fn ($q, string $area) => $q->where('city_area_id', $area));
     }
 
     /**
@@ -60,14 +71,18 @@ final class PlaceService
      *
      * @return array{places: LengthAwarePaginator<int, Place>, counts: array<string,int>, nextReview: ?Place}
      */
-    public function indexData(?string $search = null, ?string $cityId = null, ?int $perPage = null): array
+    public function indexData(?string $search = null, ?string $cityId = null, ?string $areaId = null, ?int $perPage = null): array
     {
         return [
-            'places' => $this->paginate($perPage, $search, $cityId),
-            'counts' => $this->statusCounts(),
+            'places' => $this->paginate($perPage, $search, $cityId, $areaId),
+            // Stats mirror the active filters — filtered view, filtered numbers.
+            'counts' => $this->statusCounts($search, $cityId, $areaId),
             'nextReview' => $this->nextPendingReview(),
-            // For the index page's city filter dropdown.
+            // For the index page's filter dropdowns (areas only once a city is picked).
             'cities' => City::query()->orderBy('name_en')->get(['id', 'name_ar', 'name_en']),
+            'areas' => $cityId
+                ? CityArea::query()->where('city_id', $cityId)->orderBy('name_en')->get(['id', 'name_ar', 'name_en'])
+                : collect(),
         ];
     }
 
@@ -76,16 +91,18 @@ final class PlaceService
      *
      * @return array<string, int>
      */
-    public function statusCounts(): array
+    public function statusCounts(?string $search = null, ?string $cityId = null, ?string $areaId = null): array
     {
+        $base = fn (): Builder => $this->applyIndexFilters(Place::query(), $search, $cityId, $areaId);
+
         return [
-            'total' => Place::count(),
-            'draft' => Place::query()->where('review_status', PlaceReviewStatus::Draft->value)->count(),
-            'pending_review' => Place::query()->where('review_status', PlaceReviewStatus::PendingReview->value)->count(),
-            'approved' => Place::query()->where('review_status', PlaceReviewStatus::Approved->value)->count(),
-            'rejected' => Place::query()->where('review_status', PlaceReviewStatus::Rejected->value)->count(),
-            'active' => Place::query()->where('status', PlaceStatus::Active->value)->count(),
-            'inactive' => Place::query()->where('status', PlaceStatus::Inactive->value)->count(),
+            'total' => $base()->count(),
+            'draft' => $base()->where('review_status', PlaceReviewStatus::Draft->value)->count(),
+            'pending_review' => $base()->where('review_status', PlaceReviewStatus::PendingReview->value)->count(),
+            'approved' => $base()->where('review_status', PlaceReviewStatus::Approved->value)->count(),
+            'rejected' => $base()->where('review_status', PlaceReviewStatus::Rejected->value)->count(),
+            'active' => $base()->where('status', PlaceStatus::Active->value)->count(),
+            'inactive' => $base()->where('status', PlaceStatus::Inactive->value)->count(),
         ];
     }
 

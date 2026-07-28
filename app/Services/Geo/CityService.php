@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Services\Geo;
 
 use App\Models\City;
+use App\Models\Place;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Validation\ValidationException;
 
 final class CityService
 {
@@ -57,8 +59,26 @@ final class CityService
         return $city->refresh();
     }
 
+    /**
+     * Deleting a city cascades into its areas, and places.city_area_id is
+     * ON DELETE RESTRICT — so a city with any place under it would 500 with
+     * a raw FK error. Refuse with a readable one instead.
+     */
     public function delete(City $city): void
     {
+        $placesCount = Place::query()
+            ->whereHas('cityArea', fn ($q) => $q->where('city_id', $city->id))
+            ->count();
+
+        if ($placesCount > 0) {
+            throw ValidationException::withMessages([
+                'city' => __('Cannot delete city ":name" — :count place(s) still use its areas. Move or delete those places first.', [
+                    'name' => $city->name_en,
+                    'count' => $placesCount,
+                ]),
+            ]);
+        }
+
         $city->delete();
     }
 }

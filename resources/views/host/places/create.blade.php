@@ -245,6 +245,16 @@
                 {{-- Carries the draft we've been auto-saving so the server promotes it
                      instead of creating a duplicate row on final submit. --}}
                 <input type="hidden" name="draft_id" :value="draftId || ''">
+                {{-- Identical-units mirrors — the final submit is a plain form
+                     post, so the repeater's Alpine state must ride as inputs
+                     (blank rows are skipped). Without these, units were never
+                     saved on create/edit. --}}
+                <template x-for="(u, uIdx) in units.filter(x => (x.name || '').trim() !== '')" :key="`unit-${uIdx}`">
+                    <span>
+                        <input type="hidden" :name="`units[${uIdx}][id]`" :value="u.id || ''">
+                        <input type="hidden" :name="`units[${uIdx}][name]`" :value="u.name.trim()">
+                    </span>
+                </template>
 
                 {{-- Admin-only: attach the listing to this host's phone instead
                      of the admin's own account. Hidden mirror posts on final

@@ -80,7 +80,6 @@
     "set_as_cover": "تعيين كغلاف",
     "cover_photo": "صورة الغلاف",
     "brand_meta_description": "في كالم، نؤمن أن العقارات المميزة تستحق الظهور الأفضل، لذلك صممنا منصة تجمع بين جودة العرض وتجربة الحجز الراقية.",
-
     "showcase_title": "تطبيق لإقامات لا تُنسى.",
     "showcase_sub": "اكتشف شاليهات واستراحات ومخيمات ومزارع فاخرة مختارة بعناية في جميع أنحاء المملكة — كل مكان منتقى لراحتك.",
     "feature_1_title": "أماكن مختارة بعناية",
@@ -89,9 +88,11 @@
     "feature_2_desc": "شاهد كل غرفة ومرفق وصورة قبل الحجز — بلا مفاجآت.",
     "feature_3_title": "تواصل مباشر مع المالك",
     "feature_3_desc": "تحدث مع المالك مباشرة على واتساب. اسأل أي شيء، واحجز على راحتك.",
-
     "footer_about": "كالم منصة إقامات فاخرة في المملكة — شاليهات واستراحات ومخيمات ومزارع مختارة.",
     "footer_contact": "تواصل معنا",
     "footer_follow": "تابعنا",
-    "footer_rights": "جميع الحقوق محفوظة."
+    "footer_rights": "جميع الحقوق محفوظة.",
+    "Cannot delete area \":name\" — :count place(s) still use it. Move or delete those places first.": "لا يمكن حذف الحي \":name\" — يوجد :count مكان مرتبط به. انقل تلك الأماكن أو احذفها أولاً.",
+    "Cannot delete city \":name\" — :count place(s) still use its areas. Move or delete those places first.": "لا يمكن حذف المدينة \":name\" — يوجد :count مكان مرتبط بأحيائها. انقل تلك الأماكن أو احذفها أولاً.",
+    "Cannot delete country \":name\" — :count place(s) still exist in its cities. Move or delete those places first.": "لا يمكن حذف الدولة \":name\" — يوجد :count مكان في مدنها. انقل تلك الأماكن أو احذفها أولاً."
 }

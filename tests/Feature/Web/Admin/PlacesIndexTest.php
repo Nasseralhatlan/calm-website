@@ -58,6 +58,39 @@ it('filters the admin places list by city', function (): void {
         ->assertSee('Chalet In City B');
 });
 
+it('filters by area within a city and scopes the stat counts to the filters', function (): void {
+    // Two areas in the SAME city.
+    $areaA = CityArea::query()->first();
+    $areaB = CityArea::query()->create(['city_id' => $areaA->city_id, 'name_ar' => 'حي ب', 'name_en' => 'Sibling Area']);
+
+    indexPlace($this->host, $areaA, ['title' => 'Chalet In Area A']);
+    indexPlace($this->host, $areaB, ['title' => 'Chalet In Area B']);
+
+    $this->get('/admin/places?city='.$areaA->city_id.'&area='.$areaA->id)
+        ->assertOk()
+        ->assertSee('Chalet In Area A')
+        ->assertDontSee('Chalet In Area B')
+        // Stats on top reflect the active filters, not the whole table.
+        ->assertViewHas('counts', fn (array $counts): bool => $counts['total'] === 1 && $counts['active'] === 1)
+        // Dependent dropdown lists the chosen city's areas.
+        ->assertViewHas('areas', fn ($areas): bool => $areas->pluck('id')->contains($areaB->id));
+
+    // City filter alone still counts both.
+    $this->get('/admin/places?city='.$areaA->city_id)
+        ->assertOk()
+        ->assertViewHas('counts', fn (array $counts): bool => $counts['total'] === 2);
+});
+
+it('ignores the area param when no city is selected', function (): void {
+    $area = CityArea::query()->first();
+    indexPlace($this->host, $area, ['title' => 'Chalet Without City Filter']);
+
+    $this->get('/admin/places?area='.$area->id)
+        ->assertOk()
+        ->assertSee('Chalet Without City Filter')
+        ->assertViewHas('areaId', null);
+});
+
 it('walks the review queue forward on skip instead of bouncing back (1→2→3→1)', function (): void {
     $area = CityArea::query()->first();
 

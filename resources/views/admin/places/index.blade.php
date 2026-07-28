@@ -64,11 +64,21 @@
                     <option value="{{ $city->id }}" @selected($cityId === $city->id)>{{ $isRtl ? $city->name_ar : $city->name_en }}</option>
                 @endforeach
             </select>
+            @if($cityId && $areas->isNotEmpty())
+                <select name="area" onchange="this.form.submit()"
+                        class="bg-[#fafafa] border border-[#ebebeb] text-[13px] text-[#222] focus:outline-none {{ $isRtl ? 'font-arabic' : '' }}"
+                        style="padding: 8px 10px; border-radius: 10px; margin-inline-end: 6px; max-width: 160px;">
+                    <option value="">{{ $isRtl ? 'كل الأحياء' : 'All areas' }}</option>
+                    @foreach($areas as $area)
+                        <option value="{{ $area->id }}" @selected($areaId === $area->id)>{{ $isRtl ? $area->name_ar : $area->name_en }}</option>
+                    @endforeach
+                </select>
+            @endif
             <button type="submit" class="font-semibold text-white bg-[#222] hover:bg-black {{ $isRtl ? 'font-arabic' : '' }}"
                     style="padding: 8px 16px; border-radius: 10px; font-size: 13px;">
                 {{ $isRtl ? 'بحث' : 'Search' }}
             </button>
-            @if($search || $cityId)
+            @if($search || $cityId || $areaId)
                 <a href="{{ route('admin.places.index') }}" class="text-[13px] text-[#717171] hover:text-[#222] {{ $isRtl ? 'font-arabic' : '' }}" style="padding: 0 12px;">
                     {{ $isRtl ? '✕ مسح' : '✕ Clear' }}
                 </a>

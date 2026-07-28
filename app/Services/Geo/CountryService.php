@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Services\Geo;
 
 use App\Models\Country;
+use App\Models\Place;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Validation\ValidationException;
 
 final class CountryService
 {
@@ -47,8 +49,25 @@ final class CountryService
         return $country->refresh();
     }
 
+    /**
+     * Country delete cascades to cities, then to areas — and places restrict
+     * area deletes. Refuse with a readable error instead of a raw FK 500.
+     */
     public function delete(Country $country): void
     {
+        $placesCount = Place::query()
+            ->whereHas('cityArea.city', fn ($q) => $q->where('country_id', $country->id))
+            ->count();
+
+        if ($placesCount > 0) {
+            throw ValidationException::withMessages([
+                'country' => __('Cannot delete country ":name" — :count place(s) still exist in its cities. Move or delete those places first.', [
+                    'name' => $country->name_en,
+                    'count' => $placesCount,
+                ]),
+            ]);
+        }
+
         $country->delete();
     }
 }

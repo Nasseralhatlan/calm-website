@@ -6,6 +6,7 @@ namespace App\Services\Geo;
 
 use App\Models\CityArea;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Validation\ValidationException;
 
 final class CityAreaService
 {
@@ -35,8 +36,23 @@ final class CityAreaService
         return $cityArea->refresh();
     }
 
+    /**
+     * places.city_area_id is ON DELETE RESTRICT — deleting an area that still
+     * has places would 500 with a raw FK error, so refuse with a readable one.
+     */
     public function delete(CityArea $cityArea): void
     {
+        $placesCount = $cityArea->places()->count();
+
+        if ($placesCount > 0) {
+            throw ValidationException::withMessages([
+                'city_area' => __('Cannot delete area ":name" — :count place(s) still use it. Move or delete those places first.', [
+                    'name' => $cityArea->name_en,
+                    'count' => $placesCount,
+                ]),
+            ]);
+        }
+
         $cityArea->delete();
     }
 }

@@ -80,7 +80,6 @@
     "set_as_cover": "Set as cover",
     "cover_photo": "Cover photo",
     "brand_meta_description": "At Calm, we believe distinctive properties deserve the best presentation, so we built a platform that pairs premium presentation with a refined booking experience.",
-
     "showcase_title": "An app made for unforgettable stays.",
     "showcase_sub": "Discover hand-picked luxury chalets, resthouses, camps and farms across Saudi — each one curated for comfort.",
     "feature_1_title": "Hand-picked places",
@@ -89,9 +88,11 @@
     "feature_2_desc": "See every room, amenity and photo before you book — no surprises, ever.",
     "feature_3_title": "Talk to the owner",
     "feature_3_desc": "Reach the host directly on WhatsApp. Ask anything, book on your terms.",
-
     "footer_about": "Calm is a curated stays platform for Saudi — luxury chalets, resthouses, camps and farms.",
     "footer_contact": "Contact",
     "footer_follow": "Follow us",
-    "footer_rights": "All rights reserved."
+    "footer_rights": "All rights reserved.",
+    "Cannot delete area \":name\" — :count place(s) still use it. Move or delete those places first.": "Cannot delete area \":name\" — :count place(s) still use it. Move or delete those places first.",
+    "Cannot delete city \":name\" — :count place(s) still use its areas. Move or delete those places first.": "Cannot delete city \":name\" — :count place(s) still use its areas. Move or delete those places first.",
+    "Cannot delete country \":name\" — :count place(s) still exist in its cities. Move or delete those places first.": "Cannot delete country \":name\" — :count place(s) still exist in its cities. Move or delete those places first."
 }
