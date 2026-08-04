@@ -227,24 +227,10 @@
         </div>
     @endif
 
-    {{-- HEADER --}}
-    <header class="w-full border-b border-[#ebebeb] sticky top-0 z-30"
-            style="background-color: rgba(255,255,255,0.7); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);">
-        <div class="px-6 sm:px-10 lg:px-20 h-16 sm:h-20 flex items-center justify-between">
-            <a href="/" class="flex items-center gap-2">
-                <img src="/assets/logo/logo.png" alt="Calm" class="h-9 sm:h-10 w-auto" draggable="false">
-            </a>
-            <form method="POST" action="{{ url('/locale/' . ($locale === 'ar' ? 'en' : 'ar')) }}" class="m-0">
-                @csrf
-                <button type="submit"
-                        class="text-sm font-semibold text-[#222] hover:bg-[#f7f7f7] px-4 py-3 transition-colors {{ $locale === 'en' ? 'font-arabic' : '' }}">
-                    {{ $locale === 'ar' ? 'English' : 'العربية' }}
-                </button>
-            </form>
-        </div>
-    </header>
+    {{-- HEADER — shared guest chrome (search link, locale, sign-in/avatar) --}}
+    @include('partials._web_topbar')
 
-    <main class="max-w-7xl mx-auto w-full px-6 sm:px-10 lg:px-20 py-8 sm:py-10">
+    <main class="max-w-7xl mx-auto w-full px-6 sm:px-10 lg:px-20 py-8 sm:py-10" style="padding-bottom: 110px;">
 
         {{-- TITLE BLOCK — centered --}}
         <div class="text-center mb-6">
@@ -726,6 +712,27 @@
             </div>
         </div>
     </main>
+
+    {{-- ─────────── STICKY BOOKING CTA — the web booking funnel entry ─────────── --}}
+    @if($place->isVisible())
+        <div class="fixed inset-x-0 bottom-0 z-30 border-t border-[#ebebeb]"
+             style="background-color: rgba(255,255,255,0.92); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);">
+            <div class="mx-auto flex items-center justify-between" style="max-width: 1200px; padding: 12px 16px; gap: 12px;">
+                <div>
+                    <div class="text-[17px] font-bold text-[#222] tabular-nums {{ $fa }}">
+                        {{ number_format((int) $place->price) }} {{ $isRtl ? 'ر.س' : 'SAR' }}
+                        <span class="text-[13px] text-[#717171] font-normal">/ {{ $isRtl ? 'الليلة' : 'night' }}</span>
+                    </div>
+                    <div class="text-[12px] text-[#717171] {{ $fa }}">{{ $isRtl ? 'اختر تواريخك في الخطوة التالية' : 'Pick your dates in the next step' }}</div>
+                </div>
+                <a href="{{ route('book.show', $place) }}"
+                   class="inline-flex items-center justify-center font-bold text-white bg-[#F88379] hover:bg-[#f56b60] active:scale-[0.98] transition-all {{ $fa }}"
+                   style="padding: 14px 38px; border-radius: 18px; font-size: 15px; box-shadow: 0 6px 14px rgba(248,131,121,0.3);">
+                    {{ $isRtl ? 'احجز الآن' : 'Book now' }}
+                </a>
+            </div>
+        </div>
+    @endif
 
     {{-- ─────────── DESCRIPTION MODAL ─────────── --}}
     <div x-show="description" x-cloak x-transition.opacity id="description-scroll"

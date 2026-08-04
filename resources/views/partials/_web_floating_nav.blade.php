@@ -1,0 +1,53 @@
+{{-- Floating app-style tab bar — signed-in users only (guests get the top-bar
+     sign-in button instead). Fixed bottom-center pill: search (home),
+     bookings, favorites, account. Pages that include it should reserve
+     ~110px of bottom padding so content never hides behind it. --}}
+@php
+    $locale = app()->getLocale();
+    $isRtl = $locale === 'ar';
+    $fa = $isRtl ? 'font-arabic' : '';
+    $me = auth('api')->user();
+
+    $navItems = [
+        [
+            'href' => route('landing'),
+            'active' => request()->routeIs('landing'),
+            'label' => $isRtl ? 'البحث' : 'Search',
+            'icon' => '<circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.5" y2="16.5"></line>',
+        ],
+        [
+            'href' => route('user.my-bookings'),
+            'active' => request()->routeIs('user.my-bookings'),
+            'label' => $isRtl ? 'حجوزاتي' : 'Bookings',
+            'icon' => '<rect x="3" y="5" width="18" height="16" rx="3"></rect><line x1="3" y1="10" x2="21" y2="10"></line><line x1="8" y1="2.5" x2="8" y2="6.5"></line><line x1="16" y1="2.5" x2="16" y2="6.5"></line>',
+        ],
+        [
+            'href' => route('user.favorites'),
+            'active' => request()->routeIs('user.favorites'),
+            'label' => $isRtl ? 'المفضلة' : 'Favorites',
+            'icon' => '<path d="M12 20.5s-7.5-4.8-9.5-9.2C1 7.6 3.2 4.5 6.4 4.5c2 0 3.6 1.1 5.6 3.3 2-2.2 3.6-3.3 5.6-3.3 3.2 0 5.4 3.1 3.9 6.8-2 4.4-9.5 9.2-9.5 9.2z"></path>',
+        ],
+        [
+            'href' => $me?->isAdmin() ? route('admin.dashboard') : route('profile'),
+            'active' => request()->routeIs('profile') || request()->routeIs('admin.dashboard'),
+            'label' => $isRtl ? 'حسابي' : 'Account',
+            'icon' => '<circle cx="12" cy="8" r="4"></circle><path d="M4 21c0-4 3.6-6.5 8-6.5s8 2.5 8 6.5"></path>',
+        ],
+    ];
+@endphp
+@if($me)
+    <nav aria-label="{{ $isRtl ? 'التنقل' : 'Navigation' }}" class="fixed z-40"
+         style="bottom: 16px; left: 50%; transform: translateX(-50%);">
+        <div class="flex items-center bg-white border border-[#f0f0f0]"
+             style="border-radius: 999px; padding: 6px; gap: 2px; box-shadow: 0 12px 32px rgba(0,0,0,0.16);">
+            @foreach($navItems as $item)
+                <a href="{{ $item['href'] }}"
+                   class="flex flex-col items-center justify-center transition-colors {{ $item['active'] ? 'bg-[#222] text-white' : 'text-[#717171] hover:text-[#222]' }}"
+                   style="width: 66px; padding: 8px 0 7px; border-radius: 999px; gap: 3px;">
+                    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">{!! $item['icon'] !!}</svg>
+                    <span class="font-bold {{ $fa }}" style="font-size: 10px;">{{ $item['label'] }}</span>
+                </a>
+            @endforeach
+        </div>
+    </nav>
+@endif
