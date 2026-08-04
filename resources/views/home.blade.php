@@ -43,32 +43,35 @@
         {{-- ══ Browse mode: quick types + curated lists ══ --}}
         <div x-show="mode === 'browse'">
 
-            {{-- Quick place-type boxes — open the search modal with the type preselected --}}
+            {{-- Quick place-type boxes — open the search modal with the type
+                 preselected. Entrance stagger 140 + i·50ms (spec §5.2). --}}
             <section aria-label="{{ $isRtl ? 'أنواع الأماكن' : 'Place types' }}">
                 <div class="flex overflow-x-auto calm-hide-scroll" style="gap: 12px; padding: 4px;">
-                    @foreach($placeTypes as $t)
+                    @foreach($placeTypes as $i => $t)
                         <button type="button" @click="openWithType(@js($t->id))"
-                                class="shrink-0 flex flex-col items-center justify-center bg-white border border-[#ebebeb] hover:border-[#222] transition-all"
-                                style="min-width: 120px; padding: 18px 22px; border-radius: 20px; gap: 8px; box-shadow: 0 4px 14px rgba(0,0,0,0.04);">
+                                class="calm-enter calm-press shrink-0 flex flex-col items-center justify-center bg-white border border-[#E5E7EB] hover:border-[#1A1A1A] transition-colors"
+                                style="min-width: 120px; padding: 18px 22px; border-radius: 20px; gap: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); animation-delay: {{ 140 + $i * 50 }}ms;">
                             <span style="font-size: 30px; line-height: 1;">{{ $t->icon ?: '🏠' }}</span>
-                            <span class="text-[13px] font-bold text-[#222] {{ $fa }}">{{ $isRtl ? $t->name_ar : $t->name_en }}</span>
+                            <span class="text-[13px] font-bold text-[#1A1A1A] {{ $fa }}">{{ $isRtl ? $t->name_ar : $t->name_en }}</span>
                         </button>
                     @endforeach
                 </div>
             </section>
 
-            {{-- Curated lists (admin-managed) --}}
-            @foreach($lists as $list)
-                <section style="margin-top: 34px;" aria-label="{{ $isRtl ? $list->name_ar : $list->name_en }}">
-                    <h2 class="text-[20px] font-bold text-[#222] {{ $fa }}">
+            {{-- Curated lists (admin-managed) — compact square cards, section
+                 header 18/24 bold, staggered entrance. --}}
+            @foreach($lists as $li => $list)
+                <section class="calm-enter" style="margin-top: 34px; animation-delay: {{ 240 + $li * 120 }}ms;"
+                         aria-label="{{ $isRtl ? $list->name_ar : $list->name_en }}">
+                    <h2 class="font-bold text-[#1A1A1A] {{ $fa }}" style="font-size: 18px; line-height: 24px;">
                         @if($list->icon)<span style="margin-inline-end: 6px;">{{ $list->icon }}</span>@endif{{ $isRtl ? $list->name_ar : $list->name_en }}
                     </h2>
                     @if($isRtl ? $list->description_ar : $list->description_en)
-                        <p class="text-[13px] text-[#717171] {{ $fa }}" style="margin-top: 2px;">{{ $isRtl ? $list->description_ar : $list->description_en }}</p>
+                        <p class="text-[13px] text-[#6B7280] {{ $fa }}" style="margin-top: 2px;">{{ $isRtl ? $list->description_ar : $list->description_en }}</p>
                     @endif
-                    <div class="flex overflow-x-auto calm-hide-scroll" style="gap: 16px; margin-top: 14px; padding: 2px 2px 6px;">
+                    <div class="flex overflow-x-auto calm-hide-scroll" style="gap: 16px; margin-top: 12px; padding: 2px 2px 6px;">
                         @foreach($list->places as $p)
-                            @include('partials._web_place_card', ['p' => $p, 'cardWidth' => '250px'])
+                            @include('partials._web_place_card', ['p' => $p, 'compact' => true])
                         @endforeach
                     </div>
                 </section>
@@ -109,14 +112,17 @@
                 </template>
             </div>
 
-            {{-- First-page loading --}}
-            <div x-show="loadingGrid && items.length === 0" class="flex flex-col items-center text-[#717171] {{ $fa }}" style="padding: 70px 0; gap: 12px;">
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#F88379" stroke-width="3" stroke-linecap="round">
-                    <path d="M21 12a9 9 0 1 1-6.2-8.56">
-                        <animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="0.9s" repeatCount="indefinite"/>
-                    </path>
-                </svg>
-                <span class="text-[14px]">{{ $isRtl ? 'جاري البحث…' : 'Searching…' }}</span>
+            {{-- First-page loading — 3 skeleton hero cards (spec §5.7) --}}
+            <div x-show="loadingGrid && items.length === 0"
+                 class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" style="gap: 24px; margin-top: 18px;">
+                @for($sk = 0; $sk < 3; $sk++)
+                    <div>
+                        <div class="calm-skeleton" style="border-radius: 24px; aspect-ratio: 1.15;"></div>
+                        <div class="calm-skeleton" style="height: 14px; border-radius: 4px; width: 72%; margin-top: 12px;"></div>
+                        <div class="calm-skeleton" style="height: 14px; border-radius: 4px; width: 50%; margin-top: 8px;"></div>
+                        <div class="calm-skeleton" style="height: 14px; border-radius: 4px; width: 40%; margin-top: 8px;"></div>
+                    </div>
+                @endfor
             </div>
 
             {{-- Empty / error states --}}
@@ -147,7 +153,7 @@
 
     {{-- ══ Search modal — city / when / type / area ══ --}}
     <div x-show="modalOpen" x-cloak class="fixed inset-0 z-50" role="dialog" aria-modal="true">
-        <div class="absolute inset-0" style="background: rgba(0,0,0,0.45);" @click="closeSearch()"></div>
+        <div class="absolute inset-0" style="background: rgba(0,0,0,0.5);" @click="closeSearch()"></div>
 
         <div class="absolute inset-x-0 bottom-0 sm:inset-0 sm:m-auto bg-white flex flex-col overflow-hidden calm-modal-panel">
             {{-- Header --}}
@@ -333,7 +339,8 @@
             },
             whenLabel() {
                 if (!this.sel.checkIn) return CALM_WEB.locale === 'ar' ? 'أي وقت' : 'Anytime';
-                const f = (iso) => new Intl.DateTimeFormat(CALM_WEB.locale === 'ar' ? 'ar' : 'en', { day: 'numeric', month: 'short' })
+                // Pin Gregorian for Arabic — plain ar-SA defaults to Hijri (spec §4.5).
+                const f = (iso) => new Intl.DateTimeFormat(CALM_WEB.locale === 'ar' ? 'ar-SA-u-ca-gregory' : 'en', { day: 'numeric', month: 'short' })
                     .format(new Date(iso + 'T00:00:00'));
                 return this.sel.checkOut && this.sel.checkOut !== this.sel.checkIn
                     ? `${f(this.sel.checkIn)} – ${f(this.sel.checkOut)}`
@@ -342,8 +349,11 @@
 
             // ── Calendar (6 months, one-tap = one-day stay, later tap extends) ──
             buildCalendar() {
-                const loc = CALM_WEB.locale === 'ar' ? 'ar' : 'en';
+                // Pin Gregorian for Arabic (spec §4.5); Arabic-Indic digits for
+                // day numbers, Latin stays for prices.
+                const loc = CALM_WEB.locale === 'ar' ? 'ar-SA-u-ca-gregory' : 'en';
                 const wd = new Intl.DateTimeFormat(loc, { weekday: 'narrow' });
+                const nf = new Intl.NumberFormat(CALM_WEB.locale === 'ar' ? 'ar' : 'en');
                 // Week starts Sunday — matches the app.
                 this.weekdays = [...Array(7)].map((_, i) => wd.format(new Date(2026, 2, i + 1))); // 2026-03-01 is a Sunday
                 const mf = new Intl.DateTimeFormat(loc, { month: 'long', year: 'numeric' });
@@ -356,7 +366,7 @@
                     const daysIn = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
                     for (let d = 1; d <= daysIn; d++) {
                         const dt = new Date(first.getFullYear(), first.getMonth(), d);
-                        cells.push({ d, iso: iso(dt), past: dt < today });
+                        cells.push({ d: nf.format(d), iso: iso(dt), past: dt < today });
                     }
                     out.push({ key: `${first.getFullYear()}-${first.getMonth()}`, label: mf.format(first), cells });
                 }

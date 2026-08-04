@@ -261,3 +261,43 @@ label[for], label:has(input) { cursor: pointer; }
     cursor: pointer;
 }
 .btn-ghost:hover { background-color: #f7f7f7; }
+
+/*
+ * ── Guest-web motion kit (docs/guest-web-spec.md §5) ──
+ * The app's universal press animation is a bouncy spring (damping 10,
+ * stiffness 200) to a per-role scale. The overshooting cubic-bezier is the
+ * closest CSS-only stand-in. Per-role targets from the spec:
+ * default 0.96 · cards 0.985 · like button 0.86.
+ */
+.calm-press,
+.calm-press-card,
+.calm-press-like {
+    transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+    -webkit-tap-highlight-color: transparent;
+}
+.calm-press:active { transform: scale(0.96); }
+.calm-press-card:active { transform: scale(0.985); }
+.calm-press-like:active { transform: scale(0.86); }
+
+/* List/section entrance: opacity 0 + translateY(10px) → settled. Stagger by
+ * setting `animation-delay` inline per item. */
+@keyframes calm-enter {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: none; }
+}
+.calm-enter { animation: calm-enter 0.34s cubic-bezier(0.22, 0.9, 0.36, 1) both; }
+
+/* Skeleton pulse: opacity 0.55 ↔ 1, 850ms per half. */
+@keyframes calm-pulse {
+    0%, 100% { opacity: 0.55; }
+    50% { opacity: 1; }
+}
+.calm-skeleton {
+    background-color: #E5E7EB;
+    animation: calm-pulse 1.7s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .calm-enter, .calm-skeleton { animation: none; }
+    .calm-press:active, .calm-press-card:active, .calm-press-like:active { transform: none; }
+}

@@ -38,7 +38,11 @@ class PlaceController extends Controller
             'cityArea.city',
             'photos',
             'attributeValues.attribute.group',
+            // Rating chip + the reviews section (latest published, guest name
+            // falls back to reviewer_name for imported reviews).
+            'publishedReviews' => fn ($q) => $q->with('guest')->latest()->limit(10),
         ]);
+        $place->loadCount('publishedReviews')->loadAvg('publishedReviews', 'rate');
 
         return view('places.show', [
             'place' => $place,

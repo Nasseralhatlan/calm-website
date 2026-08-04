@@ -36,16 +36,19 @@
     ];
 @endphp
 @if($me)
+    {{-- Blur + white tint, coral active / #9CA3AF inactive, icon 22, label
+         11/14 medium — mobile tab-bar treatment (spec §5.6) in the floating
+         pill shape this site uses. --}}
     <nav aria-label="{{ $isRtl ? 'التنقل' : 'Navigation' }}" class="fixed z-40"
          style="bottom: 16px; left: 50%; transform: translateX(-50%);">
-        <div class="flex items-center bg-white border border-[#f0f0f0]"
-             style="border-radius: 999px; padding: 6px; gap: 2px; box-shadow: 0 12px 32px rgba(0,0,0,0.16);">
+        <div class="flex items-center border border-[#E5E7EB]"
+             style="border-radius: 999px; padding: 5px; gap: 2px; background-color: rgba(255,255,255,0.8); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); box-shadow: 0 0 25px rgba(0,0,0,0.05), 0 12px 32px rgba(0,0,0,0.12);">
             @foreach($navItems as $item)
                 <a href="{{ $item['href'] }}"
-                   class="flex flex-col items-center justify-center transition-colors {{ $item['active'] ? 'bg-[#222] text-white' : 'text-[#717171] hover:text-[#222]' }}"
-                   style="width: 66px; padding: 8px 0 7px; border-radius: 999px; gap: 3px;">
-                    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">{!! $item['icon'] !!}</svg>
-                    <span class="font-bold {{ $fa }}" style="font-size: 10px;">{{ $item['label'] }}</span>
+                   class="calm-press flex flex-col items-center justify-center transition-colors {{ $item['active'] ? 'text-[#F88379]' : 'text-[#9CA3AF] hover:text-[#6B7280]' }}"
+                   style="width: 68px; padding: 8px 0 7px; border-radius: 999px; gap: 4px;">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">{!! $item['icon'] !!}</svg>
+                    <span class="font-medium {{ $fa }}" style="font-size: 11px; line-height: 14px;">{{ $item['label'] }}</span>
                 </a>
             @endforeach
         </div>

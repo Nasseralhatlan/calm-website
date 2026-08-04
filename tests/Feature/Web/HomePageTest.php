@@ -5,9 +5,11 @@ declare(strict_types=1);
 use App\Enums\GeoStatus;
 use App\Enums\PlaceReviewStatus;
 use App\Enums\PlaceStatus;
+use App\Enums\ReviewStatus;
 use App\Models\CityArea;
 use App\Models\Place;
 use App\Models\PlaceList;
+use App\Models\PlaceReview;
 use App\Models\PlaceType;
 use App\Models\User;
 
@@ -105,4 +107,31 @@ it('shows the booking CTA on a live place page, linking to the funnel', function
     $this->get(route('places.show', $place))
         ->assertOk()
         ->assertSee(route('book.show', $place));
+});
+
+it('shows the rating chip and recent published reviews on the place page', function (): void {
+    $place = homePagePlace($this->host);
+    PlaceReview::query()->create([
+        'place_id' => $place->id,
+        'reviewer_name' => 'سارة العتيبي',
+        'rate' => 5,
+        'comment' => 'مكان هادئ ونظيف والتعامل راقي.',
+        'status' => ReviewStatus::Published->value,
+    ]);
+    PlaceReview::query()->create([
+        'place_id' => $place->id,
+        'reviewer_name' => 'مخفي',
+        'rate' => 1,
+        'comment' => 'تقييم قيد المراجعة يجب ألا يظهر.',
+        'status' => ReviewStatus::UnderReview->value,
+    ]);
+
+    $this->get(route('places.show', $place))
+        ->assertOk()
+        ->assertSee('التقييمات')
+        // First name only, like the app.
+        ->assertSee('سارة')
+        ->assertDontSee('العتيبي')
+        ->assertSee('مكان هادئ ونظيف والتعامل راقي.')
+        ->assertDontSee('تقييم قيد المراجعة يجب ألا يظهر.');
 });

@@ -254,6 +254,13 @@
                         {{ $facilities->count() }} {{ $isRtl ? 'مرافق' : 'facilities' }}
                     </span>
                 @endif
+                @if(($place->published_reviews_count ?? 0) > 0)
+                    <span class="inline-flex items-center text-[13px] text-[#1A1A1A] bg-[#fafafa] tabular-nums" style="gap: 4px; padding: 4px 12px; border-radius: 999px; corner-shape: squircle;">
+                        <span>★</span>
+                        <span class="font-bold">{{ number_format((float) $place->published_reviews_avg_rate, 1) }}</span>
+                        <span class="text-[#6B7280]">({{ $place->published_reviews_count }})</span>
+                    </span>
+                @endif
             </div>
         </div>
 
@@ -688,6 +695,35 @@
                 </div>
             </section>
 
+            {{-- REVIEWS — latest published; imported reviews fall back to
+                 reviewer_name. First name only, like the app. --}}
+            @if($place->publishedReviews->isNotEmpty())
+                <section style="padding-top: 56px; padding-bottom: 24px;">
+                    <h2 class="text-[22px] sm:text-2xl font-semibold text-[#222] {{ $start }} {{ $fa }}" style="margin-bottom: 6px;">
+                        {{ $isRtl ? 'التقييمات' : 'Reviews' }}
+                    </h2>
+                    <div class="flex items-center {{ $fa }}" style="gap: 6px; margin-bottom: 20px;">
+                        <span class="text-[15px] text-[#1A1A1A] tabular-nums"><span>★</span> <span class="font-bold">{{ number_format((float) $place->published_reviews_avg_rate, 1) }}</span></span>
+                        <span class="text-[13px] text-[#6B7280]">· {{ $place->published_reviews_count }} {{ $isRtl ? 'تقييم' : 'reviews' }}</span>
+                    </div>
+                    <div class="flex overflow-x-auto calm-hide-scroll" style="gap: 14px; padding-bottom: 6px;">
+                        @foreach($place->publishedReviews as $review)
+                            @php $reviewerName = \Illuminate\Support\Str::of((string) ($review->guest?->name ?? $review->reviewer_name))->trim()->explode(' ')->first() ?: ($isRtl ? 'ضيف' : 'Guest'); @endphp
+                            <div class="shrink-0 bg-white border border-[#E5E7EB] {{ $start }}" style="width: 280px; border-radius: 20px; padding: 16px 18px;">
+                                <div class="flex items-center justify-between" style="gap: 8px;">
+                                    <span class="font-bold text-[#1A1A1A] text-[14px] truncate {{ $fa }}">{{ $reviewerName }}</span>
+                                    <span class="shrink-0 text-[13px] text-[#1A1A1A] tabular-nums">★ <span class="font-bold">{{ $review->rate }}</span></span>
+                                </div>
+                                <div class="text-[12px] text-[#6B7280] {{ $fa }}" style="margin-top: 2px;">{{ $review->created_at?->translatedFormat($isRtl ? 'F Y' : 'M Y') }}</div>
+                                @if($review->comment)
+                                    <p class="text-[13px] text-[#222] {{ $fa }}" style="margin-top: 10px; line-height: 1.6; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden;">{{ $review->comment }}</p>
+                                @endif
+                            </div>
+                        @endforeach
+                    </div>
+                </section>
+            @endif
+
             {{-- HOUSE RULES — text content the host wrote in the wizard --}}
             @if($place->localized_rules)
                 <section style="padding-top: 56px; padding-bottom: 56px;">
@@ -713,22 +749,24 @@
         </div>
     </main>
 
-    {{-- ─────────── STICKY BOOKING CTA — the web booking funnel entry ─────────── --}}
+    {{-- ─────────── RESERVE BAR — the web booking funnel entry ───────────
+         Spec §5.5: blur + white 0.8 tint, 0 0 25px shadow, row PINNED LTR
+         (price visually left, CTA right in both locales), price 17/22 bold,
+         unit 12/16 muted, coral CTA radius 15 with colored shadow. --}}
     @if($place->isVisible())
-        <div class="fixed inset-x-0 bottom-0 z-30 border-t border-[#ebebeb]"
-             style="background-color: rgba(255,255,255,0.92); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);">
-            <div class="mx-auto flex items-center justify-between" style="max-width: 1200px; padding: 12px 16px; gap: 12px;">
-                <div>
-                    <div class="text-[17px] font-bold text-[#222] tabular-nums {{ $fa }}">
+        <div class="fixed inset-x-0 bottom-0 z-30"
+             style="background-color: rgba(255,255,255,0.8); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); box-shadow: 0 0 25px rgba(0,0,0,0.05);">
+            <div class="mx-auto flex items-center" dir="ltr" style="max-width: 1200px; padding: 16px 20px 14px; gap: 12px;">
+                <div class="flex-1 min-w-0 text-left">
+                    <div class="font-bold text-[#1A1A1A] tabular-nums" style="font-size: 17px; line-height: 22px;">
                         {{ number_format((int) $place->price) }} {{ $isRtl ? 'ر.س' : 'SAR' }}
-                        <span class="text-[13px] text-[#717171] font-normal">/ {{ $isRtl ? 'الليلة' : 'night' }}</span>
                     </div>
-                    <div class="text-[12px] text-[#717171] {{ $fa }}">{{ $isRtl ? 'اختر تواريخك في الخطوة التالية' : 'Pick your dates in the next step' }}</div>
+                    <div class="text-[#6B7280] {{ $fa }}" style="font-size: 12px; line-height: 16px; margin-top: 2px;">/ {{ $isRtl ? 'الليلة' : 'night' }}</div>
                 </div>
                 <a href="{{ route('book.show', $place) }}"
-                   class="inline-flex items-center justify-center font-bold text-white bg-[#F88379] hover:bg-[#f56b60] active:scale-[0.98] transition-all {{ $fa }}"
-                   style="padding: 14px 38px; border-radius: 18px; font-size: 15px; box-shadow: 0 6px 14px rgba(248,131,121,0.3);">
-                    {{ $isRtl ? 'احجز الآن' : 'Book now' }}
+                   class="calm-press inline-flex items-center justify-center font-medium text-white bg-[#F88379] hover:bg-[#E66E64] transition-colors {{ $fa }}"
+                   style="padding: 14px 48px; border-radius: 15px; font-size: 15px; line-height: 20px; box-shadow: 0 6px 12px rgba(248,131,121,0.3);">
+                    {{ $isRtl ? 'احجز الآن' : 'Reserve' }}
                 </a>
             </div>
         </div>
@@ -934,5 +972,7 @@
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     [x-cloak] { display: none !important; }
+    .calm-hide-scroll { scrollbar-width: none; }
+    .calm-hide-scroll::-webkit-scrollbar { display: none; }
 </style>
 @endsection

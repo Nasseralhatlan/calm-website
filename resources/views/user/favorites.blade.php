@@ -25,14 +25,17 @@
             </template>
         </div>
 
-        {{-- Loading --}}
-        <div x-show="loadingGrid && items.length === 0" class="flex flex-col items-center text-[#717171] {{ $fa }}" style="padding: 70px 0; gap: 12px;">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#F88379" stroke-width="3" stroke-linecap="round">
-                <path d="M21 12a9 9 0 1 1-6.2-8.56">
-                    <animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="0.9s" repeatCount="indefinite"/>
-                </path>
-            </svg>
-            <span class="text-[14px]">{{ $isRtl ? 'جاري التحميل…' : 'Loading…' }}</span>
+        {{-- Loading — 4 skeleton cards (spec §6.1 wishlist) --}}
+        <div x-show="loadingGrid && items.length === 0"
+             class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" style="gap: 24px; margin-top: 20px;">
+            @for($sk = 0; $sk < 4; $sk++)
+                <div>
+                    <div class="calm-skeleton" style="border-radius: 24px; aspect-ratio: 1.15;"></div>
+                    <div class="calm-skeleton" style="height: 14px; border-radius: 4px; width: 72%; margin-top: 12px;"></div>
+                    <div class="calm-skeleton" style="height: 14px; border-radius: 4px; width: 50%; margin-top: 8px;"></div>
+                    <div class="calm-skeleton" style="height: 14px; border-radius: 4px; width: 40%; margin-top: 8px;"></div>
+                </div>
+            @endfor
         </div>
 
         {{-- Empty state --}}
