@@ -41,7 +41,7 @@
          pill shape this site uses. --}}
     <nav aria-label="{{ $isRtl ? 'التنقل' : 'Navigation' }}" class="fixed z-40"
          style="bottom: 16px; left: 50%; transform: translateX(-50%);">
-        <div class="flex items-center border border-[#E5E7EB]"
+        <div class="flex items-center border border-[#F1F1F1]"
              style="border-radius: 999px; padding: 5px; gap: 2px; background-color: rgba(255,255,255,0.8); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); box-shadow: 0 0 25px rgba(0,0,0,0.05), 0 12px 32px rgba(0,0,0,0.12);">
             @foreach($navItems as $item)
                 <a href="{{ $item['href'] }}"

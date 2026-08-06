@@ -47,7 +47,7 @@
 
     <div class="absolute inset-x-0 bottom-0 sm:inset-0 sm:m-auto bg-white flex flex-col overflow-hidden calm-modal-panel">
         {{-- Header: close + labeled wizard steps (المدينة · متى · النوع · الحي) --}}
-        <div class="border-b border-[#ebebeb] shrink-0" style="padding: 12px 20px 0;">
+        <div class="border-b border-[#F1F1F1] shrink-0" style="padding: 12px 20px 0;">
             <div class="flex items-center justify-between">
                 <button type="button" @click="close()" aria-label="{{ $isRtl ? 'إغلاق' : 'Close' }}"
                         class="calm-press flex items-center justify-center text-[#717171] hover:text-[#222] hover:bg-[#f7f7f7] transition-colors"
@@ -90,7 +90,7 @@
 
             {{-- متى --}}
             <section x-show="currentKey() === 'when'" x-cloak>
-                <div class="border border-[#ebebeb]" style="border-radius: 18px; padding: 12px 10px; max-height: 320px; overflow-y: auto;">
+                <div class="border border-[#F1F1F1]" style="border-radius: 18px; padding: 12px 10px; max-height: 320px; overflow-y: auto;">
                     <div class="grid" style="grid-template-columns: repeat(7, 1fr);">
                         <template x-for="w in weekdays" :key="w">
                             <div class="text-center text-[11px] text-[#b0b0b0] {{ $fa }}" x-text="w"></div>
@@ -157,7 +157,7 @@
         </div>
 
         {{-- Footer: clear · back / next / search --}}
-        <div class="flex items-center justify-between border-t border-[#ebebeb] bg-white shrink-0" style="padding: 14px 20px; gap: 10px;">
+        <div class="flex items-center justify-between border-t border-[#F1F1F1] bg-white shrink-0" style="padding: 14px 20px; gap: 10px;">
             <button type="button" @click="resetSelection()"
                     class="text-[13px] font-semibold text-[#717171] underline {{ $fa }}">{{ $isRtl ? 'مسح الكل' : 'Clear all' }}</button>
             <div class="flex items-center" style="gap: 8px;">

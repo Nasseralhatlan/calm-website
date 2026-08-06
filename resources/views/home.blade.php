@@ -21,92 +21,51 @@
 
     @include('partials._web_topbar', ['searchPill' => true])
 
-    <main class="mx-auto w-full" style="max-width: 1200px; padding: 18px 16px 110px;">
+    <main class="mx-auto w-full" style="max-width: 1240px; padding: 40px 24px 110px;">
 
-        {{-- ══ Browse mode: quick types + curated lists ══ --}}
+        {{-- ══ Browse mode: curated lists (Figma reference) ══ --}}
         <div x-show="mode === 'browse'">
-
-            {{-- Quick place-type boxes — open the search wizard with the type
-                 preselected. Entrance stagger 140 + i·50ms (spec §5.2). --}}
-            <section aria-label="{{ $isRtl ? 'أنواع الأماكن' : 'Place types' }}">
-                <div class="flex overflow-x-auto calm-hide-scroll" style="gap: 12px; padding: 4px;">
-                    @foreach($placeTypes as $i => $t)
-                        <button type="button" @click="$dispatch('calm-open-search', { typeId: @js($t->id) })"
-                                class="calm-enter calm-press shrink-0 flex flex-col items-center justify-center bg-white border border-[#E5E7EB] hover:border-[#1A1A1A] transition-colors"
-                                style="min-width: 120px; padding: 18px 22px; border-radius: 20px; gap: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); animation-delay: {{ 140 + $i * 50 }}ms;">
-                            <span style="font-size: 30px; line-height: 1;">{{ $t->icon ?: '🏠' }}</span>
-                            <span class="text-[13px] font-bold text-[#1A1A1A] {{ $fa }}">{{ $isRtl ? $t->name_ar : $t->name_en }}</span>
-                        </button>
-                    @endforeach
-                </div>
-            </section>
-
-            {{-- Curated lists (admin-managed) — Airbnb-style rows: title +
-                 view-all arrow chip, scroll chevrons, compact square cards,
-                 and a «See all» tile closing each row. --}}
             @foreach($lists as $li => $list)
-                <section class="calm-enter" style="margin-top: 30px; animation-delay: {{ 240 + $li * 120 }}ms;"
+                <section class="calm-enter" style="{{ $li > 0 ? 'margin-top: 56px;' : '' }} animation-delay: {{ 140 + $li * 120 }}ms;"
                          aria-label="{{ $isRtl ? $list->name_ar : $list->name_en }}">
-                    <div class="flex items-center justify-between" style="gap: 10px;">
-                        <button type="button" @click="$dispatch('calm-open-search')"
-                                class="calm-press flex items-center min-w-0 group/head" style="gap: 8px;">
-                            <h2 class="font-bold text-[#1A1A1A] truncate {{ $fa }}" style="font-size: 18px; line-height: 24px;">
-                                @if($list->icon)<span style="margin-inline-end: 6px;">{{ $list->icon }}</span>@endif{{ $isRtl ? $list->name_ar : $list->name_en }}
-                            </h2>
-                            <span class="shrink-0 flex items-center justify-center bg-white border border-[#E5E7EB] text-[#1A1A1A]"
-                                  style="width: 26px; height: 26px; border-radius: 50%;">
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"
-                                     class="{{ $isRtl ? 'scale-x-[-1]' : '' }}" style="{{ $isRtl ? 'transform: scaleX(-1);' : '' }}">
-                                    <path d="M5 12h14M13 5l7 7-7 7"></path>
-                                </svg>
-                            </span>
-                        </button>
-                        <div class="hidden sm:flex items-center shrink-0" style="gap: 8px;">
-                            <button type="button" @click="scrollRow('list{{ $li }}', -1)" aria-label="{{ $isRtl ? 'السابق' : 'Previous' }}"
-                                    class="calm-press flex items-center justify-center bg-white border border-[#E5E7EB] text-[#717171] hover:text-[#1A1A1A] hover:border-[#1A1A1A] transition-colors"
-                                    style="width: 30px; height: 30px; border-radius: 50%;">
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" style="{{ $isRtl ? '' : 'transform: scaleX(-1);' }}">
-                                    <path d="M9 5l7 7-7 7"></path>
-                                </svg>
-                            </button>
-                            <button type="button" @click="scrollRow('list{{ $li }}', 1)" aria-label="{{ $isRtl ? 'التالي' : 'Next' }}"
-                                    class="calm-press flex items-center justify-center bg-white border border-[#E5E7EB] text-[#717171] hover:text-[#1A1A1A] hover:border-[#1A1A1A] transition-colors"
-                                    style="width: 30px; height: 30px; border-radius: 50%;">
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" style="{{ $isRtl ? 'transform: scaleX(-1);' : '' }}">
-                                    <path d="M9 5l7 7-7 7"></path>
-                                </svg>
-                            </button>
-                        </div>
-                    </div>
+                    <h2 class="font-bold text-black {{ $fa }}" style="font-size: 22px; line-height: 28px;">
+                        {{ $isRtl ? $list->name_ar : $list->name_en }}
+                    </h2>
                     @if($isRtl ? $list->description_ar : $list->description_en)
-                        <p class="text-[13px] text-[#6B7280] {{ $fa }}" style="margin-top: 2px;">{{ $isRtl ? $list->description_ar : $list->description_en }}</p>
+                        <p class="{{ $fa }}" style="font-size: 13px; margin-top: 4px; color: #AAAAAA;">{{ $isRtl ? $list->description_ar : $list->description_en }}</p>
                     @endif
-                    <div x-ref="list{{ $li }}" class="flex overflow-x-auto calm-hide-scroll" style="gap: 16px; margin-top: 12px; padding: 2px 2px 6px;">
+                    <div class="flex overflow-x-auto calm-hide-scroll" style="gap: 24px; margin-top: 24px; padding: 4px 4px 8px;">
                         @foreach($list->places as $p)
                             @include('partials._web_place_card', ['p' => $p, 'compact' => true])
                         @endforeach
 
-                        {{-- «See all» tile --}}
+                        {{-- «عرض الكل» tile --}}
                         @php $seeAllCovers = $list->places->map(fn ($sp) => $sp->coverPhoto?->url ?? $sp->visiblePhotos()->first()?->url)->filter()->take(2)->values(); @endphp
                         <button type="button" @click="$dispatch('calm-open-search')"
-                                class="calm-press-card shrink-0 flex flex-col items-center justify-center bg-white border border-[#E5E7EB] hover:border-[#1A1A1A] transition-colors"
-                                style="width: 158px; height: 158px; border-radius: 24px; gap: 12px;">
-                            <span class="relative block" style="width: 64px; height: 52px;">
+                                class="calm-press-card shrink-0 flex flex-col items-center justify-center bg-white"
+                                style="width: 190px; height: 190px; border-radius: 20px; gap: 16px; box-shadow: 0 0 50px rgba(0,0,0,0.05);">
+                            <span class="relative block" style="width: 74px; height: 62px;">
                                 @foreach($seeAllCovers as $ci => $cUrl)
                                     <img src="{{ $cUrl }}" alt="" loading="lazy"
                                          class="absolute object-cover border-2 border-white"
-                                         style="width: 46px; height: 46px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-                                                {{ $ci === 0 ? 'top: 6px; inset-inline-start: 0; transform: rotate(-6deg); z-index: 1;' : 'top: 0; inset-inline-end: 0; transform: rotate(5deg); z-index: 2;' }}">
+                                         style="width: 54px; height: 54px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+                                                {{ $ci === 0 ? 'top: 8px; inset-inline-start: 0; transform: rotate(-7deg); z-index: 1;' : 'top: 0; inset-inline-end: 0; transform: rotate(6deg); z-index: 2;' }}">
                                 @endforeach
                             </span>
-                            <span class="text-[13px] font-bold text-[#1A1A1A] {{ $fa }}">{{ $isRtl ? 'عرض الكل' : 'See all' }}</span>
+                            <span class="flex items-center text-[13px] font-bold text-black {{ $fa }}" style="gap: 4px;">
+                                <span>{{ $isRtl ? 'عرض الكل' : 'See all' }}</span>
+                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"
+                                     style="{{ $isRtl ? 'transform: scaleX(-1);' : '' }}">
+                                    <path d="M9 5l7 7-7 7"></path>
+                                </svg>
+                            </span>
                         </button>
                     </div>
                 </section>
             @endforeach
 
             @if($lists->isEmpty())
-                <div class="text-center text-[#6B7280] {{ $fa }}" style="padding: 70px 0;">
+                <div class="text-center {{ $fa }}" style="padding: 70px 0; color: #AAAAAA;">
                     {{ $isRtl ? 'لا توجد أماكن معروضة بعد — عد قريباً.' : 'Nothing to show yet — check back soon.' }}
                 </div>
             @endif
@@ -116,36 +75,36 @@
         <div x-show="mode === 'results'" x-cloak>
             <div class="flex items-center justify-between flex-wrap" style="gap: 10px;">
                 <div>
-                    <h2 class="text-[20px] font-bold text-[#1A1A1A] {{ $fa }}">{{ $isRtl ? 'نتائج البحث' : 'Search results' }}</h2>
-                    <p class="text-[13px] text-[#6B7280] tabular-nums {{ $fa }}" x-show="!loadingGrid || items.length > 0"
+                    <h2 class="font-bold text-black {{ $fa }}" style="font-size: 22px; line-height: 28px;">{{ $isRtl ? 'نتائج البحث' : 'Search results' }}</h2>
+                    <p class="text-[13px] tabular-nums {{ $fa }}" style="color: #AAAAAA;" x-show="!loadingGrid || items.length > 0"
                        x-text="total + ' {{ $isRtl ? 'مكان' : 'places' }}'"></p>
                 </div>
                 <div class="flex items-center" style="gap: 8px;">
                     <button type="button" @click="$dispatch('calm-open-search')"
-                            class="calm-press text-[13px] font-bold text-[#1A1A1A] border border-[#E5E7EB] hover:border-[#1A1A1A] bg-white transition-all {{ $fa }}"
-                            style="padding: 10px 18px; border-radius: 18px;">
+                            class="calm-press text-[13px] font-bold text-black bg-white transition-all {{ $fa }}"
+                            style="padding: 11px 20px; border-radius: 999px; box-shadow: 0 0 50px rgba(0,0,0,0.08);">
                         {{ $isRtl ? 'تعديل البحث' : 'Edit search' }}
                     </button>
                     <button type="button" @click="clearSearch()"
-                            class="text-[13px] font-semibold text-[#6B7280] hover:text-[#1A1A1A] transition-colors {{ $fa }}"
-                            style="padding: 10px 12px;">
+                            class="text-[13px] font-semibold hover:text-black transition-colors {{ $fa }}"
+                            style="padding: 10px 12px; color: #AAAAAA;">
                         ✕ {{ $isRtl ? 'مسح' : 'Clear' }}
                     </button>
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" style="gap: 24px; margin-top: 18px;">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" style="gap: 28px 24px; margin-top: 24px;">
                 <template x-for="p in items" :key="p.id">
                     @include('partials._web_card_template')
                 </template>
             </div>
 
-            {{-- First-page loading — 3 skeleton hero cards (spec §5.7) --}}
+            {{-- First-page loading — skeleton cards --}}
             <div x-show="loadingGrid && items.length === 0"
-                 class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" style="gap: 24px; margin-top: 18px;">
+                 class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" style="gap: 28px 24px; margin-top: 24px;">
                 @for($sk = 0; $sk < 3; $sk++)
                     <div>
-                        <div class="calm-skeleton" style="border-radius: 24px; aspect-ratio: 1.15;"></div>
+                        <div class="calm-skeleton" style="border-radius: 14px; aspect-ratio: 1.15;"></div>
                         <div class="calm-skeleton" style="height: 14px; border-radius: 4px; width: 72%; margin-top: 12px;"></div>
                         <div class="calm-skeleton" style="height: 14px; border-radius: 4px; width: 50%; margin-top: 8px;"></div>
                         <div class="calm-skeleton" style="height: 14px; border-radius: 4px; width: 40%; margin-top: 8px;"></div>
@@ -155,7 +114,7 @@
 
             {{-- Empty / error states --}}
             <div x-show="!loadingGrid && !gridError && items.length === 0" x-cloak
-                 class="text-center text-[#6B7280] {{ $fa }}" style="padding: 70px 0;">
+                 class="text-center {{ $fa }}" style="padding: 70px 0; color: #AAAAAA;">
                 <div style="font-size: 34px; margin-bottom: 10px;">🔍</div>
                 {{ $isRtl ? 'لا توجد نتائج مطابقة — جرّب تعديل البحث.' : 'No matching places — try adjusting your search.' }}
             </div>
@@ -164,10 +123,10 @@
             </div>
 
             {{-- Load more --}}
-            <div class="text-center" style="margin-top: 28px;" x-show="hasMore && !gridError" x-cloak>
+            <div class="text-center" style="margin-top: 32px;" x-show="hasMore && !gridError" x-cloak>
                 <button type="button" @click="loadMore(searchParams())" :disabled="loadingGrid"
-                        class="calm-press inline-flex items-center font-bold text-white bg-[#1A1A1A] hover:bg-black disabled:opacity-60 transition-colors {{ $fa }}"
-                        style="padding: 13px 34px; border-radius: 18px; gap: 8px; font-size: 14px;">
+                        class="calm-press inline-flex items-center font-bold text-white hover:opacity-90 disabled:opacity-60 transition-opacity {{ $fa }}"
+                        style="padding: 13px 34px; border-radius: 12px; gap: 8px; font-size: 14px; background-color: #000;">
                     <svg x-show="loadingGrid" x-cloak width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round">
                         <path d="M21 12a9 9 0 1 1-6.2-8.56">
                             <animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="0.9s" repeatCount="indefinite"/>
@@ -242,14 +201,6 @@
                 if (a.typeId) q.set('type', a.typeId);
                 if (a.checkIn) { q.set('in', a.checkIn); q.set('out', a.checkOut || a.checkIn); }
                 window.history.replaceState({}, '', `${window.location.pathname}?${q}`);
-            },
-
-            // Airbnb-style row chevrons — scroll one viewport at a time.
-            scrollRow(key, dir) {
-                const el = this.$refs[key];
-                if (!el) return;
-                const rtl = document.documentElement.dir === 'rtl';
-                el.scrollBy({ left: (rtl ? -dir : dir) * Math.round(el.clientWidth * 0.9), behavior: 'smooth' });
             },
         };
     }
