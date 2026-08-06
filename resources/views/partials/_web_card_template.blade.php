@@ -35,11 +35,18 @@
         </div>
     </a>
 
+    {{-- Guest-favorite badge --}}
+    <span x-show="p.rating && p.rating.avg >= 4.8 && p.rating.count >= 2" x-cloak
+          class="absolute bg-white font-bold text-[#1A1A1A] {{ $fa }}"
+          style="top: 12px; inset-inline-start: 12px; padding: 4px 10px; border-radius: 999px; font-size: 11px; line-height: 14px; box-shadow: 0 2px 8px rgba(0,0,0,0.12); pointer-events: none;">
+        {{ $isRtl ? 'مفضل الضيوف' : 'Guest favorite' }}
+    </span>
+
     {{-- Heart — sibling overlay, NOT inside the link --}}
     <button type="button" @click.stop.prevent="toggleLike(p)"
             aria-label="{{ $isRtl ? 'إضافة إلى المفضلة' : 'Save to favorites' }}"
             class="calm-press-like absolute flex items-center justify-center"
-            style="top: 12px; inset-inline-start: 12px; width: 32px; height: 32px;">
+            style="top: 12px; inset-inline-end: 12px; width: 32px; height: 32px;">
         <svg width="26" height="26" viewBox="0 0 24 24" stroke="#fff" stroke-width="1.8"
              :fill="p.is_liked ? '#F88379' : 'rgba(0,0,0,0.45)'">
             <path d="M12 20.5s-7.5-4.8-9.5-9.2C1 7.6 3.2 4.5 6.4 4.5c2 0 3.6 1.1 5.6 3.3 2-2.2 3.6-3.3 5.6-3.3 3.2 0 5.4 3.1 3.9 6.8-2 4.4-9.5 9.2-9.5 9.2z"></path>

@@ -202,7 +202,17 @@
                             this.sel.checkIn = ci;
                             this.sel.checkOut = (co && /^\d{4}-\d{2}-\d{2}$/.test(co)) ? co : ci;
                         }
+                        this.broadcastState();
                     }
+                },
+
+                // Keeps the top-bar pill segment labels in sync.
+                broadcastState() {
+                    this.$dispatch('calm-search-state', {
+                        cityName: this.cat.cities.find((c) => c.id === this.sel.cityId)?.name || null,
+                        whenText: this.sel.checkIn ? this.whenLabel() : null,
+                        typeName: this.cat.types.find((t) => t.id === this.sel.typeId)?.name || null,
+                    });
                 },
 
                 // ── Wizard ──
@@ -228,11 +238,16 @@
                     if (detail.typeId && this.cat.types.some((t) => t.id === detail.typeId)) {
                         this.sel.typeId = detail.typeId;
                     }
-                    // Jump to the type step when a quick-type box opened us and
-                    // the city is already known; otherwise start at the city.
-                    this.step = (detail.typeId && this.sel.cityId)
-                        ? this.stepKeys().indexOf('type')
-                        : 0;
+                    if (detail.step && this.stepKeys().includes(detail.step)) {
+                        // A pill segment opens its own step directly.
+                        this.step = this.stepKeys().indexOf(detail.step);
+                    } else {
+                        // Jump to the type step when a quick-type box opened us
+                        // and the city is already known; otherwise start at city.
+                        this.step = (detail.typeId && this.sel.cityId)
+                            ? this.stepKeys().indexOf('type')
+                            : 0;
+                    }
                     this.modalOpen = true;
                     document.body.style.overflow = 'hidden';
                 },
@@ -241,7 +256,11 @@
                     document.body.style.overflow = '';
                 },
                 apply() {
-                    if (!this.sel.cityId) return;
+                    if (!this.sel.cityId) {
+                        this.step = 0; // city is required — send them to pick one
+                        return;
+                    }
+                    this.broadcastState();
                     this.close();
                     const selection = { ...this.sel };
                     if (this.opts.redirect) {
@@ -257,6 +276,7 @@
                 resetSelection() {
                     this.sel = { cityId: null, areaId: null, typeId: null, checkIn: null, checkOut: null };
                     this.step = 0;
+                    this.broadcastState();
                 },
 
                 // ── Selection helpers ──

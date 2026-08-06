@@ -1,9 +1,11 @@
-{{-- Server-rendered place card (docs/guest-web-spec.md §5.3).
+{{-- Server-rendered place card, Airbnb-style.
      $compact = true  → compact square card (home carousels): 158×158 image,
-                        radius 24, three 12/16 lines, all text #000.
+                        radius 24, two 12/16 lines (title, price · rating).
      $compact = false → full/hero card (grids): image aspect 1.15, radius 24,
                         title 15/20 bold #000 + rating, meta 13/18 muted,
                         price 14/20 bold.
+     «مفضل الضيوف» badge at inline-start when avg ≥ 4.8 with ≥ 2 reviews;
+     heart at inline-end.
      STRUCTURE RULE: the heart is a positioned SIBLING of the card link —
      an <a>/<button> nested inside an <a> is invalid HTML and makes the
      browser parser split the card apart (images vanish).
@@ -25,6 +27,7 @@
     ])->filter()->implode(' · ');
     $ratingAvg = $p->published_reviews_avg_rate !== null ? number_format((float) $p->published_reviews_avg_rate, 1) : null;
     $ratingCount = (int) ($p->published_reviews_count ?? 0);
+    $guestFavorite = $ratingAvg !== null && (float) $ratingAvg >= 4.8 && $ratingCount >= 2;
     $liked = (bool) ($p->liked_by_me ?? false);
     $heartSize = $compact ? 30 : 32;
     $priceLabel = number_format((int) $p->price).' '.($isRtl ? 'ر.س' : 'SAR');
@@ -41,10 +44,9 @@
         @if($compact)
             <div style="padding-top: 8px; display: flex; flex-direction: column; gap: 3px;">
                 <span class="font-medium text-black truncate {{ $fa }}" style="font-size: 12px; line-height: 16px;">{{ $p->localized_title }}</span>
-                @if($meta !== '')
-                    <span class="font-light text-black truncate {{ $fa }}" style="font-size: 12px; line-height: 16px;">{{ $meta }}</span>
-                @endif
-                <span class="font-medium text-black {{ $fa }}" style="font-size: 12px; line-height: 16px;">{{ $priceLabel }} <span class="text-[#6B7280]">/ {{ $isRtl ? 'الليلة' : 'night' }}</span></span>
+                <span class="text-[#6B7280] truncate {{ $fa }}" style="font-size: 12px; line-height: 16px;">
+                    {{ $priceLabel }} / {{ $isRtl ? 'الليلة' : 'night' }} · ★ {{ $ratingAvg ?? ($isRtl ? 'جديد' : 'New') }}
+                </span>
             </div>
         @else
             <div style="padding-top: 12px; display: flex; flex-direction: column; gap: 4px;">
@@ -70,8 +72,16 @@
         @endif
     </a>
 
+    {{-- Guest-favorite badge --}}
+    @if($guestFavorite)
+        <span class="absolute bg-white font-bold text-[#1A1A1A] {{ $fa }}"
+              style="top: 12px; inset-inline-start: 12px; padding: 4px 10px; border-radius: 999px; font-size: 11px; line-height: 14px; box-shadow: 0 2px 8px rgba(0,0,0,0.12); pointer-events: none;">
+            {{ $isRtl ? 'مفضل الضيوف' : 'Guest favorite' }}
+        </span>
+    @endif
+
     {{-- Heart — sibling overlay, NOT inside the link --}}
-    <div class="absolute" style="top: 12px; inset-inline-start: 12px;">
+    <div class="absolute" style="top: 12px; inset-inline-end: 12px;">
         @if($me)
             <button type="button" x-data="{ liked: @js($liked) }"
                     @click.stop.prevent="liked = !liked; fetch('/api/places/{{ $p->id }}/like', { method: liked ? 'POST' : 'DELETE', headers: { 'Accept': 'application/json' }, credentials: 'same-origin' })"

@@ -41,21 +41,66 @@
                 </div>
             </section>
 
-            {{-- Curated lists (admin-managed) — compact square cards, section
-                 header 18/24 bold, staggered entrance. --}}
+            {{-- Curated lists (admin-managed) — Airbnb-style rows: title +
+                 view-all arrow chip, scroll chevrons, compact square cards,
+                 and a «See all» tile closing each row. --}}
             @foreach($lists as $li => $list)
-                <section class="calm-enter" style="margin-top: 34px; animation-delay: {{ 240 + $li * 120 }}ms;"
+                <section class="calm-enter" style="margin-top: 30px; animation-delay: {{ 240 + $li * 120 }}ms;"
                          aria-label="{{ $isRtl ? $list->name_ar : $list->name_en }}">
-                    <h2 class="font-bold text-[#1A1A1A] {{ $fa }}" style="font-size: 18px; line-height: 24px;">
-                        @if($list->icon)<span style="margin-inline-end: 6px;">{{ $list->icon }}</span>@endif{{ $isRtl ? $list->name_ar : $list->name_en }}
-                    </h2>
+                    <div class="flex items-center justify-between" style="gap: 10px;">
+                        <button type="button" @click="$dispatch('calm-open-search')"
+                                class="calm-press flex items-center min-w-0 group/head" style="gap: 8px;">
+                            <h2 class="font-bold text-[#1A1A1A] truncate {{ $fa }}" style="font-size: 18px; line-height: 24px;">
+                                @if($list->icon)<span style="margin-inline-end: 6px;">{{ $list->icon }}</span>@endif{{ $isRtl ? $list->name_ar : $list->name_en }}
+                            </h2>
+                            <span class="shrink-0 flex items-center justify-center bg-white border border-[#E5E7EB] text-[#1A1A1A]"
+                                  style="width: 26px; height: 26px; border-radius: 50%;">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"
+                                     class="{{ $isRtl ? 'scale-x-[-1]' : '' }}" style="{{ $isRtl ? 'transform: scaleX(-1);' : '' }}">
+                                    <path d="M5 12h14M13 5l7 7-7 7"></path>
+                                </svg>
+                            </span>
+                        </button>
+                        <div class="hidden sm:flex items-center shrink-0" style="gap: 8px;">
+                            <button type="button" @click="scrollRow('list{{ $li }}', -1)" aria-label="{{ $isRtl ? 'السابق' : 'Previous' }}"
+                                    class="calm-press flex items-center justify-center bg-white border border-[#E5E7EB] text-[#717171] hover:text-[#1A1A1A] hover:border-[#1A1A1A] transition-colors"
+                                    style="width: 30px; height: 30px; border-radius: 50%;">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" style="{{ $isRtl ? '' : 'transform: scaleX(-1);' }}">
+                                    <path d="M9 5l7 7-7 7"></path>
+                                </svg>
+                            </button>
+                            <button type="button" @click="scrollRow('list{{ $li }}', 1)" aria-label="{{ $isRtl ? 'التالي' : 'Next' }}"
+                                    class="calm-press flex items-center justify-center bg-white border border-[#E5E7EB] text-[#717171] hover:text-[#1A1A1A] hover:border-[#1A1A1A] transition-colors"
+                                    style="width: 30px; height: 30px; border-radius: 50%;">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" style="{{ $isRtl ? 'transform: scaleX(-1);' : '' }}">
+                                    <path d="M9 5l7 7-7 7"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
                     @if($isRtl ? $list->description_ar : $list->description_en)
                         <p class="text-[13px] text-[#6B7280] {{ $fa }}" style="margin-top: 2px;">{{ $isRtl ? $list->description_ar : $list->description_en }}</p>
                     @endif
-                    <div class="flex overflow-x-auto calm-hide-scroll" style="gap: 16px; margin-top: 12px; padding: 2px 2px 6px;">
+                    <div x-ref="list{{ $li }}" class="flex overflow-x-auto calm-hide-scroll" style="gap: 16px; margin-top: 12px; padding: 2px 2px 6px;">
                         @foreach($list->places as $p)
                             @include('partials._web_place_card', ['p' => $p, 'compact' => true])
                         @endforeach
+
+                        {{-- «See all» tile --}}
+                        @php $seeAllCovers = $list->places->map(fn ($sp) => $sp->coverPhoto?->url ?? $sp->visiblePhotos()->first()?->url)->filter()->take(2)->values(); @endphp
+                        <button type="button" @click="$dispatch('calm-open-search')"
+                                class="calm-press-card shrink-0 flex flex-col items-center justify-center bg-white border border-[#E5E7EB] hover:border-[#1A1A1A] transition-colors"
+                                style="width: 158px; height: 158px; border-radius: 24px; gap: 12px;">
+                            <span class="relative block" style="width: 64px; height: 52px;">
+                                @foreach($seeAllCovers as $ci => $cUrl)
+                                    <img src="{{ $cUrl }}" alt="" loading="lazy"
+                                         class="absolute object-cover border-2 border-white"
+                                         style="width: 46px; height: 46px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+                                                {{ $ci === 0 ? 'top: 6px; inset-inline-start: 0; transform: rotate(-6deg); z-index: 1;' : 'top: 0; inset-inline-end: 0; transform: rotate(5deg); z-index: 2;' }}">
+                                @endforeach
+                            </span>
+                            <span class="text-[13px] font-bold text-[#1A1A1A] {{ $fa }}">{{ $isRtl ? 'عرض الكل' : 'See all' }}</span>
+                        </button>
                     </div>
                 </section>
             @endforeach
@@ -197,6 +242,14 @@
                 if (a.typeId) q.set('type', a.typeId);
                 if (a.checkIn) { q.set('in', a.checkIn); q.set('out', a.checkOut || a.checkIn); }
                 window.history.replaceState({}, '', `${window.location.pathname}?${q}`);
+            },
+
+            // Airbnb-style row chevrons — scroll one viewport at a time.
+            scrollRow(key, dir) {
+                const el = this.$refs[key];
+                if (!el) return;
+                const rtl = document.documentElement.dir === 'rtl';
+                el.scrollBy({ left: (rtl ? -dir : dir) * Math.round(el.clientWidth * 0.9), behavior: 'smooth' });
             },
         };
     }
