@@ -46,20 +46,26 @@
     <div class="absolute inset-0" style="background: rgba(0,0,0,0.5);" @click="close()"></div>
 
     <div class="absolute inset-x-0 bottom-0 sm:inset-0 sm:m-auto bg-white flex flex-col overflow-hidden calm-modal-panel">
-        {{-- Header: close + step title + app-style pagination dots --}}
-        <div class="border-b border-[#ebebeb] shrink-0" style="padding: 14px 20px 12px;">
+        {{-- Header: close + labeled wizard steps (المدينة · متى · النوع · الحي) --}}
+        <div class="border-b border-[#ebebeb] shrink-0" style="padding: 12px 20px 0;">
             <div class="flex items-center justify-between">
                 <button type="button" @click="close()" aria-label="{{ $isRtl ? 'إغلاق' : 'Close' }}"
                         class="calm-press flex items-center justify-center text-[#717171] hover:text-[#222] hover:bg-[#f7f7f7] transition-colors"
                         style="width: 34px; height: 34px; border-radius: 50%; font-size: 16px;">✕</button>
-                <h2 class="text-[17px] font-bold text-[#1A1A1A] {{ $fa }}" x-text="stepTitle()"></h2>
+                <div class="flex items-center justify-center" style="gap: 6px;">
+                    <template x-for="(k, i) in stepKeys()" :key="k">
+                        <button type="button" @click="goToStep(i)"
+                                class="flex flex-col items-center transition-colors {{ $fa }}"
+                                :class="i === step ? 'text-[#1A1A1A]' : 'text-[#9CA3AF] hover:text-[#6B7280]'"
+                                style="padding: 8px 10px 12px; gap: 6px; position: relative;">
+                            <span :class="i === step ? 'font-bold' : 'font-semibold'" style="font-size: 13px; line-height: 16px;"
+                                  x-text="stepTitles[k]"></span>
+                            <span style="position: absolute; bottom: 0; height: 3px; border-radius: 3px 3px 0 0; transition: all 0.25s;"
+                                  :style="i === step ? 'width: 22px; background: #F88379;' : 'width: 0; background: transparent;'"></span>
+                        </button>
+                    </template>
+                </div>
                 <div style="width: 34px;"></div>
-            </div>
-            <div class="flex items-center justify-center" style="gap: 4px; margin-top: 10px;">
-                <template x-for="(k, i) in stepKeys()" :key="k">
-                    <span style="height: 5px; border-radius: 3px; transition: all 0.25s;"
-                          :style="i === step ? 'width: 14px; background: #F88379;' : 'width: 5px; background: #E5E7EB;'"></span>
-                </template>
             </div>
         </div>
 
@@ -181,6 +187,7 @@
             return {
                 cat: catalog,
                 opts: opts || {},
+                stepTitles: @js($stepTitles),
                 modalOpen: false,
                 step: 0,
                 sel: { cityId: null, areaId: null, typeId: null, checkIn: null, checkOut: null },
@@ -212,6 +219,7 @@
                         cityName: this.cat.cities.find((c) => c.id === this.sel.cityId)?.name || null,
                         whenText: this.sel.checkIn ? this.whenLabel() : null,
                         typeName: this.cat.types.find((t) => t.id === this.sel.typeId)?.name || null,
+                        areaName: this.cityAreas().find((a) => a.id === this.sel.areaId)?.name || null,
                     });
                 },
 
@@ -223,10 +231,14 @@
                 },
                 currentKey() { return this.stepKeys()[this.step] || 'city'; },
                 stepTitle() {
-                    return @js($stepTitles)[this.currentKey()];
+                    return this.stepTitles[this.currentKey()];
                 },
                 isLastStep() { return this.step >= this.stepKeys().length - 1; },
                 canNext() { return this.currentKey() !== 'city' || !!this.sel.cityId; },
+                goToStep(i) {
+                    // Later steps need a city first — bounce to the city step.
+                    this.step = (i > 0 && !this.sel.cityId) ? 0 : Math.min(i, this.stepKeys().length - 1);
+                },
                 next() {
                     if (!this.canNext()) return;
                     if (this.isLastStep()) { this.apply(); return; }

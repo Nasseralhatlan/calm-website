@@ -1,11 +1,12 @@
-{{-- Guest web top bar — Airbnb-style: logo · compact segmented search pill
-     (city | when | type + coral circle button) · host CTA + locale +
+{{-- Guest web top bar — Airbnb-style: logo · segmented search bar
+     (city | when | type | area + coral circle button) · host CTA + locale +
      sign-in/avatar. Header size matches the place-page photo-tour header
-     (h-20, white 0.7 + blur).
+     (h-20, white 0.7 + blur). The bar is borderless with a strong shadow;
+     each segment is a pill of its own.
 
-     With $searchPill = true the pill opens the reusable wizard
-     (partials/_web_search_modal must be on the page); its segment labels stay
-     live via the modal's 'calm-search-state' broadcasts. Otherwise the pill
+     With $searchPill = true the bar opens the reusable wizard
+     (partials/_web_search_modal must be on the page); segment labels stay
+     live via the modal's 'calm-search-state' broadcasts. Otherwise the bar
      is a static link back to the home search. --}}
 @php
     $locale = app()->getLocale();
@@ -19,6 +20,7 @@
     $anyCity = $isRtl ? 'أي مدينة' : 'Anywhere';
     $anyTime = $isRtl ? 'أي وقت' : 'Anytime';
     $anyType = $isRtl ? 'أي نوع' : 'Any type';
+    $anyArea = $isRtl ? 'أي حي' : 'Any area';
 
     $hostCta = null;
     if ($me === null) {
@@ -28,60 +30,70 @@
     } elseif (! $me->isAdmin()) {
         $hostCta = [route('host.places.create'), $isRtl ? 'كن مضيفاً' : 'Become a host'];
     }
+
+    $barShadow = 'box-shadow: 0 6px 20px rgba(0,0,0,0.13);';
+    $sepStyle = 'width: 1px; height: 26px; background: #F3F4F6;';
 @endphp
 <header class="sticky top-0 z-40 border-b border-[#ebebeb]"
         style="background-color: rgba(255,255,255,0.7); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);">
-    <div class="mx-auto flex items-center justify-between h-20" style="max-width: 1200px; padding: 0 16px; gap: 12px;">
+    <div class="mx-auto flex items-center justify-between" style="max-width: 1200px; padding: 0 16px; height: 88px; gap: 12px;">
         <a href="{{ route('landing') }}" class="shrink-0 flex items-center">
             <img src="/assets/logo/logo.png" alt="Calm" class="h-9 sm:h-10 w-auto" draggable="false">
         </a>
 
-        {{-- Compact segmented pill (desktop; mobile gets its own row below) --}}
+        {{-- Segmented search bar (desktop; mobile gets its own row below) --}}
         <div class="hidden md:flex flex-1 justify-center min-w-0">
             @if($searchPill)
                 <div x-data="calmTopSearch()" x-on:calm-search-state.window="set($event.detail)"
-                     class="flex items-center bg-white border border-[#E5E7EB]"
-                     style="border-radius: 999px; height: 54px; padding: 0 7px 0 0; box-shadow: 0 2px 8px rgba(0,0,0,0.06);">
+                     class="flex items-center bg-white"
+                     style="border-radius: 999px; height: 66px; padding: 0 9px; gap: 2px; {{ $barShadow }}">
                     <button type="button" @click="$dispatch('calm-open-search')"
                             class="calm-press flex items-center hover:bg-[#f7f7f7] transition-colors {{ $fa }}"
-                            style="gap: 8px; padding: 0 20px; height: 100%; border-radius: 999px;">
+                            style="gap: 8px; padding: 0 22px; height: 50px; border-radius: 999px;">
                         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#1A1A1A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M3 9.5L12 3l9 6.5V21a1 1 0 0 1-1 1h-5v-7h-6v7H4a1 1 0 0 1-1-1V9.5z"></path>
                         </svg>
                         <span class="text-[14px] font-bold text-[#1A1A1A] whitespace-nowrap" x-text="city || @js($anyCity)"></span>
                     </button>
-                    <span class="shrink-0" style="width: 1px; height: 24px; background: #E5E7EB;"></span>
+                    <span class="shrink-0" style="{{ $sepStyle }}"></span>
                     <button type="button" @click="$dispatch('calm-open-search', { step: 'when' })"
                             class="calm-press hover:bg-[#f7f7f7] transition-colors text-[14px] font-semibold text-[#6B7280] whitespace-nowrap {{ $fa }}"
-                            style="padding: 0 20px; height: 100%;" x-text="when || @js($anyTime)"></button>
-                    <span class="shrink-0" style="width: 1px; height: 24px; background: #E5E7EB;"></span>
+                            style="padding: 0 22px; height: 50px; border-radius: 999px;" x-text="when || @js($anyTime)"></button>
+                    <span class="shrink-0" style="{{ $sepStyle }}"></span>
                     <button type="button" @click="$dispatch('calm-open-search', { step: 'type' })"
                             class="calm-press hover:bg-[#f7f7f7] transition-colors text-[14px] font-semibold text-[#6B7280] whitespace-nowrap {{ $fa }}"
-                            style="padding: 0 16px 0 20px; height: 100%;" x-text="type || @js($anyType)"></button>
+                            style="padding: 0 22px; height: 50px; border-radius: 999px;" x-text="type || @js($anyType)"></button>
+                    <span class="shrink-0" style="{{ $sepStyle }}"></span>
+                    <button type="button" @click="$dispatch('calm-open-search', { step: 'area' })"
+                            class="calm-press hover:bg-[#f7f7f7] transition-colors text-[14px] font-semibold text-[#6B7280] whitespace-nowrap {{ $fa }}"
+                            style="padding: 0 22px; height: 50px; border-radius: 999px;" x-text="area || @js($anyArea)"></button>
                     <button type="button" @click="$dispatch('calm-open-search')" aria-label="{{ $isRtl ? 'بحث' : 'Search' }}"
                             class="calm-press shrink-0 flex items-center justify-center text-white bg-[#F88379] hover:bg-[#E66E64] transition-colors"
-                            style="width: 40px; height: 40px; border-radius: 50%;">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round">
+                            style="width: 48px; height: 48px; border-radius: 50%; margin-inline-start: 6px;">
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round">
                             <circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.5" y2="16.5"></line>
                         </svg>
                     </button>
                 </div>
             @else
                 <a href="{{ route('landing') }}"
-                   class="calm-press flex items-center bg-white border border-[#E5E7EB]"
-                   style="border-radius: 999px; height: 54px; padding: 0 7px 0 0; box-shadow: 0 2px 8px rgba(0,0,0,0.06);">
-                    <span class="flex items-center text-[14px] font-bold text-[#1A1A1A] whitespace-nowrap {{ $fa }}" style="gap: 8px; padding: 0 20px;">
+                   class="calm-press flex items-center bg-white"
+                   style="border-radius: 999px; height: 66px; padding: 0 9px; gap: 2px; {{ $barShadow }}">
+                    <span class="flex items-center text-[14px] font-bold text-[#1A1A1A] whitespace-nowrap {{ $fa }}" style="gap: 8px; padding: 0 22px;">
                         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#1A1A1A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M3 9.5L12 3l9 6.5V21a1 1 0 0 1-1 1h-5v-7h-6v7H4a1 1 0 0 1-1-1V9.5z"></path>
                         </svg>
                         {{ $anyCity }}
                     </span>
-                    <span class="shrink-0" style="width: 1px; height: 24px; background: #E5E7EB;"></span>
-                    <span class="text-[14px] font-semibold text-[#6B7280] whitespace-nowrap {{ $fa }}" style="padding: 0 20px;">{{ $anyTime }}</span>
-                    <span class="shrink-0" style="width: 1px; height: 24px; background: #E5E7EB;"></span>
-                    <span class="text-[14px] font-semibold text-[#6B7280] whitespace-nowrap {{ $fa }}" style="padding: 0 16px 0 20px;">{{ $anyType }}</span>
-                    <span class="shrink-0 flex items-center justify-center text-white bg-[#F88379]" style="width: 40px; height: 40px; border-radius: 50%;">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round">
+                    <span class="shrink-0" style="{{ $sepStyle }}"></span>
+                    <span class="text-[14px] font-semibold text-[#6B7280] whitespace-nowrap {{ $fa }}" style="padding: 0 22px;">{{ $anyTime }}</span>
+                    <span class="shrink-0" style="{{ $sepStyle }}"></span>
+                    <span class="text-[14px] font-semibold text-[#6B7280] whitespace-nowrap {{ $fa }}" style="padding: 0 22px;">{{ $anyType }}</span>
+                    <span class="shrink-0" style="{{ $sepStyle }}"></span>
+                    <span class="text-[14px] font-semibold text-[#6B7280] whitespace-nowrap {{ $fa }}" style="padding: 0 22px;">{{ $anyArea }}</span>
+                    <span class="shrink-0 flex items-center justify-center text-white bg-[#F88379]"
+                          style="width: 48px; height: 48px; border-radius: 50%; margin-inline-start: 6px;">
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round">
                             <circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.5" y2="16.5"></line>
                         </svg>
                     </span>
@@ -117,42 +129,46 @@
         </div>
     </div>
 
-    {{-- Mobile: the pill on its own row --}}
+    {{-- Mobile: the bar on its own row --}}
     <div class="md:hidden" style="padding: 0 16px 12px;">
         @if($searchPill)
             <div x-data="calmTopSearch()" x-on:calm-search-state.window="set($event.detail)"
-                 class="flex items-center bg-white border border-[#E5E7EB] w-full"
-                 style="border-radius: 999px; height: 52px; padding: 0 6px 0 0; box-shadow: 0 2px 8px rgba(0,0,0,0.06);">
+                 class="flex items-center bg-white w-full"
+                 style="border-radius: 999px; height: 58px; padding: 0 7px; {{ $barShadow }}">
                 <button type="button" @click="$dispatch('calm-open-search')"
-                        class="flex-1 min-w-0 flex items-center justify-center {{ $fa }}" style="gap: 6px; height: 100%;">
+                        class="flex-1 min-w-0 flex items-center justify-center {{ $fa }}" style="gap: 6px; height: 46px; border-radius: 999px;">
                     <span class="text-[13px] font-bold text-[#1A1A1A] truncate" x-text="city || @js($anyCity)"></span>
                 </button>
-                <span class="shrink-0" style="width: 1px; height: 22px; background: #E5E7EB;"></span>
+                <span class="shrink-0" style="{{ $sepStyle }}"></span>
                 <button type="button" @click="$dispatch('calm-open-search', { step: 'when' })"
                         class="flex-1 min-w-0 text-center text-[13px] font-semibold text-[#6B7280] truncate {{ $fa }}"
-                        style="height: 100%;" x-text="when || @js($anyTime)"></button>
-                <span class="shrink-0" style="width: 1px; height: 22px; background: #E5E7EB;"></span>
+                        style="height: 46px; border-radius: 999px;" x-text="when || @js($anyTime)"></button>
+                <span class="shrink-0" style="{{ $sepStyle }}"></span>
                 <button type="button" @click="$dispatch('calm-open-search', { step: 'type' })"
                         class="flex-1 min-w-0 text-center text-[13px] font-semibold text-[#6B7280] truncate {{ $fa }}"
-                        style="height: 100%;" x-text="type || @js($anyType)"></button>
+                        style="height: 46px; border-radius: 999px;" x-text="type || @js($anyType)"></button>
+                <span class="shrink-0" style="{{ $sepStyle }}"></span>
+                <button type="button" @click="$dispatch('calm-open-search', { step: 'area' })"
+                        class="flex-1 min-w-0 text-center text-[13px] font-semibold text-[#6B7280] truncate {{ $fa }}"
+                        style="height: 46px; border-radius: 999px;" x-text="area || @js($anyArea)"></button>
                 <button type="button" @click="$dispatch('calm-open-search')" aria-label="{{ $isRtl ? 'بحث' : 'Search' }}"
                         class="shrink-0 flex items-center justify-center text-white bg-[#F88379]"
-                        style="width: 40px; height: 40px; border-radius: 50%;">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round">
+                        style="width: 44px; height: 44px; border-radius: 50%; margin-inline-start: 4px;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round">
                         <circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.5" y2="16.5"></line>
                     </svg>
                 </button>
             </div>
         @else
             <a href="{{ route('landing') }}"
-               class="flex items-center w-full bg-white border border-[#E5E7EB]"
-               style="border-radius: 999px; height: 52px; padding: 0 6px 0 16px; gap: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.06);">
+               class="flex items-center w-full bg-white"
+               style="border-radius: 999px; height: 58px; padding: 0 7px 0 18px; gap: 10px; {{ $barShadow }}">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1A1A1A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M3 9.5L12 3l9 6.5V21a1 1 0 0 1-1 1h-5v-7h-6v7H4a1 1 0 0 1-1-1V9.5z"></path>
                 </svg>
                 <span class="flex-1 text-[13px] font-bold text-[#1A1A1A] {{ $fa }}">{{ $isRtl ? 'ابحث في كالم' : 'Search Calm' }}</span>
-                <span class="shrink-0 flex items-center justify-center text-white bg-[#F88379]" style="width: 40px; height: 40px; border-radius: 50%;">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round">
+                <span class="shrink-0 flex items-center justify-center text-white bg-[#F88379]" style="width: 44px; height: 44px; border-radius: 50%;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round">
                         <circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.5" y2="16.5"></line>
                     </svg>
                 </span>
@@ -165,11 +181,12 @@
         if (!window.calmTopSearch) {
             window.calmTopSearch = function () {
                 return {
-                    city: null, when: null, type: null,
+                    city: null, when: null, type: null, area: null,
                     set(d) {
                         this.city = (d && d.cityName) || null;
                         this.when = (d && d.whenText) || null;
                         this.type = (d && d.typeName) || null;
+                        this.area = (d && d.areaName) || null;
                     },
                 };
             };
