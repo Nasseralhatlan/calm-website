@@ -43,7 +43,7 @@
                         @php $seeAllCovers = $list->places->map(fn ($sp) => $sp->coverPhoto?->url ?? $sp->visiblePhotos()->first()?->url)->filter()->take(2)->values(); @endphp
                         <button type="button" @click="$dispatch('calm-open-search')"
                                 class="calm-press-card shrink-0 flex flex-col items-center justify-center bg-white"
-                                style="width: 190px; height: 190px; border-radius: 20px; gap: 16px; box-shadow: 0 0 50px rgba(0,0,0,0.05);">
+                                style="width: 170px; height: 170px; border-radius: 24px; corner-shape: squircle; -webkit-corner-shape: squircle; gap: 14px; box-shadow: 0 0 50px rgba(0,0,0,0.05); border: 1px solid #F1F1F1;">
                             <span class="relative block" style="width: 74px; height: 62px;">
                                 @foreach($seeAllCovers as $ci => $cUrl)
                                     <img src="{{ $cUrl }}" alt="" loading="lazy"
@@ -104,7 +104,7 @@
                  class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" style="gap: 28px 24px; margin-top: 24px;">
                 @for($sk = 0; $sk < 3; $sk++)
                     <div>
-                        <div class="calm-skeleton" style="border-radius: 14px; aspect-ratio: 1.15;"></div>
+                        <div class="calm-skeleton" style="border-radius: 18px; corner-shape: squircle; -webkit-corner-shape: squircle; aspect-ratio: 1.15;"></div>
                         <div class="calm-skeleton" style="height: 14px; border-radius: 4px; width: 72%; margin-top: 12px;"></div>
                         <div class="calm-skeleton" style="height: 14px; border-radius: 4px; width: 50%; margin-top: 8px;"></div>
                         <div class="calm-skeleton" style="height: 14px; border-radius: 4px; width: 40%; margin-top: 8px;"></div>
@@ -126,7 +126,7 @@
             <div class="text-center" style="margin-top: 32px;" x-show="hasMore && !gridError" x-cloak>
                 <button type="button" @click="loadMore(searchParams())" :disabled="loadingGrid"
                         class="calm-press inline-flex items-center font-bold text-white hover:opacity-90 disabled:opacity-60 transition-opacity {{ $fa }}"
-                        style="padding: 13px 34px; border-radius: 12px; gap: 8px; font-size: 14px; background-color: #000;">
+                        style="padding: 13px 34px; border-radius: 16px; corner-shape: squircle; -webkit-corner-shape: squircle; gap: 8px; font-size: 14px; background-color: #000;">
                     <svg x-show="loadingGrid" x-cloak width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round">
                         <path d="M21 12a9 9 0 1 1-6.2-8.56">
                             <animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="0.9s" repeatCount="indefinite"/>

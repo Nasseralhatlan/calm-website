@@ -1,9 +1,9 @@
 {{-- Server-rendered place card — Figma reference style.
-     $compact = true  → home carousels: 190×190 image radius 14, then
-                        title (black bold) / «area . city» (#AAAAAA) /
-                        «375 SR» (black bold).
-     $compact = false → grids: image aspect 1.15 radius 14, title + rating,
-                        muted meta, price.
+     $compact = true  → home carousels: 170×170 image, squircle radius 18,
+                        then title (black bold) / «area . city» (#AAAAAA) /
+                        «375 SR» (black bold, aligned with the text).
+     $compact = false → grids: image aspect 1.15 squircle radius 18,
+                        title + rating, muted meta, price.
      STRUCTURE RULE: the heart is a positioned SIBLING of the card link —
      an <a>/<button> nested inside an <a> is invalid HTML and makes the
      browser parser split the card apart (images vanish).
@@ -27,10 +27,10 @@
     $heartSize = $compact ? 30 : 32;
     $priceLabel = number_format((int) $p->price).' SR';
 @endphp
-<div class="calm-press-card group relative shrink-0" @if($compact) style="width: 190px;" @endif>
+<div class="calm-press-card group relative shrink-0" @if($compact) style="width: 170px;" @endif>
     <a href="{{ route('places.show', $p) }}" class="block">
         <div class="relative overflow-hidden"
-             style="background-color: #F3F4F6; border-radius: 14px; {{ $compact ? 'width: 190px; height: 190px;' : 'aspect-ratio: 1.15;' }}">
+             style="background-color: #F3F4F6; border-radius: 18px; corner-shape: squircle; -webkit-corner-shape: squircle; {{ $compact ? 'width: 170px; height: 170px;' : 'aspect-ratio: 1.15;' }}">
             @if($cover)
                 <img src="{{ $cover }}" alt="{{ $p->localized_title }}" loading="lazy"
                      class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.04]">
@@ -42,7 +42,7 @@
                 @if($subtitle !== '')
                     <span class="truncate {{ $fa }}" style="font-size: 13px; line-height: 17px; color: #AAAAAA;">{{ $subtitle }}</span>
                 @endif
-                <span class="font-bold text-black tabular-nums" dir="ltr" style="font-size: 14px; line-height: 18px; text-align: start;">{{ $priceLabel }}</span>
+                <span class="font-bold text-black tabular-nums" style="font-size: 14px; line-height: 18px;"><bdi dir="ltr">{{ $priceLabel }}</bdi></span>
             </div>
         @else
             <div style="padding-top: 12px; display: flex; flex-direction: column; gap: 4px;">
@@ -61,7 +61,7 @@
                 @if($subtitle !== '')
                     <p class="truncate {{ $fa }}" style="font-size: 13px; line-height: 18px; color: #AAAAAA;">{{ $subtitle }}</p>
                 @endif
-                <p class="font-bold text-black tabular-nums" dir="ltr" style="font-size: 14px; line-height: 20px; margin-top: 2px; text-align: start;">{{ $priceLabel }}</p>
+                <p class="font-bold text-black tabular-nums" style="font-size: 14px; line-height: 20px; margin-top: 2px;"><bdi dir="ltr">{{ $priceLabel }}</bdi></p>
             </div>
         @endif
     </a>

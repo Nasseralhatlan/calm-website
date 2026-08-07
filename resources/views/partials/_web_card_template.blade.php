@@ -12,7 +12,7 @@
 @endphp
 <div class="calm-press-card group relative">
     <a :href="`/places/${p.id}`" class="block">
-        <div class="relative overflow-hidden" style="background-color: #F3F4F6; border-radius: 14px; aspect-ratio: 1.15;">
+        <div class="relative overflow-hidden" style="background-color: #F3F4F6; border-radius: 18px; corner-shape: squircle; -webkit-corner-shape: squircle; aspect-ratio: 1.15;">
             <template x-if="p.cover_photo_url">
                 <img :src="p.cover_photo_url" :alt="cardTitle(p)" loading="lazy"
                      class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.04]">
@@ -28,8 +28,7 @@
                 </span>
             </div>
             <p class="truncate {{ $fa }}" style="font-size: 13px; line-height: 18px; color: #AAAAAA;" x-text="cardMeta(p)"></p>
-            <p class="font-bold text-black tabular-nums" dir="ltr" style="font-size: 14px; line-height: 20px; margin-top: 2px; text-align: start;"
-               x-text="fmtPrice(p.price) + ' SR'"></p>
+            <p class="font-bold text-black tabular-nums" style="font-size: 14px; line-height: 20px; margin-top: 2px;"><bdi dir="ltr" x-text="fmtPrice(p.price) + ' SR'"></bdi></p>
         </div>
     </a>
 

@@ -23,18 +23,21 @@
         $hostCta = [route('host.places.create'), $isRtl ? 'كن مضيف' : 'Become a host'];
     }
 @endphp
-<header class="sticky top-0 z-40 bg-white" style="box-shadow: 0 0 50px rgba(0,0,0,0.05);">
-    <div class="mx-auto flex items-center justify-between py-4 md:py-0 md:h-[138px]" style="max-width: 1240px; padding-inline: 24px; gap: 16px;">
+<header class="sticky top-0 z-40"
+        style="background-color: rgba(255,255,255,0.75); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); box-shadow: 0 0 50px rgba(0,0,0,0.05);">
+    <div class="mx-auto relative flex items-center justify-between py-4 md:py-0 md:h-[138px]" style="max-width: 1240px; padding-inline: 24px; gap: 16px;">
         <a href="{{ route('landing') }}" class="shrink-0 flex items-center">
             <img src="/assets/logo/logo.png" alt="Calm" class="h-9 sm:h-10 w-auto" draggable="false">
         </a>
 
-        {{-- Search bar (desktop; mobile gets its own row below) --}}
-        <div class="hidden md:flex flex-1 justify-center min-w-0">
+        {{-- Search bar — absolutely centered on the page (the side groups are
+             unequal widths, so flex centering would sit off-center). Mobile
+             gets its own row below. --}}
+        <div class="hidden lg:flex justify-center" style="position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(450px, calc(100% - 740px));">
             @if($searchPill)
                 <button type="button" x-data @click="$dispatch('calm-open-search')"
                         class="calm-press flex items-center justify-center bg-white w-full"
-                        style="max-width: 450px; height: 56px; border-radius: 999px; box-shadow: 0 0 50px rgba(0,0,0,0.05);">
+                        style="height: 56px; border-radius: 999px; border: 1px solid #F1F1F1; box-shadow: 0 0 50px rgba(0,0,0,0.05);">
                     <span dir="ltr" class="flex items-center" style="gap: 9px;">
                         <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <path d="M13.125 13.125L11.25 11.25" stroke="black" stroke-width="1.5" stroke-linecap="round"/>
@@ -46,7 +49,7 @@
             @else
                 <a href="{{ route('landing') }}"
                    class="calm-press flex items-center justify-center bg-white w-full"
-                   style="max-width: 450px; height: 56px; border-radius: 999px; box-shadow: 0 0 50px rgba(0,0,0,0.05);">
+                   style="height: 56px; border-radius: 999px; border: 1px solid #F1F1F1; box-shadow: 0 0 50px rgba(0,0,0,0.05);">
                     <span dir="ltr" class="flex items-center" style="gap: 9px;">
                         <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <path d="M13.125 13.125L11.25 11.25" stroke="black" stroke-width="1.5" stroke-linecap="round"/>
@@ -79,19 +82,19 @@
             @else
                 <a href="{{ route('login', ['next' => request()->getRequestUri()]) }}"
                    class="calm-press inline-flex items-center text-[14px] font-bold text-white hover:opacity-90 transition-opacity {{ $fa }}"
-                   style="padding: 12px 22px; border-radius: 12px; background-color: #000;">
+                   style="padding: 12px 22px; border-radius: 16px; corner-shape: squircle; -webkit-corner-shape: squircle; background-color: #000;">
                     {{ $isRtl ? 'تسجيل الدخول' : 'Sign in' }}
                 </a>
             @endif
         </div>
     </div>
 
-    {{-- Mobile: the search bar on its own row --}}
-    <div class="md:hidden" style="padding: 0 16px 14px;">
+    {{-- Below lg: the search bar on its own row --}}
+    <div class="lg:hidden" style="padding: 0 16px 14px;">
         @if($searchPill)
             <button type="button" x-data @click="$dispatch('calm-open-search')"
                     class="calm-press flex items-center justify-center bg-white w-full"
-                    style="height: 52px; border-radius: 999px; box-shadow: 0 0 50px rgba(0,0,0,0.05);">
+                    style="height: 52px; border-radius: 999px; border: 1px solid #F1F1F1; box-shadow: 0 0 50px rgba(0,0,0,0.05);">
                 <span dir="ltr" class="flex items-center" style="gap: 9px;">
                     <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M13.125 13.125L11.25 11.25" stroke="black" stroke-width="1.5" stroke-linecap="round"/>
@@ -103,7 +106,7 @@
         @else
             <a href="{{ route('landing') }}"
                class="calm-press flex items-center justify-center bg-white w-full"
-               style="height: 52px; border-radius: 999px; box-shadow: 0 0 50px rgba(0,0,0,0.05);">
+               style="height: 52px; border-radius: 999px; border: 1px solid #F1F1F1; box-shadow: 0 0 50px rgba(0,0,0,0.05);">
                 <span dir="ltr" class="flex items-center" style="gap: 9px;">
                     <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M13.125 13.125L11.25 11.25" stroke="black" stroke-width="1.5" stroke-linecap="round"/>
