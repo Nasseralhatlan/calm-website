@@ -23,21 +23,21 @@
     $heartSize = 30;
     $priceLabel = 'SR '.number_format((int) $p->price);
 @endphp
-<div class="calm-press-card group relative shrink-0" @if($compact) style="width: 172px;" @endif>
+<div class="calm-press-card group relative shrink-0" @if($compact) style="width: clamp(126px, 37vw, 172px);" @endif>
     <a href="{{ route('places.show', $p) }}" class="block">
         <div class="relative overflow-hidden"
-             style="background-color: #F3F4F6; border-radius: 24px; corner-shape: squircle; -webkit-corner-shape: squircle; {{ $compact ? 'width: 172px; height: 172px;' : 'aspect-ratio: 1;' }}">
+             style="background-color: #F3F4F6; border-radius: 28px; corner-shape: squircle; -webkit-corner-shape: squircle; aspect-ratio: 1; {{ $compact ? 'width: 100%;' : '' }}">
             @if($cover)
                 <img src="{{ $cover }}" alt="{{ $p->localized_title }}" loading="lazy"
                      class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.04]">
             @endif
         </div>
         <div style="padding-top: 10px; display: flex; flex-direction: column; gap: 3px;">
-            <span class="font-bold text-black truncate {{ $fa }}" style="font-size: 15px; line-height: 20px;">{{ $p->localized_title }}</span>
+            <span class="font-bold text-black truncate {{ $fa }}" style="font-size: {{ $compact ? '13px' : '15px' }}; line-height: 1.35;">{{ $p->localized_title }}</span>
             @if($subtitle !== '')
-                <span class="truncate {{ $fa }}" style="font-size: 13px; line-height: 17px; color: #AAAAAA;">{{ $subtitle }}</span>
+                <span class="truncate {{ $fa }}" style="font-size: {{ $compact ? '12px' : '13px' }}; line-height: 1.3; color: #AAAAAA;">{{ $subtitle }}</span>
             @endif
-            <span class="font-bold text-black tabular-nums" style="font-size: 14px; line-height: 18px;"><bdi dir="ltr">{{ $priceLabel }}</bdi></span>
+            <span class="font-bold text-black tabular-nums" style="font-size: {{ $compact ? '13px' : '14px' }}; line-height: 1.3;"><bdi dir="ltr">{{ $priceLabel }}</bdi></span>
         </div>
     </a>
 

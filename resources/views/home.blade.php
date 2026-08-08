@@ -26,24 +26,18 @@
     <header class="sticky top-0 z-30"
             style="background-color: rgba(255,255,255,0.85); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);">
         <div class="mx-auto" style="max-width: 720px; padding: 14px 20px 14px;">
-            <div class="flex items-center justify-center" style="position: relative;">
-                <a href="{{ route('landing') }}"><img src="/assets/logo/logo.png" alt="Calm" style="height: 34px; width: auto;" draggable="false"></a>
-                <form method="POST" action="{{ url('/locale/'.($locale === 'ar' ? 'en' : 'ar')) }}" class="m-0" style="position: absolute; inset-inline-end: 0;">
-                    @csrf
-                    <button type="submit" class="text-[13px] font-semibold hover:text-black transition-colors {{ $locale === 'en' ? 'font-arabic' : '' }}" style="color: #AAAAAA; padding: 6px;">
-                        {{ $locale === 'ar' ? 'english' : 'العربية' }}
-                    </button>
-                </form>
+            <div class="flex items-center justify-center">
+                <a href="{{ route('landing') }}"><img src="/assets/logo/logo.png" alt="Calm" style="height: 32px; width: auto;" draggable="false"></a>
             </div>
             <button type="button" @click="$dispatch('calm-open-search')"
                     class="calm-press flex items-center justify-center bg-white w-full"
-                    style="margin-top: 14px; height: 60px; border-radius: 999px; border: 1px solid #F1F1F1; box-shadow: 0 0 50px rgba(0,0,0,0.05); gap: 9px;">
+                    style="margin-top: 14px; height: 54px; border-radius: 9999px; overflow: hidden; border: 1px solid #F1F1F1; box-shadow: 0 0 50px rgba(0,0,0,0.05); gap: 9px;">
                 <span dir="ltr" class="flex items-center" style="gap: 9px;">
                     <svg width="16" height="16" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M13.125 13.125L11.25 11.25" stroke="black" stroke-width="1.5" stroke-linecap="round"/>
                         <ellipse cx="6.875" cy="7.49997" rx="5.625" ry="5.62497" stroke="black" stroke-width="1.5"/>
                     </svg>
-                    <span class="text-[16px] font-semibold text-black {{ $fa }}">{{ $isRtl ? 'ابدء البحث' : 'Start searching' }}</span>
+                    <span class="text-[14px] font-semibold text-black {{ $fa }}">{{ $isRtl ? 'ابدء البحث' : 'Start searching' }}</span>
                 </span>
             </button>
         </div>
@@ -54,7 +48,7 @@
         {{-- ══ Browse mode ══ --}}
         <div x-show="mode === 'browse'">
             <div class="flex items-center justify-between" style="margin-top: 18px; gap: 10px;">
-                <h1 class="font-bold text-black {{ $fa }}" style="font-size: 28px; line-height: 34px;">{{ $isRtl ? 'اهـلا بك' : 'Welcome' }}</h1>
+                <h1 class="font-bold text-black text-[22px] sm:text-[26px] {{ $fa }}" style="line-height: 1.25;">{{ $isRtl ? 'اهـلا بك' : 'Welcome' }}</h1>
                 @if($isHost)
                     <a href="{{ route('user.places') }}"
                        class="calm-press inline-flex items-center text-white font-bold {{ $fa }}"
@@ -71,10 +65,10 @@
             <div class="grid grid-cols-3" style="gap: 14px; margin-top: 22px;">
                 @foreach($placeTypes->take(3) as $i => $t)
                     <button type="button" @click="$dispatch('calm-open-search', { typeId: @js($t->id) })"
-                            class="calm-enter calm-press flex flex-col items-center justify-center bg-white"
-                            style="aspect-ratio: 1 / 0.95; border-radius: 24px; corner-shape: squircle; -webkit-corner-shape: squircle; gap: 14px; box-shadow: 0 0 50px rgba(0,0,0,0.06); animation-delay: {{ 140 + $i * 50 }}ms;">
-                        <span style="font-size: 42px; line-height: 1;">{{ $t->icon ?: '🏠' }}</span>
-                        <span class="text-[15px] font-bold text-black {{ $fa }}">{{ $isRtl ? $t->name_ar : $t->name_en }}</span>
+                            class="calm-enter calm-press flex flex-col items-center justify-center bg-white min-w-0"
+                            style="aspect-ratio: 1 / 0.92; border-radius: 26px; corner-shape: squircle; -webkit-corner-shape: squircle; gap: 10px; padding: 10px; box-shadow: 0 0 50px rgba(0,0,0,0.06); animation-delay: {{ 140 + $i * 50 }}ms;">
+                        <span class="text-[26px] sm:text-[34px]" style="line-height: 1;">{{ $t->icon ?: '🏠' }}</span>
+                        <span class="text-[12px] sm:text-[13px] font-bold text-black truncate w-full text-center {{ $fa }}">{{ $isRtl ? $t->name_ar : $t->name_en }}</span>
                     </button>
                 @endforeach
             </div>
@@ -84,12 +78,12 @@
                 <section class="calm-enter" style="margin-top: 40px; animation-delay: {{ 260 + $li * 120 }}ms;"
                          aria-label="{{ $isRtl ? $list->name_ar : $list->name_en }}">
                     <div class="flex items-center justify-between" style="gap: 10px;">
-                        <h2 class="font-bold text-black truncate {{ $fa }}" style="font-size: 20px; line-height: 26px;">
+                        <h2 class="font-bold text-black truncate text-[17px] sm:text-[19px] {{ $fa }}" style="line-height: 1.3;">
                             {{ $isRtl ? $list->name_ar : $list->name_en }}@if($list->icon)&nbsp;{{ $list->icon }}@endif
                         </h2>
                         <button type="button" @click="scrollRow('list{{ $li }}', 1)" aria-label="{{ $isRtl ? 'التالي' : 'Next' }}"
                                 class="calm-press shrink-0 flex items-center justify-center text-black"
-                                style="width: 40px; height: 40px; border-radius: 50%; background-color: #F5F5F5;">
+                                style="width: 36px; height: 36px; border-radius: 50%; background-color: #F5F5F5;">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"
                                  style="{{ $isRtl ? 'transform: scaleX(-1);' : '' }}">
                                 <path d="M9 5l7 7-7 7"></path>
@@ -186,8 +180,8 @@
     {{-- Floating «ابدء بحث جديد» (browse mode, like the app) --}}
     <button type="button" x-show="mode === 'browse'" @click="$dispatch('calm-open-search')"
             class="calm-press fixed z-30 inline-flex items-center text-white font-bold {{ $fa }}"
-            style="bottom: calc(86px + env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%); padding: 13px 22px; border-radius: 999px; gap: 8px; font-size: 14px; background-color: rgba(35,35,35,0.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); box-shadow: 0 10px 26px rgba(0,0,0,0.25); white-space: nowrap;">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            style="bottom: calc(84px + env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%); padding: 10px 18px; border-radius: 9999px; gap: 7px; font-size: 13px; background-color: rgba(30,30,30,0.55); backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px); box-shadow: 0 8px 22px rgba(0,0,0,0.18); white-space: nowrap;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
             <circle cx="12" cy="12" r="9"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line>
         </svg>
         <span>{{ $isRtl ? 'ابدء بحث جديد' : 'Start a new search' }}</span>
