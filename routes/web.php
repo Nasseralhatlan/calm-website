@@ -71,6 +71,13 @@ Route::get('/faqs', [PageController::class, 'faq'])->name('pages.faq');
 Route::get('/ical/places/{place}/{token}.ics', CalendarFeedController::class)
     ->name('calendar.export');
 
+// Guest-web tab pages — PUBLIC on purpose: like the app, the tabs always
+// render; guests get an inline sign-in prompt while signed-in users see
+// their data (fetched client-side via the JWT cookie).
+Route::get('/favorites', [UserDashboardController::class, 'favorites'])->name('user.favorites');
+Route::get('/trips', [UserDashboardController::class, 'trips'])->name('user.trips');
+Route::get('/account', [UserDashboardController::class, 'account'])->name('user.account');
+
 // ─── Auth (web, OTP → JWT cookie) ────────────────────────────────────────────
 Route::middleware('guest')->group(function (): void {
     Route::get('/login', [LoginController::class, 'showLogin'])->name('login');
@@ -129,7 +136,6 @@ Route::middleware('auth:api')->group(function (): void {
     // Booking detail — guest or host of that booking only.
     Route::get('/bookings/{booking}', [UserDashboardController::class, 'showBooking'])->name('user.bookings.show');
     Route::get('/financials', [UserDashboardController::class, 'financials'])->name('user.financials');
-    Route::get('/favorites', [UserDashboardController::class, 'favorites'])->name('user.favorites');
     // Support inside the dashboard chrome (sidebar). Public /support redirects here when logged in.
     Route::get('/account/support', [PageController::class, 'userSupport'])->name('user.support');
 });

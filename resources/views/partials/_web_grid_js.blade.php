@@ -22,7 +22,12 @@
                 this.loadingGrid = true;
                 this.gridError = false;
                 try {
-                    const qs = new URLSearchParams({ ...params, page: String(page) });
+                    // Array values (place_type_ids[]) append once per item.
+                    const qs = new URLSearchParams();
+                    Object.entries({ ...params, page: String(page) }).forEach(([k, v]) => {
+                        if (Array.isArray(v)) v.forEach((x) => qs.append(k, x));
+                        else if (v !== null && v !== undefined) qs.append(k, v);
+                    });
                     const res = await fetch(`${endpoint}?${qs}`, {
                         headers: { 'Accept': 'application/json' },
                         credentials: 'same-origin',
@@ -53,15 +58,35 @@
                     : (p.title_en || p.title_ar)) || p.title || '';
             },
 
+            // «العمارية · N ضيوف» — area (fallback city) + guest capacity.
             cardMeta(p) {
                 const n = (o) => o
                     ? ((CALM_WEB.locale === 'ar' ? o.name_ar : o.name_en) || o.name_ar || o.name_en)
                     : null;
-                return [n(p.type), n(p.city), n(p.city_area)].filter(Boolean).join(' · ');
+                const parts = [n(p.city_area) || n(p.city)];
+                if (p.max_guests) {
+                    parts.push(CALM_WEB.locale === 'ar' ? `${p.max_guests} ضيوف` : `${p.max_guests} guests`);
+                }
+                return parts.filter(Boolean).join(' · ');
+            },
+
+            cardDesc(p) {
+                return ((CALM_WEB.locale === 'ar'
+                    ? (p.description_ar || p.description_en)
+                    : (p.description_en || p.description_ar)) || p.description || '').trim();
             },
 
             fmtPrice(v) {
                 return Number(v || 0).toLocaleString('en-US');
+            },
+
+            priceSR(p) {
+                return 'SR ' + this.fmtPrice(p.price);
+            },
+
+            // Overridden by pages that know the applied dates («لـ 7 أيام»).
+            stayLabel() {
+                return '';
             },
 
             toggleLike(p) {

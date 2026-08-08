@@ -48,7 +48,7 @@ function homePageList(string $name, Place $place, string $status = 'active'): Pl
     return $list;
 }
 
-it('renders the browse home: quick types, curated lists, and a sign-in button for guests', function (): void {
+it('renders the browse home: quick types, curated lists, and the tab bar for guests too', function (): void {
     $place = homePagePlace($this->host);
     homePageList('مختارات كالم', $place);
 
@@ -60,9 +60,11 @@ it('renders the browse home: quick types, curated lists, and a sign-in button fo
         ->assertSee('مختارات كالم')
         ->assertSee('شاليه الصفحة الرئيسية')
         ->assertSee(route('places.show', $place))
-        // Guest chrome: sign-in button, no floating tab bar.
+        // Guest hearts link to login; the app tab bar shows for everyone.
         ->assertSee('/login')
-        ->assertDontSee(route('user.my-bookings'));
+        ->assertSee(route('user.trips'))
+        ->assertSee(route('user.favorites'))
+        ->assertSee(route('user.account'));
 });
 
 it('hides inactive lists and lists whose places are not visible', function (): void {
@@ -83,22 +85,30 @@ it('hides inactive lists and lists whose places are not visible', function (): v
         ->assertDontSee('مكان غير معتمد');
 });
 
-it('shows the floating tab bar for signed-in users', function (): void {
+it('shows the host-mode chip on home for hosts only', function (): void {
+    homePagePlace($this->host);
+
     $this->actingAs($this->host, 'api')
         ->get('/')
         ->assertOk()
-        ->assertSee(route('user.my-bookings'))
-        ->assertSee(route('user.favorites'))
-        ->assertSee(route('profile'));
+        ->assertSee(route('user.places'));
+
+    $guest = User::factory()->create(['phone' => '516200002']);
+    $this->actingAs($guest, 'api')
+        ->get('/')
+        ->assertOk()
+        ->assertDontSee(route('user.places'));
 });
 
-it('renders the favorites page for signed-in users and blocks guests', function (): void {
-    $this->get('/favorites')->assertRedirect();
+it('gates the tab pages inline: prompts for guests, content when signed in', function (): void {
+    // Guests get the page WITH a sign-in prompt (no redirect, like the app).
+    $this->get('/favorites')->assertOk()->assertSee('تسجيل الدخول');
+    $this->get('/trips')->assertOk()->assertSee('تسجيل الدخول');
+    $this->get('/account')->assertOk()->assertSee('تسجيل الدخول');
 
-    $this->actingAs($this->host, 'api')
-        ->get('/favorites')
-        ->assertOk()
-        ->assertSee('/api/favorites');
+    $this->actingAs($this->host, 'api')->get('/favorites')->assertOk()->assertSee('/api/favorites');
+    $this->actingAs($this->host, 'api')->get('/trips')->assertOk()->assertSee('/api/bookings');
+    $this->actingAs($this->host, 'api')->get('/account')->assertOk()->assertSee('تسجيل الخروج');
 });
 
 it('shows the booking CTA on a live place page, linking to the funnel', function (): void {

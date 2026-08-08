@@ -4,6 +4,8 @@
     $locale = app()->getLocale();
     $isRtl = $locale === 'ar';
     $fa = $isRtl ? 'font-arabic' : '';
+    $me = auth('api')->user();
+    $isHost = $me?->isHost() ?? false;
 @endphp
 
 @section('title', $isRtl ? 'كالم — أماكن مختارة بعناية' : 'Calm — hand-picked stays')
@@ -17,49 +19,87 @@
 
 @section('body')
 <div class="min-h-screen bg-white" x-data="calmHome()" x-init="init()"
-     x-on:calm-search-apply.window="onApply($event.detail)">
+     x-on:calm-search-apply.window="onApply($event.detail)"
+     x-on:calm-search-state.window="searchState = $event.detail">
 
-    @include('partials._web_topbar', ['searchPill' => true])
+    {{-- ══ App header: centered logo + «ابدء البحث» bar (sticky, blurred) ══ --}}
+    <header class="sticky top-0 z-30"
+            style="background-color: rgba(255,255,255,0.85); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);">
+        <div class="mx-auto" style="max-width: 720px; padding: 14px 20px 14px;">
+            <div class="flex items-center justify-center" style="position: relative;">
+                <a href="{{ route('landing') }}"><img src="/assets/logo/logo.png" alt="Calm" style="height: 34px; width: auto;" draggable="false"></a>
+                <form method="POST" action="{{ url('/locale/'.($locale === 'ar' ? 'en' : 'ar')) }}" class="m-0" style="position: absolute; inset-inline-end: 0;">
+                    @csrf
+                    <button type="submit" class="text-[13px] font-semibold hover:text-black transition-colors {{ $locale === 'en' ? 'font-arabic' : '' }}" style="color: #AAAAAA; padding: 6px;">
+                        {{ $locale === 'ar' ? 'english' : 'العربية' }}
+                    </button>
+                </form>
+            </div>
+            <button type="button" @click="$dispatch('calm-open-search')"
+                    class="calm-press flex items-center justify-center bg-white w-full"
+                    style="margin-top: 14px; height: 60px; border-radius: 999px; border: 1px solid #F1F1F1; box-shadow: 0 0 50px rgba(0,0,0,0.05); gap: 9px;">
+                <span dir="ltr" class="flex items-center" style="gap: 9px;">
+                    <svg width="16" height="16" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M13.125 13.125L11.25 11.25" stroke="black" stroke-width="1.5" stroke-linecap="round"/>
+                        <ellipse cx="6.875" cy="7.49997" rx="5.625" ry="5.62497" stroke="black" stroke-width="1.5"/>
+                    </svg>
+                    <span class="text-[16px] font-semibold text-black {{ $fa }}">{{ $isRtl ? 'ابدء البحث' : 'Start searching' }}</span>
+                </span>
+            </button>
+        </div>
+    </header>
 
-    <main class="mx-auto w-full" style="max-width: 1240px; padding: 40px 24px 110px;">
+    <main class="mx-auto w-full" style="max-width: 720px; padding: 10px 20px 150px;">
 
-        {{-- ══ Browse mode: curated lists (Figma reference) ══ --}}
+        {{-- ══ Browse mode ══ --}}
         <div x-show="mode === 'browse'">
+            <div class="flex items-center justify-between" style="margin-top: 18px; gap: 10px;">
+                <h1 class="font-bold text-black {{ $fa }}" style="font-size: 28px; line-height: 34px;">{{ $isRtl ? 'اهـلا بك' : 'Welcome' }}</h1>
+                @if($isHost)
+                    <a href="{{ route('user.places') }}"
+                       class="calm-press inline-flex items-center text-white font-bold {{ $fa }}"
+                       style="padding: 10px 16px; border-radius: 999px; gap: 6px; font-size: 12px; background-color: rgba(30,30,30,0.9);">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M7 16l-4-4 4-4M17 8l4 4-4 4"></path>
+                        </svg>
+                        {{ $isRtl ? 'وضع المضيف' : 'Host mode' }}
+                    </a>
+                @endif
+            </div>
+
+            {{-- Type boxes (app: 3 white squares) --}}
+            <div class="grid grid-cols-3" style="gap: 14px; margin-top: 22px;">
+                @foreach($placeTypes->take(3) as $i => $t)
+                    <button type="button" @click="$dispatch('calm-open-search', { typeId: @js($t->id) })"
+                            class="calm-enter calm-press flex flex-col items-center justify-center bg-white"
+                            style="aspect-ratio: 1 / 0.95; border-radius: 24px; corner-shape: squircle; -webkit-corner-shape: squircle; gap: 14px; box-shadow: 0 0 50px rgba(0,0,0,0.06); animation-delay: {{ 140 + $i * 50 }}ms;">
+                        <span style="font-size: 42px; line-height: 1;">{{ $t->icon ?: '🏠' }}</span>
+                        <span class="text-[15px] font-bold text-black {{ $fa }}">{{ $isRtl ? $t->name_ar : $t->name_en }}</span>
+                    </button>
+                @endforeach
+            </div>
+
+            {{-- Curated lists — app rows: «{name} {icon}» + chevron circle --}}
             @foreach($lists as $li => $list)
-                <section class="calm-enter" style="{{ $li > 0 ? 'margin-top: 56px;' : '' }} animation-delay: {{ 140 + $li * 120 }}ms;"
+                <section class="calm-enter" style="margin-top: 40px; animation-delay: {{ 260 + $li * 120 }}ms;"
                          aria-label="{{ $isRtl ? $list->name_ar : $list->name_en }}">
-                    <h2 class="font-bold text-black {{ $fa }}" style="font-size: 22px; line-height: 28px;">
-                        {{ $isRtl ? $list->name_ar : $list->name_en }}
-                    </h2>
-                    @if($isRtl ? $list->description_ar : $list->description_en)
-                        <p class="{{ $fa }}" style="font-size: 13px; margin-top: 4px; color: #AAAAAA;">{{ $isRtl ? $list->description_ar : $list->description_en }}</p>
-                    @endif
-                    <div class="flex overflow-x-auto calm-hide-scroll" style="gap: 24px; margin-top: 24px; padding: 4px 4px 8px;">
+                    <div class="flex items-center justify-between" style="gap: 10px;">
+                        <h2 class="font-bold text-black truncate {{ $fa }}" style="font-size: 20px; line-height: 26px;">
+                            {{ $isRtl ? $list->name_ar : $list->name_en }}@if($list->icon)&nbsp;{{ $list->icon }}@endif
+                        </h2>
+                        <button type="button" @click="scrollRow('list{{ $li }}', 1)" aria-label="{{ $isRtl ? 'التالي' : 'Next' }}"
+                                class="calm-press shrink-0 flex items-center justify-center text-black"
+                                style="width: 40px; height: 40px; border-radius: 50%; background-color: #F5F5F5;">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"
+                                 style="{{ $isRtl ? 'transform: scaleX(-1);' : '' }}">
+                                <path d="M9 5l7 7-7 7"></path>
+                            </svg>
+                        </button>
+                    </div>
+                    <div x-ref="list{{ $li }}" class="flex overflow-x-auto calm-hide-scroll" style="gap: 16px; margin-top: 16px; padding: 4px 4px 8px;">
                         @foreach($list->places as $p)
                             @include('partials._web_place_card', ['p' => $p, 'compact' => true])
                         @endforeach
-
-                        {{-- «عرض الكل» tile --}}
-                        @php $seeAllCovers = $list->places->map(fn ($sp) => $sp->coverPhoto?->url ?? $sp->visiblePhotos()->first()?->url)->filter()->take(2)->values(); @endphp
-                        <button type="button" @click="$dispatch('calm-open-search')"
-                                class="calm-press-card shrink-0 flex flex-col items-center justify-center bg-white"
-                                style="width: 170px; height: 170px; border-radius: 24px; corner-shape: squircle; -webkit-corner-shape: squircle; gap: 14px; box-shadow: 0 0 50px rgba(0,0,0,0.05); border: 1px solid #F1F1F1;">
-                            <span class="relative block" style="width: 74px; height: 62px;">
-                                @foreach($seeAllCovers as $ci => $cUrl)
-                                    <img src="{{ $cUrl }}" alt="" loading="lazy"
-                                         class="absolute object-cover border-2 border-white"
-                                         style="width: 54px; height: 54px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-                                                {{ $ci === 0 ? 'top: 8px; inset-inline-start: 0; transform: rotate(-7deg); z-index: 1;' : 'top: 0; inset-inline-end: 0; transform: rotate(6deg); z-index: 2;' }}">
-                                @endforeach
-                            </span>
-                            <span class="flex items-center text-[13px] font-bold text-black {{ $fa }}" style="gap: 4px;">
-                                <span>{{ $isRtl ? 'عرض الكل' : 'See all' }}</span>
-                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"
-                                     style="{{ $isRtl ? 'transform: scaleX(-1);' : '' }}">
-                                    <path d="M9 5l7 7-7 7"></path>
-                                </svg>
-                            </span>
-                        </button>
                     </div>
                 </section>
             @endforeach
@@ -71,29 +111,34 @@
             @endif
         </div>
 
-        {{-- ══ Results mode: 3-column grid + load more ══ --}}
+        {{-- ══ Results mode — app: back + «أماكن فى {city} / N نتيجة» pill + filters ══ --}}
         <div x-show="mode === 'results'" x-cloak>
-            <div class="flex items-center justify-between flex-wrap" style="gap: 10px;">
-                <div>
-                    <h2 class="font-bold text-black {{ $fa }}" style="font-size: 22px; line-height: 28px;">{{ $isRtl ? 'نتائج البحث' : 'Search results' }}</h2>
-                    <p class="text-[13px] tabular-nums {{ $fa }}" style="color: #AAAAAA;" x-show="!loadingGrid || items.length > 0"
-                       x-text="total + ' {{ $isRtl ? 'مكان' : 'places' }}'"></p>
-                </div>
-                <div class="flex items-center" style="gap: 8px;">
-                    <button type="button" @click="$dispatch('calm-open-search')"
-                            class="calm-press text-[13px] font-bold text-black bg-white transition-all {{ $fa }}"
-                            style="padding: 11px 20px; border-radius: 999px; box-shadow: 0 0 50px rgba(0,0,0,0.08);">
-                        {{ $isRtl ? 'تعديل البحث' : 'Edit search' }}
-                    </button>
-                    <button type="button" @click="clearSearch()"
-                            class="text-[13px] font-semibold hover:text-black transition-colors {{ $fa }}"
-                            style="padding: 10px 12px; color: #AAAAAA;">
-                        ✕ {{ $isRtl ? 'مسح' : 'Clear' }}
-                    </button>
-                </div>
+            <div class="flex items-center justify-between" style="gap: 10px; margin-top: 8px;">
+                <button type="button" @click="clearSearch()" aria-label="{{ $isRtl ? 'رجوع' : 'Back' }}"
+                        class="calm-press shrink-0 flex items-center justify-center text-black" style="width: 40px; height: 40px;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"
+                         style="{{ $isRtl ? '' : 'transform: scaleX(-1);' }}">
+                        <path d="M9 5l7 7-7 7"></path>
+                    </svg>
+                </button>
+                <button type="button" @click="$dispatch('calm-open-search')"
+                        class="calm-press flex-1 min-w-0 bg-white text-center"
+                        style="border-radius: 999px; padding: 10px 20px; box-shadow: 0 0 50px rgba(0,0,0,0.08); max-width: 420px;">
+                    <span class="block font-bold text-black truncate {{ $fa }}" style="font-size: 15px; line-height: 20px;"
+                          x-text="'{{ $isRtl ? 'أماكن فى' : 'Places in' }} ' + ((searchState && searchState.cityName) || '…')"></span>
+                    <span class="block tabular-nums {{ $fa }}" style="font-size: 12px; line-height: 16px; color: #AAAAAA;"
+                          x-text="total + ' {{ $isRtl ? 'نتيجة' : 'results' }}'"></span>
+                </button>
+                <button type="button" @click="$dispatch('calm-open-search')" aria-label="{{ $isRtl ? 'الفلاتر' : 'Filters' }}"
+                        class="calm-press shrink-0 flex items-center justify-center text-black" style="width: 40px; height: 40px;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                        <line x1="4" y1="7" x2="20" y2="7"></line><circle cx="9" cy="7" r="2.4" fill="#fff"></circle>
+                        <line x1="4" y1="16" x2="20" y2="16"></line><circle cx="15" cy="16" r="2.4" fill="#fff"></circle>
+                    </svg>
+                </button>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" style="gap: 28px 24px; margin-top: 24px;">
+            <div class="grid grid-cols-1 sm:grid-cols-2" style="gap: 32px 24px; margin-top: 24px;">
                 <template x-for="p in items" :key="p.id">
                     @include('partials._web_card_template')
                 </template>
@@ -101,10 +146,10 @@
 
             {{-- First-page loading — skeleton cards --}}
             <div x-show="loadingGrid && items.length === 0"
-                 class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" style="gap: 28px 24px; margin-top: 24px;">
-                @for($sk = 0; $sk < 3; $sk++)
+                 class="grid grid-cols-1 sm:grid-cols-2" style="gap: 32px 24px; margin-top: 24px;">
+                @for($sk = 0; $sk < 2; $sk++)
                     <div>
-                        <div class="calm-skeleton" style="border-radius: 18px; corner-shape: squircle; -webkit-corner-shape: squircle; aspect-ratio: 1.15;"></div>
+                        <div class="calm-skeleton" style="border-radius: 24px; aspect-ratio: 1;"></div>
                         <div class="calm-skeleton" style="height: 14px; border-radius: 4px; width: 72%; margin-top: 12px;"></div>
                         <div class="calm-skeleton" style="height: 14px; border-radius: 4px; width: 50%; margin-top: 8px;"></div>
                         <div class="calm-skeleton" style="height: 14px; border-radius: 4px; width: 40%; margin-top: 8px;"></div>
@@ -138,6 +183,16 @@
         </div>
     </main>
 
+    {{-- Floating «ابدء بحث جديد» (browse mode, like the app) --}}
+    <button type="button" x-show="mode === 'browse'" @click="$dispatch('calm-open-search')"
+            class="calm-press fixed z-30 inline-flex items-center text-white font-bold {{ $fa }}"
+            style="bottom: calc(86px + env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%); padding: 13px 22px; border-radius: 999px; gap: 8px; font-size: 14px; background-color: rgba(35,35,35,0.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); box-shadow: 0 10px 26px rgba(0,0,0,0.25); white-space: nowrap;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <circle cx="12" cy="12" r="9"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line>
+        </svg>
+        <span>{{ $isRtl ? 'ابدء بحث جديد' : 'Start a new search' }}</span>
+    </button>
+
     @include('partials._web_search_modal', ['searchModalRedirect' => false])
     @include('partials._web_floating_nav')
     @include('partials._web_footer')
@@ -150,17 +205,19 @@
             ...calmGrid('/api/places/search'),
 
             mode: 'browse',
+            searchState: null,
             // The last selection the search modal applied — drives load-more
-            // params and the shareable URL.
+            // params and the shareable URL. areaIds/typeIds are arrays.
             applied: null,
 
             init() {
                 const q = new URLSearchParams(window.location.search);
                 if (q.get('city')) {
+                    const list = (v) => (v || '').split(',').filter(Boolean);
                     this.applied = {
                         cityId: q.get('city'),
-                        areaId: q.get('area') || null,
-                        typeId: q.get('type') || null,
+                        areaIds: list(q.get('area')),
+                        typeIds: list(q.get('type')),
                         checkIn: /^\d{4}-\d{2}-\d{2}$/.test(q.get('in') || '') ? q.get('in') : null,
                         checkOut: /^\d{4}-\d{2}-\d{2}$/.test(q.get('out') || '') ? q.get('out') : null,
                     };
@@ -179,10 +236,19 @@
             searchParams() {
                 const a = this.applied || {};
                 const q = { city_id: a.cityId };
-                if (a.areaId) q.city_area_id = a.areaId;
-                if (a.typeId) q['place_type_ids[]'] = a.typeId;
+                // The API takes ONE area — send it only for a single pick.
+                if ((a.areaIds || []).length === 1) q.city_area_id = a.areaIds[0];
+                if ((a.typeIds || []).length) q['place_type_ids[]'] = a.typeIds;
                 if (a.checkIn) { q.check_in = a.checkIn; q.check_out = a.checkOut || a.checkIn; }
                 return q;
+            },
+
+            // «لـ 7 أيام» — inclusive day count like the app.
+            stayLabel() {
+                const a = this.applied;
+                if (!a || !a.checkIn) return '';
+                const days = Math.round((new Date(a.checkOut || a.checkIn) - new Date(a.checkIn)) / 86400000) + 1;
+                return CALM_WEB.locale === 'ar' ? `لـ ${days} ${days === 1 ? 'يوم' : 'أيام'}` : `for ${days} ${days === 1 ? 'day' : 'days'}`;
             },
 
             clearSearch() {
@@ -197,10 +263,17 @@
                 const a = this.applied;
                 const q = new URLSearchParams();
                 q.set('city', a.cityId);
-                if (a.areaId) q.set('area', a.areaId);
-                if (a.typeId) q.set('type', a.typeId);
+                if ((a.areaIds || []).length) q.set('area', a.areaIds.join(','));
+                if ((a.typeIds || []).length) q.set('type', a.typeIds.join(','));
                 if (a.checkIn) { q.set('in', a.checkIn); q.set('out', a.checkOut || a.checkIn); }
                 window.history.replaceState({}, '', `${window.location.pathname}?${q}`);
+            },
+
+            scrollRow(key, dir) {
+                const el = this.$refs[key];
+                if (!el) return;
+                const rtl = document.documentElement.dir === 'rtl';
+                el.scrollBy({ left: (rtl ? -dir : dir) * Math.round(el.clientWidth * 0.9), behavior: 'smooth' });
             },
         };
     }

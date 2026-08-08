@@ -65,8 +65,22 @@ class DashboardController extends Controller
         ]);
     }
 
-    public function favorites(Request $request): View
+    public function favorites(): View
     {
-        return view('user.favorites', ['user' => $request->user()]);
+        // Public route — the page itself renders a sign-in prompt for guests
+        // and fetches /api/favorites client-side when signed in (app parity).
+        return view('user.favorites');
+    }
+
+    /** Guest-web «حجوزاتي» tab — public; prompts guests, fetches /api/bookings. */
+    public function trips(): View
+    {
+        return view('user.trips');
+    }
+
+    /** Guest-web «حسابى» tab — public; prompts guests, app-style menu otherwise. */
+    public function account(): View
+    {
+        return view('user.account', ['me' => auth('api')->user()]);
     }
 }
