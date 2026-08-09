@@ -10,9 +10,9 @@
 
 @section('body')
 {{-- App-parity login modal — step 2 of 2 (OTP). --}}
-<div class="min-h-screen" style="background-color: #E9E9E9;">
-    <div class="mx-auto bg-white flex flex-col" style="max-width: 640px; min-height: 100vh;">
-        <div class="flex-1" style="padding: 26px 24px calc(40px + env(safe-area-inset-bottom, 0px)); border-radius: 28px 28px 0 0; background: #fff; margin-top: 14px; box-shadow: 0 -4px 16px rgba(0,0,0,0.08);">
+<div class="calm-auth-backdrop min-h-screen flex flex-col justify-end sm:justify-center sm:items-center sm:px-6">
+    <div class="calm-auth-sheet bg-white w-full">
+        <div style="padding: 26px 24px calc(40px + env(safe-area-inset-bottom, 0px));">
 
             {{-- Logo + back --}}
             <div class="flex items-center justify-center" style="position: relative; margin-bottom: 34px;">
@@ -127,4 +127,27 @@
         };
     }
 </script>
+
+<style>
+    /* Modal feel: bottom sheet on mobile, centered fading modal on desktop. */
+    .calm-auth-backdrop { background-color: #E9E9E9; }
+    .calm-auth-sheet {
+        border-radius: 28px 28px 0 0;
+        min-height: calc(100vh - 14px);
+        box-shadow: 0 -4px 16px rgba(0,0,0,0.08);
+        animation: calm-sheet-up 0.42s cubic-bezier(0.22, 0.9, 0.36, 1);
+    }
+    @media (min-width: 640px) {
+        .calm-auth-backdrop { background-color: rgba(25, 25, 25, 0.5); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+        .calm-auth-sheet {
+            max-width: 480px;
+            min-height: 0;
+            border-radius: 28px;
+            box-shadow: 0 24px 60px rgba(0,0,0,0.25);
+            animation: calm-modal-in 0.3s ease-out;
+        }
+    }
+    @keyframes calm-sheet-up { from { transform: translateY(100%); } to { transform: none; } }
+    @keyframes calm-modal-in { from { opacity: 0; transform: scale(0.96) translateY(12px); } to { opacity: 1; transform: none; } }
+</style>
 @endsection

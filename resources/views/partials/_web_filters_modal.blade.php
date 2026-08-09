@@ -17,7 +17,7 @@
      style="background-color: rgba(250,250,250,0.8); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);"
      role="dialog" aria-modal="true">
 
-    <div class="mx-auto w-full bg-white flex flex-col" style="max-width: 560px; flex: 1 1 0%; min-height: 0; margin-top: 14px; border-radius: 28px 28px 0 0; box-shadow: 0 -4px 16px rgba(0,0,0,0.12);">
+    <div class="calm-filters-panel mx-auto w-full bg-white flex flex-col" style="max-width: 560px; flex: 1 1 0%; min-height: 0;">
         {{-- Header: X + الفلاتر + مسح --}}
         <div class="shrink-0 flex items-center justify-between" style="padding: 18px 22px 12px;">
             <button type="button" @click="close()" aria-label="{{ $isRtl ? 'إغلاق' : 'Close' }}"
@@ -231,4 +231,23 @@
         pointer-events: auto; width: 24px; height: 24px; border-radius: 50%; background: #fff;
         border: 1.5px solid #E0E0E0; box-shadow: 0 2px 8px rgba(0,0,0,0.15); cursor: pointer;
     }
+</style>
+<style>
+    .calm-filters-panel {
+        margin-top: 14px;
+        border-radius: 28px 28px 0 0;
+        box-shadow: 0 -4px 16px rgba(0,0,0,0.12);
+        animation: calm-sheet-up 0.38s cubic-bezier(0.22, 0.9, 0.36, 1);
+    }
+    @media (min-width: 640px) {
+        .calm-filters-panel {
+            margin: auto 0;
+            align-self: center;
+            max-height: 86vh;
+            border-radius: 28px;
+            box-shadow: 0 24px 60px rgba(0,0,0,0.25);
+            animation: calm-modal-in 0.3s ease-out;
+        }
+    }
+    @keyframes calm-modal-in { from { opacity: 0; transform: scale(0.96) translateY(12px); } to { opacity: 1; transform: none; } }
 </style>

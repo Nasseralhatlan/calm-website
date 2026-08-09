@@ -50,7 +50,7 @@
      style="background-color: rgba(250,250,250,0.75); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);"
      role="dialog" aria-modal="true">
 
-    <div class="mx-auto w-full" style="max-width: 560px; padding: 16px 20px 0; flex: 1 1 0%; min-height: 0; display: flex; flex-direction: column;">
+    <div class="mx-auto w-full" style="max-width: 560px; padding: 16px 20px 0; flex: 1 1 0%; min-height: 0; display: flex; flex-direction: column; animation: calm-sheet-up 0.38s cubic-bezier(0.22, 0.9, 0.36, 1);">
         {{-- Top: centered logo + close --}}
         <div class="shrink-0 flex items-center justify-center" style="position: relative; margin-bottom: 14px;">
             <img src="/assets/logo/logo.png" alt="Calm" style="height: 30px; width: auto;" draggable="false">
@@ -438,3 +438,6 @@
         };
     }
 </script>
+<style>
+    @keyframes calm-sheet-up { from { transform: translateY(100%); } to { transform: none; } }
+</style>
