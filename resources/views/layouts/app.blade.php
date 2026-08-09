@@ -18,6 +18,12 @@
             corner-shape: squircle !important;
             -webkit-corner-shape: squircle !important;
         }
+        /* True pills/circles — the page-wide squircle flattens huge radii in
+           Chrome (corner-shape shipped), so these opt back into round. */
+        .calm-round {
+            corner-shape: round !important;
+            -webkit-corner-shape: round !important;
+        }
     </style>
 </head>
 <body class="min-h-screen antialiased">

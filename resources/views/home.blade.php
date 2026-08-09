@@ -30,7 +30,7 @@
                 <a href="{{ route('landing') }}"><img src="/assets/logo/logo.png" alt="Calm" style="height: 32px; width: auto;" draggable="false"></a>
             </div>
             <button type="button" @click="$dispatch('calm-open-search')"
-                    class="calm-press flex items-center justify-center bg-white w-full"
+                    class="calm-press calm-round flex items-center justify-center bg-white w-full"
                     style="margin-top: 14px; height: 54px; border-radius: 9999px; overflow: hidden; border: 1px solid #F1F1F1; box-shadow: 0 0 50px rgba(0,0,0,0.05); gap: 9px;">
                 <span dir="ltr" class="flex items-center" style="gap: 9px;">
                     <svg width="16" height="16" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -43,11 +43,11 @@
         </div>
     </header>
 
-    <main class="mx-auto w-full" style="max-width: 720px; padding: 10px 20px 150px;">
+    <main class="mx-auto w-full" style="max-width: 720px; padding: 10px 0 150px;">
 
         {{-- ══ Browse mode ══ --}}
         <div x-show="mode === 'browse'">
-            <div class="flex items-center justify-between" style="margin-top: 18px; gap: 10px;">
+            <div class="flex items-center justify-between" style="margin-top: 18px; gap: 10px; padding-inline: 20px;">
                 <h1 class="font-bold text-black text-[22px] sm:text-[26px] {{ $fa }}" style="line-height: 1.25;">{{ $isRtl ? 'اهـلا بك' : 'Welcome' }}</h1>
                 @if($isHost)
                     <a href="{{ route('user.places') }}"
@@ -62,7 +62,7 @@
             </div>
 
             {{-- Type boxes (app: 3 white squares) --}}
-            <div class="grid grid-cols-3" style="gap: 14px; margin-top: 22px;">
+            <div class="grid grid-cols-3" style="gap: 14px; margin-top: 22px; padding-inline: 20px;">
                 @foreach($placeTypes->take(3) as $i => $t)
                     <button type="button" @click="$dispatch('calm-open-search', { typeId: @js($t->id) })"
                             class="calm-enter calm-press flex flex-col items-center justify-center bg-white min-w-0"
@@ -77,12 +77,12 @@
             @foreach($lists as $li => $list)
                 <section class="calm-enter" style="margin-top: 40px; animation-delay: {{ 260 + $li * 120 }}ms;"
                          aria-label="{{ $isRtl ? $list->name_ar : $list->name_en }}">
-                    <div class="flex items-center justify-between" style="gap: 10px;">
+                    <div class="flex items-center justify-between" style="gap: 10px; padding-inline: 20px;">
                         <h2 class="font-bold text-black truncate text-[17px] sm:text-[19px] {{ $fa }}" style="line-height: 1.3;">
                             {{ $isRtl ? $list->name_ar : $list->name_en }}@if($list->icon)&nbsp;{{ $list->icon }}@endif
                         </h2>
                         <button type="button" @click="scrollRow('list{{ $li }}', 1)" aria-label="{{ $isRtl ? 'التالي' : 'Next' }}"
-                                class="calm-press shrink-0 flex items-center justify-center text-black"
+                                class="calm-press calm-round shrink-0 flex items-center justify-center text-black"
                                 style="width: 36px; height: 36px; border-radius: 50%; background-color: #F5F5F5;">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"
                                  style="{{ $isRtl ? 'transform: scaleX(-1);' : '' }}">
@@ -90,7 +90,7 @@
                             </svg>
                         </button>
                     </div>
-                    <div x-ref="list{{ $li }}" class="flex overflow-x-auto calm-hide-scroll" style="gap: 16px; margin-top: 16px; padding: 4px 4px 8px;">
+                    <div x-ref="list{{ $li }}" class="flex overflow-x-auto calm-hide-scroll" style="gap: 16px; margin-top: 16px; padding: 4px 20px 8px;">
                         @foreach($list->places as $p)
                             @include('partials._web_place_card', ['p' => $p, 'compact' => true])
                         @endforeach
@@ -99,14 +99,14 @@
             @endforeach
 
             @if($lists->isEmpty())
-                <div class="text-center {{ $fa }}" style="padding: 70px 0; color: #AAAAAA;">
+                <div class="text-center {{ $fa }}" style="padding: 70px 20px; color: #AAAAAA;">
                     {{ $isRtl ? 'لا توجد أماكن معروضة بعد — عد قريباً.' : 'Nothing to show yet — check back soon.' }}
                 </div>
             @endif
         </div>
 
         {{-- ══ Results mode — app: back + «أماكن فى {city} / N نتيجة» pill + filters ══ --}}
-        <div x-show="mode === 'results'" x-cloak>
+        <div x-show="mode === 'results'" x-cloak style="padding-inline: 20px;">
             <div class="flex items-center justify-between" style="gap: 10px; margin-top: 8px;">
                 <button type="button" @click="clearSearch()" aria-label="{{ $isRtl ? 'رجوع' : 'Back' }}"
                         class="calm-press shrink-0 flex items-center justify-center text-black" style="width: 40px; height: 40px;">
@@ -179,7 +179,7 @@
 
     {{-- Floating «ابدء بحث جديد» (browse mode, like the app) --}}
     <button type="button" x-show="mode === 'browse'" @click="$dispatch('calm-open-search')"
-            class="calm-press fixed z-30 inline-flex items-center text-white font-bold {{ $fa }}"
+            class="calm-press calm-round fixed z-30 inline-flex items-center text-white font-bold {{ $fa }}"
             style="bottom: calc(84px + env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%); padding: 10px 18px; border-radius: 9999px; gap: 7px; font-size: 13px; background-color: rgba(30,30,30,0.55); backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px); box-shadow: 0 8px 22px rgba(0,0,0,0.18); white-space: nowrap;">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
             <circle cx="12" cy="12" r="9"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line>
