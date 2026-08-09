@@ -400,12 +400,18 @@
                     this._lastPick = { iso, t: now };
 
                     const s = this.sel;
-                    if (s.checkIn && s.checkIn === s.checkOut && iso === s.checkIn) return; // re-tap on the same single day
-                    if (s.checkIn && s.checkIn === s.checkOut && iso > s.checkIn) {
-                        s.checkOut = iso; // extend the one-day pick into a range
-                    } else {
-                        s.checkIn = iso; s.checkOut = iso; // fresh one-day selection
+                    // Nothing selected → the click is the start (a one-day stay
+                    // until a second day is picked).
+                    if (!s.checkIn) { s.checkIn = iso; s.checkOut = iso; return; }
+
+                    if (s.checkIn === s.checkOut) { // single day selected
+                        if (iso > s.checkIn) { s.checkOut = iso; return; }      // after → end date
+                        if (iso < s.checkIn) { s.checkOut = s.checkIn; s.checkIn = iso; return; } // before → swap
+                        return; // same day re-tap → keep
                     }
+
+                    // A full range exists → start over from the clicked day.
+                    s.checkIn = iso; s.checkOut = iso;
                 },
                 cellStyle(c) {
                     let st = 'height: 42px; display: flex; align-items: center; justify-content: center;';
