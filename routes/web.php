@@ -37,6 +37,8 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', [LandingController::class, 'index'])->name('landing');
 Route::post('/locale/{locale}', [LandingController::class, 'switchLocale'])->name('locale.switch');
 Route::get('/places/{place}', [PlaceController::class, 'show'])->name('places.show');
+// «عرض الكل» — a curated home list's full set of places.
+Route::get('/lists/{placeList}', [LandingController::class, 'list'])->name('web.list');
 
 // Web booking funnel — the link hosts share ("احجز عبر الرابط"). The page is
 // public; creating the booking and the status page need the JWT cookie the

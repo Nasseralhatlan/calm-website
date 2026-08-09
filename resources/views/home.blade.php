@@ -92,9 +92,31 @@
                         </button>
                     </div>
                     <div x-ref="list{{ $li }}" class="flex overflow-x-auto calm-hide-scroll" style="gap: 16px; margin-top: 16px; padding: 4px 20px 8px;">
-                        @foreach($list->places as $p)
+                        @foreach($list->places->take(5) as $p)
                             @include('partials._web_place_card', ['p' => $p, 'compact' => true])
                         @endforeach
+
+                        {{-- «عرض الكل» — animated stacked photos → the list page --}}
+                        @php $seeAllCovers = $list->places->skip(5)->concat($list->places)->map(fn ($sp) => $sp->coverPhoto?->url ?? $sp->visiblePhotos()->first()?->url)->filter()->unique()->take(2)->values(); @endphp
+                        <a href="{{ route('web.list', $list) }}"
+                           class="calm-press-card calm-seeall shrink-0 flex flex-col items-center justify-center bg-white"
+                           style="width: clamp(126px, 37vw, 172px); height: clamp(126px, 37vw, 172px); border-radius: 28px; corner-shape: squircle; -webkit-corner-shape: squircle; gap: 14px; box-shadow: 0 0 50px rgba(0,0,0,0.06); border: 1px solid #F1F1F1;">
+                            <span class="relative block" style="width: 70px; height: 58px;">
+                                @foreach($seeAllCovers as $ci => $cUrl)
+                                    <img src="{{ $cUrl }}" alt="" loading="lazy"
+                                         class="calm-seeall-img{{ $ci }} absolute object-cover border-2 border-white"
+                                         style="width: 50px; height: 50px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+                                                {{ $ci === 0 ? 'top: 8px; inset-inline-start: 0; z-index: 1;' : 'top: 0; inset-inline-end: 0; z-index: 2;' }}">
+                                @endforeach
+                            </span>
+                            <span class="flex items-center text-[13px] font-bold text-black {{ $fa }}" style="gap: 4px;">
+                                <span>{{ $isRtl ? 'عرض الكل' : 'See all' }}</span>
+                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"
+                                     style="{{ $isRtl ? 'transform: scaleX(-1);' : '' }}">
+                                    <path d="M9 5l7 7-7 7"></path>
+                                </svg>
+                            </span>
+                        </a>
                     </div>
                 </section>
             @endforeach
@@ -316,5 +338,15 @@
     [x-cloak] { display: none !important; }
     .calm-hide-scroll { scrollbar-width: none; }
     .calm-hide-scroll::-webkit-scrollbar { display: none; }
+
+    /* «عرض الكل» stacked photos: slow idle sway, fanning apart on hover/press. */
+    .calm-seeall img { transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
+    .calm-seeall-img0 { animation: calm-seeall-sway0 3.6s ease-in-out infinite alternate; }
+    .calm-seeall-img1 { animation: calm-seeall-sway1 3.6s ease-in-out infinite alternate; }
+    .calm-seeall:hover .calm-seeall-img0, .calm-seeall:active .calm-seeall-img0 { transform: rotate(-14deg) translate(4px, 2px); animation: none; }
+    .calm-seeall:hover .calm-seeall-img1, .calm-seeall:active .calm-seeall-img1 { transform: rotate(10deg) translate(-4px, -2px); animation: none; }
+    @keyframes calm-seeall-sway0 { from { transform: rotate(-9deg); } to { transform: rotate(-4deg); } }
+    @keyframes calm-seeall-sway1 { from { transform: rotate(7deg); } to { transform: rotate(2deg); } }
+    @media (prefers-reduced-motion: reduce) { .calm-seeall-img0, .calm-seeall-img1 { animation: none; } }
 </style>
 @endsection

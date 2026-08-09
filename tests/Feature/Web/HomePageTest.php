@@ -67,6 +67,25 @@ it('renders the browse home: quick types, curated lists, and the tab bar for gue
         ->assertSee(route('user.account'));
 });
 
+it('links each home list to its «عرض الكل» page, which shows every place', function (): void {
+    $place = homePagePlace($this->host, ['title_ar' => 'مكان القائمة الكاملة']);
+    $list = homePageList('قائمة كاملة', $place);
+
+    $this->get('/')
+        ->assertOk()
+        ->assertSee(route('web.list', $list));
+
+    $this->get(route('web.list', $list))
+        ->assertOk()
+        ->assertSee('قائمة كاملة')
+        ->assertSee('مكان القائمة الكاملة');
+
+    // Inactive lists 404 on the dedicated page.
+    $inactivePlace = homePagePlace($this->host, ['title_ar' => 'مكان قائمة موقوفة']);
+    $inactive = homePageList('قائمة موقوفة للصفحة', $inactivePlace, GeoStatus::Inactive->value);
+    $this->get(route('web.list', $inactive))->assertNotFound();
+});
+
 it('hides inactive lists and lists whose places are not visible', function (): void {
     $visible = homePagePlace($this->host, ['title_ar' => 'مكان ظاهر']);
     homePageList('قائمة موقوفة', $visible, GeoStatus::Inactive->value);
