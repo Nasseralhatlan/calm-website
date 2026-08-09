@@ -51,13 +51,15 @@
                      @scroll.debounce.60ms="ci = Math.min({{ $carousel->count() - 1 }}, Math.round(Math.abs($el.scrollLeft) / $el.clientWidth))">
                     @foreach($carousel as $u)
                         <img src="{{ $u }}" alt="{{ $p->localized_title }}" loading="lazy"
-                             class="w-full h-full object-cover shrink-0" style="scroll-snap-align: center;">
+                             class="w-full h-full object-cover shrink-0"
+                             style="scroll-snap-align: center; scroll-snap-stop: always;">
                     @endforeach
                 </div>
                 <div class="absolute flex items-center justify-center" style="bottom: 10px; left: 0; right: 0; gap: 4px; pointer-events: none;">
                     @foreach($carousel as $di => $u)
-                        <span class="calm-round" style="height: 5px; border-radius: 3px; background: #fff; transition: all 0.25s;"
-                              :style="{{ $di }} === ci ? 'width: 14px; opacity: 1;' : 'width: 5px; opacity: 0.55;'"></span>
+                        {{-- Full style lives in the binding — Alpine string :style replaces the static attr --}}
+                        <span class="calm-round"
+                              :style="'height: 5px; border-radius: 3px; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.25); transition: all 0.25s; ' + ({{ $di }} === ci ? 'width: 14px; opacity: 1;' : 'width: 5px; opacity: 0.55;')"></span>
                     @endforeach
                 </div>
             @elseif($carousel->isNotEmpty())

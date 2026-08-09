@@ -19,16 +19,18 @@
                  x-init="window.calmDragScroll && calmDragScroll($el)"
                  @scroll.debounce.60ms="ci = Math.min(imgs().length - 1, Math.round(Math.abs($el.scrollLeft) / $el.clientWidth))">
                 <template x-for="(u, ui) in imgs()" :key="ui">
-                    <img :src="u" :alt="cardTitle(p)" :loading="ui === 0 ? 'lazy' : 'lazy'"
-                         class="w-full h-full object-cover shrink-0" style="scroll-snap-align: center;">
+                    <img :src="u" :alt="cardTitle(p)" loading="lazy"
+                         class="w-full h-full object-cover shrink-0"
+                         style="scroll-snap-align: center; scroll-snap-stop: always;">
                 </template>
             </div>
             {{-- Pagination dots (app spec: active 14px, inactive 5px @55%) --}}
             <div class="absolute flex items-center justify-center" style="bottom: 10px; left: 0; right: 0; gap: 4px; pointer-events: none;"
                  x-show="imgs().length > 1">
                 <template x-for="(u, di) in imgs()" :key="'d' + di">
-                    <span class="calm-round" style="height: 5px; border-radius: 3px; background: #fff; transition: all 0.25s;"
-                          :style="di === ci ? 'width: 14px; opacity: 1;' : 'width: 5px; opacity: 0.55;'"></span>
+                    {{-- Full style lives in the binding — Alpine string :style replaces the static attr --}}
+                    <span class="calm-round"
+                          :style="'height: 5px; border-radius: 3px; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.25); transition: all 0.25s; ' + (di === ci ? 'width: 14px; opacity: 1;' : 'width: 5px; opacity: 0.55;')"></span>
                 </template>
             </div>
         </div>
