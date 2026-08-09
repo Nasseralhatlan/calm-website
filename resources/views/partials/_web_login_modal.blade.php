@@ -22,7 +22,7 @@
      role="dialog" aria-modal="true">
     <div class="absolute inset-0" @click="close()"></div>
 
-    <div class="calm-login-sheet bg-white w-full relative">
+    <div class="calm-login-sheet bg-white w-full relative" :style="kb ? 'margin-bottom: ' + kb + 'px;' : ''">
         <div style="padding: 26px 24px calc(40px + env(safe-area-inset-bottom, 0px));">
 
             {{-- Logo + close/back --}}
@@ -62,6 +62,7 @@
                     </div>
                     <input type="tel" x-model="phone" inputmode="numeric" maxlength="9" placeholder="5xxxxxxxx"
                            autocomplete="tel-national" dir="ltr" @keydown.enter.prevent="requestOtp()"
+                           @focus="setTimeout(() => $el.scrollIntoView({ block: 'center', behavior: 'smooth' }), 300)"
                            class="calm-login-input flex-1 bg-white text-[17px] font-bold text-black focus:outline-none tabular-nums"
                            style="padding: 15px 18px; min-width: 0; border: 1.5px solid #E9E9E9; border-radius: 18px; letter-spacing: 0.5px; text-align: end; transition: border-color 0.15s;">
                 </div>
@@ -95,6 +96,7 @@
 
                 <input type="text" x-model="otp" inputmode="numeric" maxlength="6" autocomplete="one-time-code"
                        dir="ltr" placeholder="－ － － － － －" @keydown.enter.prevent="verifyOtp()"
+                       @focus="setTimeout(() => $el.scrollIntoView({ block: 'center', behavior: 'smooth' }), 300)"
                        class="calm-login-input w-full bg-white text-[22px] text-center font-bold text-black tabular-nums focus:outline-none"
                        style="margin-top: 30px; padding: 16px 14px; border: 1.5px solid #000; border-radius: 18px; letter-spacing: 0.35em;">
 
@@ -153,6 +155,7 @@
                     this.error = '';
                     this.openState = true;
                     document.body.style.overflow = 'hidden';
+                    this.watchKeyboard();
                     if (!this.countries.length) {
                         try {
                             const res = await fetch('/api/countries', { headers: { Accept: 'application/json' } });
@@ -167,6 +170,30 @@
                     this.openState = false;
                     document.body.style.overflow = '';
                     this.stopTimer();
+                    this.unwatchKeyboard();
+                },
+
+                // ── Keyboard clearance (iOS doesn't resize the layout
+                //    viewport, so lift the sheet by the keyboard's height) ──
+                kb: 0,
+                _vv: null,
+                watchKeyboard() {
+                    if (!window.visualViewport) return;
+                    this._vv = () => {
+                        const vv = window.visualViewport;
+                        this.kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+                    };
+                    window.visualViewport.addEventListener('resize', this._vv);
+                    window.visualViewport.addEventListener('scroll', this._vv);
+                    this._vv();
+                },
+                unwatchKeyboard() {
+                    if (this._vv && window.visualViewport) {
+                        window.visualViewport.removeEventListener('resize', this._vv);
+                        window.visualViewport.removeEventListener('scroll', this._vv);
+                    }
+                    this._vv = null;
+                    this.kb = 0;
                 },
 
                 normPhone() {
@@ -244,11 +271,12 @@
 </script>
 <style>
     .calm-login-input:focus { border-color: #000 !important; }
-    .calm-login-backdrop { background-color: rgba(25, 25, 25, 0.4); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+    .calm-login-backdrop { background-color: rgba(25, 25, 25, 0.4); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); overflow-y: auto; }
     .calm-login-sheet {
         border-radius: 28px 28px 0 0;
         box-shadow: 0 -4px 16px rgba(0,0,0,0.12);
         animation: calm-login-up 0.4s cubic-bezier(0.22, 0.9, 0.36, 1);
+        transition: margin-bottom 0.2s ease;
     }
     @media (min-width: 640px) {
         .calm-login-sheet {
