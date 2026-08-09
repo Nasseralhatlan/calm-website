@@ -17,7 +17,7 @@
             {{-- Photo carousel — scroll-snap over the backend-capped set (≤10) --}}
             <div class="flex overflow-x-auto calm-hide-scroll w-full h-full" style="scroll-snap-type: x mandatory; cursor: grab;"
                  x-init="window.calmDragScroll && calmDragScroll($el)"
-                 @scroll.debounce.60ms="ci = Math.min(imgs().length - 1, Math.round(Math.abs($el.scrollLeft) / $el.clientWidth))">
+                 @scroll="ci = Math.min(imgs().length - 1, Math.round(Math.abs($el.scrollLeft) / $el.clientWidth))">
                 <template x-for="(u, ui) in imgs()" :key="ui">
                     <img :src="u" :alt="cardTitle(p)" loading="lazy"
                          class="w-full h-full object-cover shrink-0"

@@ -48,7 +48,7 @@
                 {{-- Featured-photos carousel (scroll-snap + app-spec dots) --}}
                 <div class="flex overflow-x-auto calm-hide-scroll w-full h-full" style="scroll-snap-type: x mandatory; cursor: grab;"
                      x-init="window.calmDragScroll && calmDragScroll($el)"
-                     @scroll.debounce.60ms="ci = Math.min({{ $carousel->count() - 1 }}, Math.round(Math.abs($el.scrollLeft) / $el.clientWidth))">
+                     @scroll="ci = Math.min({{ $carousel->count() - 1 }}, Math.round(Math.abs($el.scrollLeft) / $el.clientWidth))">
                     @foreach($carousel as $u)
                         <img src="{{ $u }}" alt="{{ $p->localized_title }}" loading="lazy"
                              class="w-full h-full object-cover shrink-0"
