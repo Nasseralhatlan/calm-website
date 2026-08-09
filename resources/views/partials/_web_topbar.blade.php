@@ -80,11 +80,11 @@
                    class="calm-press flex items-center justify-center text-white font-bold hover:opacity-90 transition-opacity"
                    style="width: 38px; height: 38px; border-radius: 50%; background-color: #000; font-size: 14px;">{{ $profileInitial }}</a>
             @else
-                <a href="{{ route('login', ['next' => request()->getRequestUri()]) }}"
-                   class="calm-press inline-flex items-center text-[14px] font-bold text-white hover:opacity-90 transition-opacity {{ $fa }}"
-                   style="padding: 12px 22px; border-radius: 16px; corner-shape: squircle; -webkit-corner-shape: squircle; background-color: #000;">
+                <button type="button" x-data @click="$dispatch('calm-open-login')"
+                        class="calm-press inline-flex items-center text-[14px] font-bold text-white hover:opacity-90 transition-opacity {{ $fa }}"
+                        style="padding: 12px 22px; border-radius: 16px; corner-shape: squircle; -webkit-corner-shape: squircle; background-color: #000;">
                     {{ $isRtl ? 'تسجيل الدخول' : 'Sign in' }}
-                </a>
+                </button>
             @endif
         </div>
     </div>

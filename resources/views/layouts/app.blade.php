@@ -28,5 +28,9 @@
 </head>
 <body class="min-h-screen antialiased">
     @yield('body')
+    {{-- Global SPA-style login modal — any page can $dispatch('calm-open-login') --}}
+    @if(! auth('api')->user())
+        @include('partials._web_login_modal')
+    @endif
 </body>
 </html>

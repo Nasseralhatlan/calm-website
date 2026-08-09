@@ -91,7 +91,7 @@
 
             toggleLike(p) {
                 if (!CALM_WEB.signedIn) {
-                    window.location.href = CALM_WEB.loginUrl;
+                    window.dispatchEvent(new CustomEvent('calm-open-login'));
                     return;
                 }
                 p.is_liked = !p.is_liked;

@@ -55,14 +55,14 @@
                 </svg>
             </button>
         @else
-            <a href="{{ route('login', ['next' => request()->getRequestUri()]) }}"
-               aria-label="{{ $isRtl ? 'سجّل الدخول للحفظ في المفضلة' : 'Sign in to save' }}"
-               class="calm-press-like flex items-center justify-center" style="width: {{ $heartSize }}px; height: {{ $heartSize }}px;">
+            <button type="button" x-data @click.stop.prevent="$dispatch('calm-open-login')"
+                    aria-label="{{ $isRtl ? 'سجّل الدخول للحفظ في المفضلة' : 'Sign in to save' }}"
+                    class="calm-press-like flex items-center justify-center" style="width: {{ $heartSize }}px; height: {{ $heartSize }}px;">
                 <svg width="{{ $heartSize - 6 }}" height="{{ $heartSize - 6 }}" viewBox="0 0 24 24" fill="rgba(0,0,0,0.2)" stroke="#fff" stroke-width="2"
                      style="filter: drop-shadow(0 1px 4px rgba(0,0,0,0.25));">
                     <path d="M12 20.5s-7.5-4.8-9.5-9.2C1 7.6 3.2 4.5 6.4 4.5c2 0 3.6 1.1 5.6 3.3 2-2.2 3.6-3.3 5.6-3.3 3.2 0 5.4 3.1 3.9 6.8-2 4.4-9.5 9.2-9.5 9.2z"></path>
                 </svg>
-            </a>
+            </button>
         @endif
     </div>
 </div>
