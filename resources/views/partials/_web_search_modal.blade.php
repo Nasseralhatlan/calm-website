@@ -38,8 +38,8 @@
 
     // NOTE: Alpine string :style REPLACES the static style attribute, so the
     // card look must live inside the binding itself.
-    $cardBase = 'border-radius: 28px; box-shadow: 0 0 50px rgba(0,0,0,0.06); overflow: hidden; transition: flex-grow 0.35s cubic-bezier(0.22, 0.9, 0.36, 1);';
-    $expandedFlex = "'".$cardBase." flex: 1 1 0%; min-height: 0;'";
+    $cardBase = 'border-radius: 28px; box-shadow: 0 0 50px rgba(0,0,0,0.06); overflow: hidden; transition: flex-grow 0.38s cubic-bezier(0.22, 0.9, 0.36, 1), flex-shrink 0.38s cubic-bezier(0.22, 0.9, 0.36, 1);';
+    $expandedFlex = "'".$cardBase." flex: 1 1 auto; min-height: 0;'";
     $collapsedFlex = "'".$cardBase." flex: 0 0 auto;'";
 @endphp
 <div x-data="calmSearchModal(@js($searchModalCatalog), { redirect: @js((bool) ($searchModalRedirect ?? true)) })"
@@ -68,7 +68,7 @@
                     <span class="font-semibold" style="font-size: 14px; color: #AAAAAA;">{{ $isRtl ? 'وين ؟' : 'Where?' }}</span>
                     <span class="font-bold text-black" style="font-size: 15px;" x-text="cityLabel()"></span>
                 </button>
-                <div x-show="active === 'where'" x-transition.opacity.duration.250ms class="flex flex-col" style="padding: 20px 24px; flex: 1 1 0%; min-height: 0;">
+                <div x-show="active === 'where'" class="flex flex-col" style="padding: 20px 24px; flex: 1 1 0%; min-height: 0;">
                     <button type="button" @click="toggle('where')" class="shrink-0 w-full text-start">
                         <h3 class="font-bold text-black {{ $fa }}" style="font-size: 19px; line-height: 25px;">{{ $isRtl ? 'وين ؟' : 'Where?' }}</h3>
                     </button>
@@ -98,7 +98,7 @@
                     <span class="font-semibold" style="font-size: 14px; color: #AAAAAA;">{{ $isRtl ? 'متى ؟' : 'When?' }}</span>
                     <span class="font-bold text-black" style="font-size: 15px;" x-text="whenShort()"></span>
                 </button>
-                <div x-show="active === 'when'" x-transition.opacity.duration.250ms class="flex flex-col" style="padding: 20px 24px; flex: 1 1 0%; min-height: 0;">
+                <div x-show="active === 'when'" class="flex flex-col" style="padding: 20px 24px; flex: 1 1 0%; min-height: 0;">
                     <button type="button" @click="toggle('when')" class="shrink-0 w-full text-start">
                         <h3 class="font-bold text-black {{ $fa }}" style="font-size: 19px; line-height: 25px;">{{ $isRtl ? 'متى ؟' : 'When?' }}</h3>
                     </button>
@@ -149,7 +149,7 @@
                     <span class="font-semibold" style="font-size: 14px; color: #AAAAAA;">{{ $isRtl ? 'نوع المكان ؟' : 'Place type?' }}</span>
                     <span class="font-bold text-black" style="font-size: 15px;" x-text="typeLabel()"></span>
                 </button>
-                <div x-show="active === 'type'" x-transition.opacity.duration.250ms class="flex flex-col" style="padding: 20px 24px; flex: 1 1 0%; min-height: 0;">
+                <div x-show="active === 'type'" class="flex flex-col" style="padding: 20px 24px; flex: 1 1 0%; min-height: 0;">
                     <button type="button" @click="toggle('type')" class="shrink-0 w-full text-start">
                         <h3 class="font-bold text-black {{ $fa }}" style="font-size: 19px; line-height: 25px;">{{ $isRtl ? 'نوع المكان ؟' : 'Place type?' }}</h3>
                         <p class="{{ $fa }}" style="margin-top: 2px; font-size: 12px; color: #AAAAAA;">{{ $isRtl ? 'اختر نوعاً أو أكثر' : 'Pick one or more' }}</p>
@@ -181,7 +181,7 @@
                     <span class="font-semibold" style="font-size: 14px; color: #AAAAAA;">{{ $isRtl ? 'المنطقة ؟' : 'Area?' }}</span>
                     <span class="font-bold text-black" style="font-size: 15px;" x-text="areaLabel()"></span>
                 </button>
-                <div x-show="active === 'area'" x-transition.opacity.duration.250ms class="flex flex-col" style="padding: 20px 24px; flex: 1 1 0%; min-height: 0;">
+                <div x-show="active === 'area'" class="flex flex-col" style="padding: 20px 24px; flex: 1 1 0%; min-height: 0;">
                     <button type="button" @click="toggle('area')" class="shrink-0 w-full text-start">
                         <h3 class="font-bold text-black {{ $fa }}" style="font-size: 19px; line-height: 25px;">{{ $isRtl ? 'المنطقة ؟' : 'Area?' }}</h3>
                         <p class="{{ $fa }}" style="margin-top: 2px; font-size: 12px; color: #AAAAAA;">{{ $isRtl ? 'اختر منطقة أو أكثر' : 'Pick one or more' }}</p>
