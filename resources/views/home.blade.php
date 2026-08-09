@@ -23,7 +23,7 @@
      x-on:calm-search-state.window="searchState = $event.detail">
 
     {{-- ══ App header: centered logo + «ابدء البحث» bar (sticky, blurred) ══ --}}
-    <header class="sticky top-0 z-30"
+    <header class="sticky top-0 z-30" x-show="mode === 'browse'"
             style="background-color: rgba(255,255,255,0.85); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);">
         <div class="mx-auto" style="max-width: 720px; padding: 14px 20px 14px;">
             <div class="flex items-center justify-center">
@@ -43,7 +43,7 @@
         </div>
     </header>
 
-    <main class="mx-auto w-full" style="max-width: 720px; padding: 10px 0 150px;">
+    <main class="mx-auto w-full" style="max-width: 720px; padding: 10px 0 36px;">
 
         {{-- ══ Browse mode ══ --}}
         <div x-show="mode === 'browse'">
@@ -106,8 +106,9 @@
         </div>
 
         {{-- ══ Results mode — app: back + «أماكن فى {city} / N نتيجة» pill + filters ══ --}}
-        <div x-show="mode === 'results'" x-cloak style="padding-inline: 20px;">
-            <div class="flex items-center justify-between" style="gap: 10px; margin-top: 8px;">
+        <div x-show="mode === 'results'" x-cloak>
+            <div class="sticky top-0 z-30 flex items-center justify-between"
+                 style="gap: 10px; padding: 12px 20px; background-color: rgba(255,255,255,0.85); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);">
                 <button type="button" @click="clearSearch()" aria-label="{{ $isRtl ? 'رجوع' : 'Back' }}"
                         class="calm-press shrink-0 flex items-center justify-center text-black" style="width: 40px; height: 40px;">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"
@@ -116,8 +117,8 @@
                     </svg>
                 </button>
                 <button type="button" @click="$dispatch('calm-open-search')"
-                        class="calm-press flex-1 min-w-0 bg-white text-center"
-                        style="border-radius: 999px; padding: 10px 20px; box-shadow: 0 0 50px rgba(0,0,0,0.08); max-width: 420px;">
+                        class="calm-press calm-round flex-1 min-w-0 bg-white text-center"
+                        style="border-radius: 9999px; padding: 10px 20px; box-shadow: 0 0 50px rgba(0,0,0,0.08); max-width: 420px;">
                     <span class="block font-bold text-black truncate {{ $fa }}" style="font-size: 15px; line-height: 20px;"
                           x-text="'{{ $isRtl ? 'أماكن فى' : 'Places in' }} ' + ((searchState && searchState.cityName) || '…')"></span>
                     <span class="block tabular-nums {{ $fa }}" style="font-size: 12px; line-height: 16px; color: #AAAAAA;"
@@ -132,7 +133,8 @@
                 </button>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2" style="gap: 32px 24px; margin-top: 24px;">
+            <div style="padding-inline: 20px;">
+            <div class="grid grid-cols-1 sm:grid-cols-2" style="gap: 32px 24px; margin-top: 16px;">
                 <template x-for="p in items" :key="p.id">
                     @include('partials._web_card_template')
                 </template>
@@ -174,6 +176,7 @@
                     <span>{{ $isRtl ? 'عرض المزيد' : 'Load more' }}</span>
                 </button>
             </div>
+            </div>
         </div>
     </main>
 
@@ -188,7 +191,9 @@
     </button>
 
     @include('partials._web_search_modal', ['searchModalRedirect' => false])
-    @include('partials._web_floating_nav')
+    <div x-show="mode === 'browse'">
+        @include('partials._web_floating_nav')
+    </div>
     @include('partials._web_footer')
 </div>
 
