@@ -12,8 +12,14 @@
 @section('body')
 <div class="min-h-screen" style="background-color: #FBFBFB;" @if($me) x-data="calmTrips()" x-init="load(1)" @endif>
 
-    <main class="mx-auto w-full" style="max-width: 720px; padding: 36px 20px 150px;">
-        <h1 class="font-bold text-black {{ $fa }}" style="font-size: 28px; line-height: 34px;">{{ $isRtl ? 'حـجوزاتـي' : 'My bookings' }}</h1>
+    {{-- Fixed (sticky) page header --}}
+    <header class="sticky top-0 z-30" style="background-color: rgba(255,255,255,0.85); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);">
+        <div class="mx-auto w-full" style="max-width: 720px; padding: 18px 20px;">
+            <h1 class="font-bold text-black {{ $fa }}" style="font-size: 20px; line-height: 1.3;">{{ $isRtl ? 'حـجوزاتـي' : 'My bookings' }}</h1>
+        </div>
+    </header>
+
+    <main class="mx-auto w-full" style="max-width: 720px; padding: 6px 20px 36px;">
 
         @if(! $me)
             @include('partials._web_login_prompt', [

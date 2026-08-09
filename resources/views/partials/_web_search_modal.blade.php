@@ -45,6 +45,7 @@
 <div x-data="calmSearchModal(@js($searchModalCatalog), { redirect: @js((bool) ($searchModalRedirect ?? true)) })"
      x-on:calm-open-search.window="open($event.detail || {})"
      x-on:calm-search-reset.window="resetSelection()"
+     x-on:calm-filters-sync.window="sel.typeIds = [...$event.detail.typeIds]; sel.areaIds = [...$event.detail.areaIds]; broadcastState()"
      x-show="modalOpen" x-cloak class="fixed inset-0 z-50 flex flex-col"
      style="background-color: rgba(250,250,250,0.75); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);"
      role="dialog" aria-modal="true">

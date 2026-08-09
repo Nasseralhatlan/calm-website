@@ -12,11 +12,24 @@
 @endphp
 <div class="calm-press-card group relative">
     <a :href="`/places/${p.id}`" class="block">
-        <div class="relative overflow-hidden" style="background-color: #F3F4F6; border-radius: 24px; corner-shape: squircle; -webkit-corner-shape: squircle; aspect-ratio: 1;">
-            <template x-if="p.cover_photo_url">
-                <img :src="p.cover_photo_url" :alt="cardTitle(p)" loading="lazy"
-                     class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.04]">
-            </template>
+        <div class="relative overflow-hidden" style="background-color: #F3F4F6; border-radius: 24px; corner-shape: squircle; -webkit-corner-shape: squircle; aspect-ratio: 1;"
+             x-data="{ ci: 0, imgs() { const l = (p.carousel_photos && p.carousel_photos.length ? p.carousel_photos : [p.cover_photo_url]).filter(Boolean); return l; } }">
+            {{-- Photo carousel — scroll-snap over the backend-capped set (≤10) --}}
+            <div class="flex overflow-x-auto calm-hide-scroll w-full h-full" style="scroll-snap-type: x mandatory;"
+                 @scroll.debounce.60ms="ci = Math.min(imgs().length - 1, Math.round(Math.abs($el.scrollLeft) / $el.clientWidth))">
+                <template x-for="(u, ui) in imgs()" :key="ui">
+                    <img :src="u" :alt="cardTitle(p)" :loading="ui === 0 ? 'lazy' : 'lazy'"
+                         class="w-full h-full object-cover shrink-0" style="scroll-snap-align: center;">
+                </template>
+            </div>
+            {{-- Pagination dots (app spec: active 14px, inactive 5px @55%) --}}
+            <div class="absolute flex items-center justify-center" style="bottom: 10px; left: 0; right: 0; gap: 4px; pointer-events: none;"
+                 x-show="imgs().length > 1">
+                <template x-for="(u, di) in imgs()" :key="'d' + di">
+                    <span class="calm-round" style="height: 5px; border-radius: 3px; background: #fff; transition: all 0.25s;"
+                          :style="di === ci ? 'width: 14px; opacity: 1;' : 'width: 5px; opacity: 0.55;'"></span>
+                </template>
+            </div>
         </div>
         <div style="padding-top: 12px; display: flex; flex-direction: column; gap: 4px;">
             <div class="flex items-center justify-between" style="gap: 8px;">

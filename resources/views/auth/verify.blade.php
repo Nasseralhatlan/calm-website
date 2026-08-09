@@ -9,94 +9,46 @@
 @section('title', ($isRtl ? 'التحقق' : 'Verify') . ' · Calm')
 
 @section('body')
-<div class="min-h-screen bg-[#fafafa] flex flex-col">
-    {{-- ── Top bar ── --}}
-    <header class="bg-white border-b border-[#ebebeb]"
-            style="background-color: rgba(255,255,255,0.85); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);">
-        <div class="mx-auto flex items-center justify-between px-6 sm:px-10" style="max-width: 1280px; height: 72px;">
-            <a href="{{ route('landing') }}" class="flex items-center">
-                <img src="/assets/logo/logo.png" alt="Calm" class="h-9 w-auto select-none" draggable="false">
-            </a>
-            <div class="flex items-center" style="gap: 8px;">
-                <a href="{{ route('login') }}" class="hidden sm:inline text-[13px] text-[#717171] hover:text-[#222] {{ $fa }}">
-                    {{ $isRtl ? 'تغيير الرقم' : 'Change number' }}
-                </a>
-                <form method="POST" action="{{ url('/locale/'.($locale === 'ar' ? 'en' : 'ar')) }}" class="m-0">
-                    @csrf
-                    <button type="submit"
-                            class="text-[13px] font-semibold text-[#222] hover:bg-[#f7f7f7] {{ $locale === 'en' ? 'font-arabic' : '' }}"
-                            style="padding: 8px 14px; border-radius: 12px;">
-                        {{ $locale === 'ar' ? 'English' : 'العربية' }}
-                    </button>
-                </form>
-            </div>
-        </div>
-    </header>
+{{-- App-parity login modal — step 2 of 2 (OTP). --}}
+<div class="min-h-screen" style="background-color: #E9E9E9;">
+    <div class="mx-auto bg-white flex flex-col" style="max-width: 640px; min-height: 100vh;">
+        <div class="flex-1" style="padding: 26px 24px calc(40px + env(safe-area-inset-bottom, 0px)); border-radius: 28px 28px 0 0; background: #fff; margin-top: 14px; box-shadow: 0 -4px 16px rgba(0,0,0,0.08);">
 
-    {{-- ── Card ── --}}
-    <div class="flex-1 flex items-center justify-center px-6" style="padding-top: 40px; padding-bottom: 40px;">
-        <div class="w-full bg-white"
-             style="max-width: 440px; padding: 40px 32px; border-radius: 28px; box-shadow: 0 20px 50px rgba(0,0,0,0.05);">
-
-            <div class="flex items-center justify-center" style="margin-bottom: 20px;">
-                <span class="flex items-center justify-center"
-                      style="width: 60px; height: 60px; border-radius: 18px; background-color: #fafafa; color: #222;">
-                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <rect x="6" y="2" width="12" height="20" rx="3"></rect>
-                        <line x1="11" y1="18" x2="13" y2="18"></line>
+            {{-- Logo + back --}}
+            <div class="flex items-center justify-center" style="position: relative; margin-bottom: 34px;">
+                <img src="/assets/logo/logo.png" alt="Calm" style="height: 34px; width: auto;" draggable="false">
+                <a href="{{ route('login', array_filter(['next' => $next ?? null])) }}" aria-label="{{ $isRtl ? 'رجوع' : 'Back' }}"
+                   class="calm-press calm-round flex items-center justify-center bg-white text-black"
+                   style="position: absolute; inset-inline-start: 0; width: 44px; height: 44px; border-radius: 50%; box-shadow: 0 0 25px rgba(0,0,0,0.1);">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"
+                         style="{{ $isRtl ? '' : 'transform: scaleX(-1);' }}">
+                        <path d="M9 5l7 7-7 7"></path>
                     </svg>
-                </span>
+                </a>
             </div>
 
-            <h1 class="text-[22px] sm:text-[24px] font-bold text-center text-[#222] {{ $fa }}" style="margin-bottom: 8px; line-height: 1.25;">
-                {{ $isRtl ? 'أدخل رمز التحقق' : 'Enter the code' }}
+            <h1 class="text-center font-bold text-black {{ $fa }}" style="font-size: 26px; line-height: 1.3;">
+                {{ $isRtl ? 'تحقق من رقم الجوال' : 'Verify your phone' }}
             </h1>
-            <p class="text-[14px] text-center text-[#717171] {{ $fa }}" style="margin-bottom: 16px; line-height: 1.6;">
-                {{ $isRtl ? 'أرسلنا رمزاً مكوناً من 6 أرقام إلى' : 'We sent a 6-digit code to' }}<br>
-                <span dir="ltr" class="font-semibold text-[#222]">+966 {{ $phone }}</span>
+            <p class="text-center {{ $fa }}" style="font-size: 15px; line-height: 1.6; margin-top: 10px; color: #AAAAAA;">
+                {{ $isRtl ? 'تم إرسال رمز التحقق إلى رقم جوالك، أدخله للمتابعة بأمان' : 'We sent a verification code to your phone — enter it to continue' }}
             </p>
 
-            @if(! empty($expiresAtMs))
-                {{-- Countdown timer driven by the OTP row's expires_at. Counts to 0,
-                     then locks the input and surfaces the Resend link. --}}
-                <div x-data="otpCountdown({{ (int) $expiresAtMs }})"
-                     x-init="start"
-                     class="flex items-center justify-center {{ $fa }}"
-                     style="margin-bottom: 22px; gap: 8px;">
-                    {{-- Live region: time remaining --}}
-                    <template x-if="remainingMs > 0">
-                        <span class="inline-flex items-center text-[13px] font-semibold tabular-nums {{ $fa }}"
-                              style="padding: 6px 12px; border-radius: 999px; background-color: #f4f6f8; color: #222; gap: 6px;">
-                            <span aria-hidden="true">⏱</span>
-                            <span dir="ltr" x-text="format"></span>
-                            <span class="text-[#717171]">{{ $isRtl ? 'متبقّي' : 'left' }}</span>
-                        </span>
-                    </template>
-                    {{-- Expired state --}}
-                    <template x-if="remainingMs === 0">
-                        <span class="inline-flex items-center text-[13px] font-semibold tabular-nums {{ $fa }}"
-                              style="padding: 6px 12px; border-radius: 999px; background-color: #fef2f2; color: #b91c1c; gap: 6px;">
-                            <span aria-hidden="true">⌛</span>
-                            <span>{{ $isRtl ? 'انتهت صلاحية الرمز' : 'Code expired' }}</span>
-                        </span>
-                    </template>
-                </div>
-            @endif
-
             @if(session('status'))
-                <div class="text-[13px] text-[#15803d] bg-[#f0fdf4] border border-[#bbf7d0] {{ $fa }}"
-                     style="padding: 12px 14px; border-radius: 14px; margin-bottom: 16px;">
+                <div class="text-[13px] text-[#15803d] bg-[#f0fdf4] {{ $fa }}"
+                     style="padding: 12px 14px; border-radius: 14px; margin-top: 18px;">
                     {{ session('status') }}
                 </div>
             @endif
 
-            <form method="POST" action="{{ route('login.verify.submit') }}" novalidate>
+            <form method="POST" action="{{ route('login.verify.submit') }}" novalidate x-data="{ c: '' }">
                 @csrf
                 <input type="hidden" name="phone" value="{{ $phone }}">
                 @if(! empty($next))<input type="hidden" name="next" value="{{ $next }}">@endif
 
                 <input type="text"
                        name="otp"
+                       x-model="c"
                        inputmode="numeric"
                        pattern="\d{6}"
                        maxlength="6"
@@ -104,27 +56,44 @@
                        required
                        autofocus
                        dir="ltr"
-                       placeholder="• • • • • •"
-                       class="w-full bg-[#fafafa] border-2 border-[#ebebeb] focus:border-[#222] text-[26px] text-center font-bold text-[#222] tabular-nums focus:outline-none transition-colors"
-                       style="padding: 18px 14px; border-radius: 16px; letter-spacing: 0.4em;">
+                       placeholder="－ － － － － －"
+                       class="calm-input w-full bg-white text-[24px] text-center font-bold text-black tabular-nums focus:outline-none"
+                       style="margin-top: 38px; padding: 18px 14px; border: 1.5px solid #000; border-radius: 18px; letter-spacing: 0.35em;">
 
                 @error('otp')
                     <p class="text-[13px] text-[#dc2626] text-center {{ $fa }}" style="margin-top: 10px;">{{ $message }}</p>
                 @enderror
 
-                <button type="submit"
-                        class="w-full font-bold text-white bg-[#222] hover:bg-black active:scale-[0.98] transition-all {{ $fa }}"
-                        style="margin-top: 22px; padding: 15px 20px; border-radius: 16px; font-size: 15px;">
-                    {{ $isRtl ? 'تأكيد ومتابعة' : 'Verify and continue' }}
-                </button>
-            </form>
+                {{-- Countdown («الوقت المتبقي 2:54») --}}
+                @if(! empty($expiresAtMs))
+                    <div x-data="otpCountdown({{ (int) $expiresAtMs }})" x-init="start"
+                         class="flex items-center justify-center {{ $fa }}" style="margin-top: 70px; gap: 8px;">
+                        <template x-if="remainingMs > 0">
+                            <span class="flex items-center" style="gap: 8px;">
+                                <span class="font-bold text-black tabular-nums" dir="ltr" style="font-size: 16px;" x-text="format"></span>
+                                <span style="font-size: 14px; color: #AAAAAA;">{{ $isRtl ? 'الوقت المتبقي' : 'Time remaining' }}</span>
+                            </span>
+                        </template>
+                        <template x-if="remainingMs === 0">
+                            <span style="font-size: 14px; color: #DC2626;" class="{{ $fa }}">{{ $isRtl ? 'انتهت صلاحية الرمز' : 'Code expired' }}</span>
+                        </template>
+                    </div>
+                @endif
 
-            <p class="text-center text-[13px] text-[#717171] {{ $fa }}" style="margin-top: 22px;">
-                {{ $isRtl ? 'لم يصلك الرمز؟' : "Didn't get the code?" }}
-                <a href="{{ route('login') }}" class="font-semibold text-[#222] hover:underline" style="margin-inline-start: 4px;">
-                    {{ $isRtl ? 'إعادة الإرسال' : 'Resend' }}
-                </a>
-            </p>
+                <button type="submit" :disabled="!/^\d{6}$/.test(c)"
+                        class="calm-press w-full font-bold text-white {{ $fa }}"
+                        :style="'margin-top: 18px; padding: 17px; border-radius: 18px; font-size: 16px; transition: background-color 0.2s; background-color: ' + (/^\d{6}$/.test(c) ? '#000' : '#BDBDBD') + ';'"
+                        style="margin-top: 18px; padding: 17px; border-radius: 18px; font-size: 16px; background-color: #BDBDBD;">
+                    {{ $isRtl ? 'تسجيل الدخول' : 'Sign in' }}
+                </button>
+
+                <p class="text-center text-[13px] {{ $fa }}" style="margin-top: 18px; color: #AAAAAA;">
+                    {{ $isRtl ? 'لم يصلك الرمز؟' : "Didn't get the code?" }}
+                    <a href="{{ route('login', array_filter(['next' => $next ?? null])) }}" class="font-bold text-black hover:underline" style="margin-inline-start: 4px;">
+                        {{ $isRtl ? 'إعادة الإرسال' : 'Resend' }}
+                    </a>
+                </p>
+            </form>
         </div>
     </div>
 </div>

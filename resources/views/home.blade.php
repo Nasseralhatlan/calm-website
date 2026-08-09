@@ -20,6 +20,7 @@
 @section('body')
 <div class="min-h-screen bg-white" x-data="calmHome()" x-init="init()"
      x-on:calm-search-apply.window="onApply($event.detail)"
+     x-on:calm-filters-apply.window="onFiltersApply($event.detail)"
      x-on:calm-search-state.window="searchState = $event.detail">
 
     {{-- ══ App header: centered logo + «ابدء البحث» bar (sticky, blurred) ══ --}}
@@ -124,7 +125,7 @@
                     <span class="block tabular-nums {{ $fa }}" style="font-size: 12px; line-height: 16px; color: #AAAAAA;"
                           x-text="total + ' {{ $isRtl ? 'نتيجة' : 'results' }}'"></span>
                 </button>
-                <button type="button" @click="$dispatch('calm-open-search')" aria-label="{{ $isRtl ? 'الفلاتر' : 'Filters' }}"
+                <button type="button" @click="openFilters()" aria-label="{{ $isRtl ? 'الفلاتر' : 'Filters' }}"
                         class="calm-press shrink-0 flex items-center justify-center text-black" style="width: 40px; height: 40px;">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
                         <line x1="4" y1="7" x2="20" y2="7"></line><circle cx="9" cy="7" r="2.4" fill="#fff"></circle>
@@ -191,6 +192,7 @@
     </button>
 
     @include('partials._web_search_modal', ['searchModalRedirect' => false])
+    @include('partials._web_filters_modal')
     <div x-show="mode === 'browse'">
         @include('partials._web_floating_nav')
     </div>
@@ -208,6 +210,8 @@
             // The last selection the search modal applied — drives load-more
             // params and the shareable URL. areaIds/typeIds are arrays.
             applied: null,
+            // Advanced filters from the الفلاتر sheet.
+            filters: { priceMin: null, priceMax: null, guests: null, amenityIds: [] },
 
             init() {
                 const q = new URLSearchParams(window.location.search);
@@ -227,18 +231,49 @@
 
             onApply(selection) {
                 this.applied = selection;
+                // A fresh main search resets the advanced filters (app parity).
+                this.filters = { priceMin: null, priceMax: null, guests: null, amenityIds: [] };
                 this.mode = 'results';
+                this.fetchPage(1, this.searchParams());
+                this.syncUrl();
+            },
+
+            openFilters() {
+                if (!this.applied) return;
+                this.$dispatch('calm-open-filters', {
+                    cityId: this.applied.cityId,
+                    typeIds: this.applied.typeIds || [],
+                    areaIds: this.applied.areaIds || [],
+                    filters: this.filters,
+                });
+            },
+
+            onFiltersApply(detail) {
+                if (!this.applied) return;
+                this.applied.typeIds = detail.typeIds;
+                this.applied.areaIds = detail.areaIds;
+                this.filters = {
+                    priceMin: detail.priceMin, priceMax: detail.priceMax,
+                    guests: detail.guests, amenityIds: detail.amenityIds,
+                };
+                // Keep the search sheet's chips in sync with the filter picks.
+                this.$dispatch('calm-filters-sync', { typeIds: detail.typeIds, areaIds: detail.areaIds });
                 this.fetchPage(1, this.searchParams());
                 this.syncUrl();
             },
 
             searchParams() {
                 const a = this.applied || {};
+                const f = this.filters || {};
                 const q = { city_id: a.cityId };
                 // The API takes ONE area — send it only for a single pick.
                 if ((a.areaIds || []).length === 1) q.city_area_id = a.areaIds[0];
                 if ((a.typeIds || []).length) q['place_type_ids[]'] = a.typeIds;
                 if (a.checkIn) { q.check_in = a.checkIn; q.check_out = a.checkOut || a.checkIn; }
+                if (f.priceMin !== null && f.priceMin !== undefined) q.price_min = f.priceMin;
+                if (f.priceMax !== null && f.priceMax !== undefined) q.price_max = f.priceMax;
+                if (f.guests) q.guests = f.guests;
+                if ((f.amenityIds || []).length) q['amenities[]'] = f.amenityIds;
                 return q;
             },
 
