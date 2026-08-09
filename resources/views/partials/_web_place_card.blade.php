@@ -15,6 +15,17 @@
     $compact = $compact ?? false;
 
     $cover = $p->coverPhoto?->url ?? $p->visiblePhotos()->first()?->url;
+    // Card carousel = the host-curated "shown outside" set (featured_order),
+    // capped like the API's carousel_photos. Falls back to the cover alone.
+    $carousel = $compact ? collect() : $p->visiblePhotos()
+        ->filter(fn ($ph) => $ph->featured_order !== null)
+        ->sortBy('featured_order')
+        ->take(10)
+        ->map(fn ($ph) => $ph->url)
+        ->values();
+    if (! $compact && $carousel->isEmpty() && $cover) {
+        $carousel = collect([$cover]);
+    }
     $cardCity = $p->cityArea?->city;
     $areaName = $isRtl ? $p->cityArea?->name_ar : $p->cityArea?->name_en;
     $cityName = $cardCity ? ($isRtl ? $cardCity->name_ar : $cardCity->name_en) : null;
@@ -26,9 +37,30 @@
 <div class="calm-press-card group relative shrink-0" @if($compact) style="width: clamp(126px, 37vw, 172px);" @endif>
     <a href="{{ route('places.show', $p) }}" class="block">
         <div class="relative overflow-hidden"
-             style="background-color: #F3F4F6; border-radius: 28px; corner-shape: squircle; -webkit-corner-shape: squircle; aspect-ratio: 1; {{ $compact ? 'width: 100%;' : '' }}">
-            @if($cover)
-                <img src="{{ $cover }}" alt="{{ $p->localized_title }}" loading="lazy"
+             style="background-color: #F3F4F6; border-radius: 28px; corner-shape: squircle; -webkit-corner-shape: squircle; aspect-ratio: 1; {{ $compact ? 'width: 100%;' : '' }}"
+             @if(! $compact && $carousel->count() > 1) x-data="{ ci: 0 }" @endif>
+            @if($compact)
+                @if($cover)
+                    <img src="{{ $cover }}" alt="{{ $p->localized_title }}" loading="lazy"
+                         class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.04]">
+                @endif
+            @elseif($carousel->count() > 1)
+                {{-- Featured-photos carousel (scroll-snap + app-spec dots) --}}
+                <div class="flex overflow-x-auto calm-hide-scroll w-full h-full" style="scroll-snap-type: x mandatory;"
+                     @scroll.debounce.60ms="ci = Math.min({{ $carousel->count() - 1 }}, Math.round(Math.abs($el.scrollLeft) / $el.clientWidth))">
+                    @foreach($carousel as $u)
+                        <img src="{{ $u }}" alt="{{ $p->localized_title }}" loading="lazy"
+                             class="w-full h-full object-cover shrink-0" style="scroll-snap-align: center;">
+                    @endforeach
+                </div>
+                <div class="absolute flex items-center justify-center" style="bottom: 10px; left: 0; right: 0; gap: 4px; pointer-events: none;">
+                    @foreach($carousel as $di => $u)
+                        <span class="calm-round" style="height: 5px; border-radius: 3px; background: #fff; transition: all 0.25s;"
+                              :style="{{ $di }} === ci ? 'width: 14px; opacity: 1;' : 'width: 5px; opacity: 0.55;'"></span>
+                    @endforeach
+                </div>
+            @elseif($carousel->isNotEmpty())
+                <img src="{{ $carousel->first() }}" alt="{{ $p->localized_title }}" loading="lazy"
                      class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.04]">
             @endif
         </div>

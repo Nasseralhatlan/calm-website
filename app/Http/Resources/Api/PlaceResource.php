@@ -58,12 +58,14 @@ class PlaceResource extends JsonResource
             // gallery photo if the host hasn't featured any).
             'cover_photo_url' => $this->coverPhoto?->url
                 ?? ($this->whenLoaded('photos', fn () => $this->visiblePhotos()->first()?->url)),
-            // Card carousel: a capped slice of the visible gallery (featured
-            // first) so list payloads stay light — additive, clients that
-            // only need the cover keep ignoring it.
+            // Card carousel: ONLY the host-curated "shown outside" showcase
+            // (featured_order), capped — the backend decides what appears on
+            // cards. Empty when nothing is featured; clients fall back to the
+            // cover. Additive — clients that only need the cover ignore it.
             'carousel_photos' => $this->whenLoaded('photos', function () {
                 return $this->visiblePhotos()
-                    ->sortBy(fn ($p) => [$p->featured_order === null ? 1 : 0, $p->featured_order ?? $p->sort_order])
+                    ->filter(fn ($p) => $p->featured_order !== null)
+                    ->sortBy('featured_order')
                     ->take(10)
                     ->map(fn ($p) => $p->url)
                     ->values();

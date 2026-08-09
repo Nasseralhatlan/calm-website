@@ -301,3 +301,7 @@ label[for], label:has(input) { cursor: pointer; }
     .calm-enter, .calm-skeleton { animation: none; }
     .calm-press:active, .calm-press-card:active, .calm-press-like:active { transform: none; }
 }
+
+/* Horizontal scrollers (card rows, in-card carousels) hide their scrollbar. */
+.calm-hide-scroll { scrollbar-width: none; }
+.calm-hide-scroll::-webkit-scrollbar { display: none; }
