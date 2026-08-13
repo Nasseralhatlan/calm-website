@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace Database\Seeders;
 
+use App\Enums\AttributePhotoRule;
 use App\Enums\PlaceReviewStatus;
 use App\Enums\PlaceStatus;
 use App\Enums\ReviewStatus;
+use App\Models\Attribute;
 use App\Models\CityArea;
 use App\Models\Place;
+use App\Models\PlaceAttribute;
 use App\Models\PlaceList;
 use App\Models\PlacePhoto;
 use App\Models\PlaceReview;
@@ -74,6 +77,11 @@ class DemoContentSeeder extends Seeder
             ['ريم', 5, 'قضينا وقتاً رائعاً، المسبح نظيف والجلسات مريحة.'],
         ];
 
+        // «المميزات البارزة» pulls highlighted boolean amenities.
+        foreach (['Fully Private', 'Air Conditioning', 'High-Speed Internet'] as $hl) {
+            Attribute::query()->where('name_en', $hl)->update(['is_highlighted' => true]);
+        }
+
         $places = collect($demoPlaces)->map(function (array $row, int $i) use ($host, $areas, $typeByName, $reviewPool): Place {
             [$title, $typeName, $price, $guests, $description] = $row;
             $area = $areas[$i % $areas->count()];
@@ -85,7 +93,8 @@ class DemoContentSeeder extends Seeder
                     'city_area_id' => $area->id,
                     'title' => $title,
                     'description' => $description,
-                    'description_ar' => $description,
+                    'description_ar' => $description."\n\nالمكان مجهز بالكامل للعوائل والتجمعات، مع جلسات داخلية وخارجية مريحة، وإضاءة مسائية هادئة تناسب السهرات. يتوفر موقف خاص للسيارات ومدخل مستقل يضمن أعلى درجات الخصوصية طوال فترة الإقامة.",
+                    'rules_ar' => "· المحافظة على المكان: يرجى الحفاظ على نظافة المكان والمرافق، وتسليمه بحالة جيدة كما تم استلامه.\n· الهدوء والخصوصية: يرجى احترام الجيران والمناطق المحيطة، وتجنب الإزعاج أو رفع الصوت خصوصًا في الأوقات المتأخرة.\n· الحفلات والتجمعات: لا يسمح بإقامة الحفلات أو التجمعات داخل المكان.\n· التدخين: يمنع التدخين داخل المكان.\n· الأثاث والممتلكات: يرجى عدم نقل أو إتلاف الأثاث والمرافق، ويتحمل الضيف مسؤولية أي تلفيات ناتجة عن سوء الاستخدام.",
                     'price' => $price,
                     'max_guests' => $guests,
                     'check_in_time' => '15:00',
@@ -106,6 +115,49 @@ class DemoContentSeeder extends Seeder
                     'sort_order' => $p,
                     'featured_order' => $p < 3 ? $p : null,
                 ]);
+            }
+
+            // Facilities + amenities so the place page's الإقامة / صور المرافق /
+            // المميزات البارزة / المرافق والمميزات sections all render.
+            $attr = fn (string $en) => Attribute::query()->where('name_en', $en)->first();
+            $place->attributeValues()->delete();
+
+            $facilityDefs = [
+                ['Bathroom', 1 + ($i % 2), 'دش شاور'],
+                ['Bedroom', 1 + ($i % 3), 'سرير فندقي - مرآة - تكييف - مغسلة'],
+                ['Kitchen', 1, 'ثلاجة - مايكرويف'],
+                ['Living Room', 1, 'كنب - طاولات تقديم - تلفزيون - مكيف'],
+                ["Men's Majlis", 1, 'كنب - طاولة تقديم - مكيف'],
+                ['Swimming Pool', 1, 'جلسات خارجية'],
+            ];
+            foreach ($facilityDefs as [$en, $count, $desc]) {
+                if ($a = $attr($en)) {
+                    PlaceAttribute::query()->create([
+                        'place_id' => $place->id, 'attribute_id' => $a->id,
+                        'value' => (string) $count, 'description' => $desc,
+                    ]);
+                }
+            }
+
+            $amenityNames = [
+                'Air Conditioning', 'High-Speed Internet', 'Coffee Machine', 'Refrigerator',
+                'Fully Private', 'Private Entrance', 'Prayer Area', 'Heating', 'Microwave',
+            ];
+            foreach (array_slice($amenityNames, $i % 3, 7) as $en) {
+                if ($a = $attr($en)) {
+                    PlaceAttribute::query()->create([
+                        'place_id' => $place->id, 'attribute_id' => $a->id, 'value' => '1',
+                    ]);
+                }
+            }
+
+            // Link two photos to photo-allowed facilities so صور المرافق shows.
+            $photoTargets = collect(['Swimming Pool', 'Bedroom'])
+                ->map($attr)
+                ->filter(fn ($a) => $a && $a->photo_rule !== AttributePhotoRule::None)
+                ->values();
+            foreach ($place->photos()->orderBy('sort_order')->skip(1)->take($photoTargets->count())->get() as $pi => $photo) {
+                $photo->update(['place_attribute_id' => $photoTargets[$pi]->id]);
             }
 
             // Demo reviews (2–3 per place, skipping one place so the «جديد»
