@@ -46,7 +46,8 @@ window.calmDragScroll = (el) => {
         // rounding alone made short drags spring back.
         const startIdx = Math.round(Math.abs(startLeft) / w);
         const delta = el.scrollLeft - startLeft;
-        const rtl = document.documentElement.dir === 'rtl';
+        // The carousel's own direction — card carousels are dir=ltr even on RTL pages.
+        const rtl = getComputedStyle(el).direction === 'rtl';
         const forward = rtl ? delta < 0 : delta > 0;
         const stepped = Math.abs(delta) > w * 0.2 ? (forward ? 1 : -1) : 0;
         const maxIdx = Math.max(0, Math.round(el.scrollWidth / w) - 1);

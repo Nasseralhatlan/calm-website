@@ -15,7 +15,7 @@
         <div class="relative overflow-hidden" style="background-color: #F3F4F6; border-radius: 24px; corner-shape: squircle; -webkit-corner-shape: squircle; aspect-ratio: 1;"
              x-data="{ ci: 0, imgs() { const l = (p.carousel_photos && p.carousel_photos.length ? p.carousel_photos : [p.cover_photo_url]).filter(Boolean); return l; } }">
             {{-- Photo carousel — scroll-snap over the backend-capped set (≤10) --}}
-            <div class="flex overflow-x-auto calm-hide-scroll w-full h-full" style="scroll-snap-type: x mandatory; cursor: grab;"
+            <div class="flex overflow-x-auto calm-hide-scroll w-full h-full" dir="ltr" style="scroll-snap-type: x mandatory; cursor: grab;"
                  x-init="window.calmDragScroll && calmDragScroll($el)"
                  @scroll="ci = Math.min(imgs().length - 1, Math.round(Math.abs($el.scrollLeft) / $el.clientWidth))">
                 <template x-for="(u, ui) in imgs()" :key="ui">
@@ -25,7 +25,7 @@
                 </template>
             </div>
             {{-- Pagination dots (app spec: active 14px, inactive 5px @55%) --}}
-            <div class="absolute flex items-center justify-center" style="bottom: 10px; left: 0; right: 0; gap: 4px; pointer-events: none;"
+            <div class="absolute flex items-center justify-center" dir="ltr" style="bottom: 10px; left: 0; right: 0; gap: 4px; pointer-events: none;"
                  x-show="imgs().length > 1">
                 <template x-for="(u, di) in imgs()" :key="'d' + di">
                     {{-- Full style lives in the binding — Alpine string :style replaces the static attr --}}
