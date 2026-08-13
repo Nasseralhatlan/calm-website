@@ -207,10 +207,27 @@
             this.liked = !this.liked;
             fetch('/api/places/{{ $place->id }}/like', { method: this.liked ? 'POST' : 'DELETE', headers: { 'Accept': 'application/json' }, credentials: 'same-origin' }).catch(() => {});
         },
+        shareCopied: false,
         sharePlace() {
-            const payload = { title: document.title, url: window.location.href };
-            if (navigator.share) { navigator.share(payload).catch(() => {}); }
-            else if (navigator.clipboard) { navigator.clipboard.writeText(payload.url); }
+            // Clean listing URL (no ?check_in etc.).
+            const url = window.location.origin + window.location.pathname;
+            // navigator.share/clipboard exist only in secure contexts (https or
+            // localhost) — over plain LAN http both are undefined, so fall all
+            // the way back to the execCommand copy.
+            if (navigator.share) { navigator.share({ title: document.title, url }).catch(() => {}); return; }
+            const done = () => { this.shareCopied = true; setTimeout(() => this.shareCopied = false, 2200); };
+            const legacy = () => {
+                const ta = document.createElement('textarea');
+                ta.value = url;
+                ta.style.cssText = 'position: fixed; top: 0; opacity: 0;';
+                document.body.appendChild(ta);
+                ta.focus(); ta.select();
+                try { document.execCommand('copy'); } catch (e) { /* no-op */ }
+                document.body.removeChild(ta);
+                done();
+            };
+            if (navigator.clipboard?.writeText) { navigator.clipboard.writeText(url).then(done).catch(legacy); }
+            else { legacy(); }
         },
     }"
     @keydown.escape.window="closeGallery(); closeSheet(); closeDescription();"
@@ -234,6 +251,13 @@
             }
         }
     </style>
+
+    {{-- Share fallback feedback --}}
+    <div x-show="shareCopied" x-cloak x-transition.opacity
+         class="fixed z-50 text-white font-bold {{ $fa }}"
+         style="top: calc(70px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); background: rgba(25,25,25,0.9); padding: 10px 20px; border-radius: 999px; font-size: 13px; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); white-space: nowrap;">
+        {{ $isRtl ? 'تم نسخ الرابط' : 'Link copied' }}
+    </div>
     {{-- OWNER/ADMIN STATUS BANNER — pinned above the page so they always know
          the listing's review + active status while previewing it as a guest. --}}
     @if($showStatusBanner ?? false)

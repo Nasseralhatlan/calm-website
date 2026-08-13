@@ -138,10 +138,11 @@ it('shows the booking CTA on a live place page, wired to the booking modal', fun
         // Reserve button opens the modal…
         ->assertSee('احجز الآن')
         ->assertSee('calm-open-booking')
-        // …with the dates step + summary inside (the funnel endpoint itself
-        // is covered by the BookingFunnel feature tests).
+        // …with the dates step inside; the summary is its own page now
+        // (covered by the checkout test in BookingFunnelTest).
         ->assertSee('اختر التواريخ')
-        ->assertSee('ملخص الحجز');
+        // The modal init carries the checkout URL (slash-escaped inside @js).
+        ->assertSee('checkoutUrl');
 });
 
 it('shows the rating chip and recent published reviews on the place page', function (): void {

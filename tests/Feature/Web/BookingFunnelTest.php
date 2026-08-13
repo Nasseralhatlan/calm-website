@@ -43,6 +43,34 @@ function funnelPlace(array $attrs = []): Place
     ], $attrs));
 }
 
+it('renders the checkout page for valid dates and bounces invalid ones back', function (): void {
+    $place = funnelPlace();
+    $in = now()->addDays(5)->toDateString();
+    $out = now()->addDays(7)->toDateString();
+
+    // Valid stay → summary page with the place + CTA wiring.
+    $this->get(route('book.checkout', ['place' => $place, 'check_in' => $in, 'check_out' => $out]))
+        ->assertOk()
+        ->assertSee('ملخص الحجز')
+        ->assertSee($place->title_ar)
+        ->assertSee('الضيوف');
+
+    // Missing, malformed, inverted, or past dates → back to the listing.
+    $this->get(route('book.checkout', $place))
+        ->assertRedirect(route('places.show', $place));
+    $this->get(route('book.checkout', ['place' => $place, 'check_in' => 'nope', 'check_out' => $out]))
+        ->assertRedirect(route('places.show', $place));
+    $this->get(route('book.checkout', ['place' => $place, 'check_in' => $out, 'check_out' => $in]))
+        ->assertRedirect(route('places.show', $place));
+    $this->get(route('book.checkout', ['place' => $place, 'check_in' => now()->subDays(3)->toDateString(), 'check_out' => $in]))
+        ->assertRedirect(route('places.show', $place));
+
+    // Draft places 404 like the funnel itself.
+    $draft = funnelPlace(['review_status' => PlaceReviewStatus::Draft->value, 'status' => PlaceStatus::Inactive->value]);
+    $this->get(route('book.checkout', ['place' => $draft, 'check_in' => $in, 'check_out' => $out]))
+        ->assertNotFound();
+});
+
 it('renders the funnel page for a live place and 404s for a draft', function (): void {
     $live = funnelPlace();
     $draft = funnelPlace(['review_status' => PlaceReviewStatus::Draft->value, 'status' => PlaceStatus::Inactive->value]);

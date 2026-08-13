@@ -44,6 +44,9 @@ Route::get('/lists/{placeList}', [LandingController::class, 'list'])->name('web.
 // public; creating the booking and the status page need the JWT cookie the
 // inline OTP login sets (same api guard as the dashboard).
 Route::get('/book/{place}', [BookingFunnelController::class, 'show'])->name('book.show');
+// Checkout summary page — the place page's dates modal lands here. Public:
+// guests review the stay first and sign in from the CTA when needed.
+Route::get('/book/{place}/checkout', [BookingFunnelController::class, 'checkout'])->name('book.checkout');
 Route::middleware('auth:api')->group(function (): void {
     Route::post('/book/{place}', [BookingFunnelController::class, 'store'])->name('book.store');
     Route::get('/book/status/{booking}', [BookingFunnelController::class, 'status'])->name('book.status');
