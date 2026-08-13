@@ -35,7 +35,7 @@
     $priceLabel = 'SR '.number_format((int) $p->price);
 @endphp
 <div class="calm-press-card group relative shrink-0" @if($compact) style="width: clamp(126px, 37vw, 172px);" @endif>
-    <a href="{{ route('places.show', $p) }}" class="block">
+    <a href="{{ route('places.show', $p) }}" class="block" style="-webkit-user-drag: none;">
         <div class="relative overflow-hidden"
              style="background-color: #F3F4F6; border-radius: 28px; corner-shape: squircle; -webkit-corner-shape: squircle; aspect-ratio: 1; {{ $compact ? 'width: 100%;' : '' }}"
              @if(! $compact && $carousel->count() > 1) x-data="{ ci: 0 }" @endif>
@@ -46,16 +46,16 @@
                 @endif
             @elseif($carousel->count() > 1)
                 {{-- Featured-photos carousel (scroll-snap + app-spec dots) --}}
-                <div class="flex overflow-x-auto calm-hide-scroll w-full h-full" dir="ltr" style="scroll-snap-type: x mandatory; cursor: grab;"
+                <div class="flex overflow-x-auto calm-hide-scroll w-full h-full" style="scroll-snap-type: x mandatory; cursor: grab; touch-action: pan-x pan-y;"
                      x-init="window.calmDragScroll && calmDragScroll($el)"
                      @scroll="ci = Math.min({{ $carousel->count() - 1 }}, Math.round(Math.abs($el.scrollLeft) / $el.clientWidth))">
                     @foreach($carousel as $u)
-                        <img src="{{ $u }}" alt="{{ $p->localized_title }}" loading="lazy"
+                        <img src="{{ $u }}" alt="{{ $p->localized_title }}" loading="lazy" draggable="false"
                              class="w-full h-full object-cover shrink-0"
-                             style="scroll-snap-align: center; scroll-snap-stop: always;">
+                             style="scroll-snap-align: center; scroll-snap-stop: always; -webkit-user-drag: none; user-select: none; -webkit-touch-callout: none;">
                     @endforeach
                 </div>
-                <div class="absolute flex items-center justify-center" dir="ltr" style="bottom: 10px; left: 0; right: 0; gap: 4px; pointer-events: none;">
+                <div class="absolute flex items-center justify-center" style="bottom: 10px; left: 0; right: 0; gap: 4px; pointer-events: none;">
                     @foreach($carousel as $di => $u)
                         {{-- Full style lives in the binding — Alpine string :style replaces the static attr --}}
                         <span class="calm-round"

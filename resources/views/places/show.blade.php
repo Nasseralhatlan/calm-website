@@ -401,8 +401,8 @@
                     idx: 0, total: {{ $imgCount }},
                     onScroll(el) { const w = el.clientWidth; if (w) this.idx = Math.max(0, Math.min(this.total - 1, Math.round(Math.abs(el.scrollLeft) / w))); },
                  }">
-                <div class="flex calm-hide-scroll" dir="ltr"
-                     style="overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; height: 58vh; min-height: 340px; max-height: 540px; background-color: #f7f7f7;"
+                <div class="flex calm-hide-scroll" dir="{{ $isRtl ? 'rtl' : 'ltr' }}"
+                     style="overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; height: 58vh; min-height: 340px; max-height: 540px; background-color: #f7f7f7; touch-action: pan-x pan-y;"
                      @scroll.passive="onScroll($event.target)">
                     @foreach($heroImages as $i => $img)
                         <div @click="openGallery('{{ $sectionKeyFor($img) }}')"
@@ -415,7 +415,7 @@
                 {{-- Indicators ON the image (above the sheet overlap). --}}
                 @if($imgCount > 1)
                     @if($imgCount <= 12)
-                        <div class="absolute flex items-center justify-center pointer-events-none" dir="ltr"
+                        <div class="absolute flex items-center justify-center pointer-events-none"
                              style="left: 0; right: 0; bottom: 48px; gap: 5px;">
                             @foreach($heroImages as $i => $img)
                                 <span class="block"
