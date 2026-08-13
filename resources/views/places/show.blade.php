@@ -101,6 +101,32 @@
         }
     }
 
+    // ALL attributes (facilities + amenities) grouped for the «كل المرافق
+    // و المميزات» modal — the app lists everything with a count badge.
+    $groupedAll = [];
+    foreach ($place->attributeValues->filter(fn ($pa) => $pa->attribute)->sortBy($sortByAttribute)->groupBy(fn ($pa) => $pa->attribute->group?->id) as $items) {
+        $group = $items->first()->attribute->group;
+        if ($group && $items->count() > 0) {
+            $groupedAll[] = [
+                'label' => $isRtl ? $group->name_ar : $group->name_en,
+                'items' => $items->values()->all(),
+            ];
+        }
+    }
+
+    // Photo-tour grid rows: side-by-side pairs; an odd count promotes the 3rd
+    // image to a full-width row (2 · 1 · 2 … like the app's gallery).
+    $galleryRows = function ($imgs): array {
+        $list = collect($imgs)->values()->all();
+        $n = count($list);
+        if ($n === 0) return [];
+        if ($n === 1) return [[$list[0]]];
+        $rows = [[array_shift($list), array_shift($list)]];
+        if ($n % 2 === 1) $rows[] = [array_shift($list)];
+        while ($list !== []) $rows[] = array_splice($list, 0, 2);
+        return $rows;
+    };
+
     // Preview: first 10 amenities (Airbnb shows 10).
     $previewAmenities = $amenities->take(10);
 
@@ -264,6 +290,47 @@
         @include('partials._web_topbar')
     </div>
 
+    {{-- MOBILE FLOATING HEADER — back/share/like stay FIXED while scrolling;
+         a white blurred bar fades in once the sheet slides under them.
+         pointer-events are inline styles on purpose: the Tailwind
+         `pointer-events-auto` class wasn't in the build, which is what made
+         these buttons dead the first time. --}}
+    <div class="sm:hidden fixed inset-x-0 top-0" style="z-index: 40; pointer-events: none;"
+         x-data="{ sc: false, th: 220 }"
+         x-init="th = Math.max(160, Math.round(window.innerHeight * 0.58) - 90)"
+         @scroll.window.passive="sc = window.scrollY > th">
+        <div class="absolute inset-0"
+             :style="'transition: opacity 0.25s; border-bottom: 1px solid #F1F1F1; background-color: rgba(255,255,255,0.92); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); opacity: ' + (sc ? 1 : 0) + ';'"></div>
+        <div class="relative flex items-center justify-between" style="padding: 10px 16px; padding-top: calc(10px + env(safe-area-inset-top));">
+            <button type="button" @click="history.length > 1 ? history.back() : (window.location = '{{ route('landing') }}')"
+                    class="calm-round calm-press flex items-center justify-center text-black"
+                    style="pointer-events: auto; width: 40px; height: 40px; border-radius: 50%; background-color: rgba(255,255,255,0.92); box-shadow: 0 2px 12px rgba(0,0,0,0.14); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);"
+                    aria-label="{{ $isRtl ? 'رجوع' : 'Back' }}">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="{{ $isRtl ? '' : 'transform: scaleX(-1);' }}">
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                </svg>
+            </button>
+            <div class="flex items-center" style="gap: 10px;">
+                <button type="button" @click="sharePlace()"
+                        class="calm-round calm-press flex items-center justify-center text-black"
+                        style="pointer-events: auto; width: 40px; height: 40px; border-radius: 50%; background-color: rgba(255,255,255,0.92); box-shadow: 0 2px 12px rgba(0,0,0,0.14); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);"
+                        aria-label="{{ $isRtl ? 'مشاركة' : 'Share' }}">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line>
+                    </svg>
+                </button>
+                <button type="button" @click="toggleLike()"
+                        class="calm-round calm-press-like flex items-center justify-center"
+                        style="pointer-events: auto; width: 40px; height: 40px; border-radius: 50%; background-color: rgba(255,255,255,0.92); box-shadow: 0 2px 12px rgba(0,0,0,0.14); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);"
+                        aria-label="{{ $isRtl ? 'إضافة إلى المفضلة' : 'Save to favorites' }}">
+                    <svg width="18" height="18" viewBox="0 0 24 24" :fill="liked ? '#F88379' : 'none'" :stroke="liked ? '#F88379' : '#1A1A1A'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
     <main class="max-w-7xl mx-auto w-full px-6 sm:px-10 lg:px-20 pt-0 sm:pt-10" style="padding-bottom: 110px;">
 
         {{-- AIRBNB-STYLE MOSAIC (desktop) / SCROLL CAROUSEL (mobile) --}}
@@ -343,37 +410,6 @@
                             <img src="{{ $img->url }}" style="width: 100%; height: 100%; object-fit: cover; pointer-events: none;" alt="" draggable="false" loading="{{ $i === 0 ? 'eager' : 'lazy' }}">
                         </div>
                     @endforeach
-                </div>
-
-                {{-- Floating circles: back at the start edge, share + like at the end. --}}
-                <div class="absolute inset-x-0 top-0 flex items-center justify-between pointer-events-none"
-                     style="padding: 14px 16px 0; padding-top: calc(14px + env(safe-area-inset-top));">
-                    <button type="button" @click="history.length > 1 ? history.back() : (window.location = '{{ route('landing') }}')"
-                            class="calm-round calm-press pointer-events-auto flex items-center justify-center text-black"
-                            style="width: 40px; height: 40px; border-radius: 50%; background-color: rgba(255,255,255,0.92); box-shadow: 0 2px 12px rgba(0,0,0,0.14); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);"
-                            aria-label="{{ $isRtl ? 'رجوع' : 'Back' }}">
-                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="{{ $isRtl ? '' : 'transform: scaleX(-1);' }}">
-                            <polyline points="9 18 15 12 9 6"></polyline>
-                        </svg>
-                    </button>
-                    <div class="flex items-center pointer-events-auto" style="gap: 10px;">
-                        <button type="button" @click="sharePlace()"
-                                class="calm-round calm-press flex items-center justify-center text-black"
-                                style="width: 40px; height: 40px; border-radius: 50%; background-color: rgba(255,255,255,0.92); box-shadow: 0 2px 12px rgba(0,0,0,0.14); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);"
-                                aria-label="{{ $isRtl ? 'مشاركة' : 'Share' }}">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line>
-                            </svg>
-                        </button>
-                        <button type="button" @click="toggleLike()"
-                                class="calm-round calm-press-like flex items-center justify-center"
-                                style="width: 40px; height: 40px; border-radius: 50%; background-color: rgba(255,255,255,0.92); box-shadow: 0 2px 12px rgba(0,0,0,0.14); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);"
-                                aria-label="{{ $isRtl ? 'إضافة إلى المفضلة' : 'Save to favorites' }}">
-                            <svg width="18" height="18" viewBox="0 0 24 24" :fill="liked ? '#F88379' : 'none'" :stroke="liked ? '#F88379' : '#1A1A1A'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
-                            </svg>
-                        </button>
-                    </div>
                 </div>
 
                 {{-- Indicators ON the image (above the sheet overlap). --}}
@@ -508,7 +544,7 @@
             @if($highlightedAmenities->isNotEmpty())
                 <section style="margin-top: 44px; border-top: 1px solid #F1F1F1; border-bottom: 1px solid #F1F1F1; padding: 30px 0 34px;">
                     <h2 class="font-bold text-black {{ $fa }}" style="font-size: 20px;">{{ $isRtl ? 'المميزات البارزة' : 'Highlights' }}</h2>
-                    <div class="flex items-start justify-start" style="margin-top: 22px; gap: 18px;">
+                    <div class="flex items-start justify-center" style="margin-top: 22px; gap: 28px;">
                         @foreach($highlightedAmenities->take(3) as $pa)
                             <div class="text-center shrink-0" style="width: 94px;">
                                 <span class="calm-round inline-flex items-center justify-center bg-white"
@@ -571,30 +607,30 @@
                 </div>
             </section>
 
-            {{-- التقييمات — app parity: no section title; big centred average
-                 with stars + count under it, then bordered transparent review
-                 boxes. «عرض الكل» opens the reviews modal. --}}
+            {{-- التقييمات — app parity: centred average with black stars, then
+                 a horizontal strip of reviews separated by vertical hairlines
+                 (no cards). «عرض جميع التقييمات» opens the modal. --}}
             @if($place->publishedReviews->isNotEmpty())
                 <section style="margin-top: 44px; border-top: 1px solid #F1F1F1; padding-top: 34px;">
                     <div class="text-center">
                         <div class="font-bold text-black tabular-nums" style="font-size: 42px; line-height: 1;">{{ number_format($ratingAvg, 1) }}</div>
                         <div dir="ltr" style="font-size: 15px; letter-spacing: 3px; margin-top: 8px;">
-                            @for($st = 1; $st <= 5; $st++)<span style="color: {{ $st <= round($ratingAvg) ? '#F5B60F' : '#E3E3E3' }};">★</span>@endfor
+                            @for($st = 1; $st <= 5; $st++)<span style="color: {{ $st <= round($ratingAvg) ? '#1A1A1A' : '#E3E3E3' }};">★</span>@endfor
                         </div>
                         <div class="{{ $fa }}" style="font-size: 13px; color: #AAAAAA; margin-top: 6px;">{{ $ratingCount }} {{ $isRtl ? 'تقييم' : 'reviews' }}</div>
                     </div>
-                    <div class="flex flex-col" style="gap: 14px; margin-top: 28px;">
-                        @foreach($place->publishedReviews->take(3) as $review)
-                            @include('partials._web_review_item', ['review' => $review])
+                    <div class="flex items-stretch overflow-x-auto calm-hide-scroll" style="margin-top: 30px;">
+                        @foreach($place->publishedReviews->take(6) as $review)
+                            <div class="shrink-0" style="width: min(72vw, 300px);{{ $loop->first ? ' padding-inline-end: 18px;' : ' padding-inline: 18px; border-inline-start: 1px solid #F1F1F1;' }}">
+                                @include('partials._web_review_item', ['review' => $review, 'clamp' => true])
+                            </div>
                         @endforeach
                     </div>
-                    @if($place->publishedReviews->count() > 3)
-                        <button type="button" @click="openSheet('reviews')"
-                                class="calm-press w-full font-bold text-black {{ $fa }}"
-                                style="margin-top: 14px; padding: 15px; border-radius: 18px; background-color: #F5F5F5; font-size: 14px;">
-                            {{ $isRtl ? 'عرض كل التقييمات' : 'Show all reviews' }} ({{ $ratingCount }})
-                        </button>
-                    @endif
+                    <button type="button" @click="openSheet('reviews')"
+                            class="calm-press w-full font-bold text-black {{ $fa }}"
+                            style="margin-top: 24px; padding: 15px; border-radius: 18px; background-color: #F5F5F5; font-size: 14px;">
+                        {{ $isRtl ? 'عرض جميع التقييمات' : 'Show all reviews' }} ({{ $ratingCount }})
+                    </button>
                 </section>
             @endif
 
@@ -664,11 +700,11 @@
         </div>
     </div>
 
-    {{-- ─────────── AMENITIES SHEET (grouped by AttributeGroup) ─────────── --}}
+    {{-- ─────────── ALL AMENITIES MODAL — grouped cards with count badges ─────────── --}}
     <div x-show="sheet === 'amenities'" x-cloak class="fixed inset-0 z-50">
         <div class="absolute inset-0" style="background-color: rgba(0,0,0,0.5);" @click="closeSheet()" x-transition.opacity></div>
-        <div class="absolute inset-x-0 bottom-0 sm:inset-0 sm:m-auto sm:max-w-2xl sm:max-h-[85vh] sm:h-fit bg-white flex flex-col"
-             style="border-radius: 28px 28px 0 0; corner-shape: squircle;"
+        <div class="absolute inset-x-0 bottom-0 sm:inset-0 sm:m-auto sm:max-w-2xl sm:h-fit bg-white flex flex-col overflow-hidden"
+             style="border-radius: 28px 28px 0 0; corner-shape: squircle; max-height: calc(100% - 56px);"
              x-show="sheet === 'amenities'"
              x-transition:enter="transition ease-out duration-300"
              x-transition:enter-start="translate-y-full sm:translate-y-0 sm:opacity-0 sm:scale-95"
@@ -677,34 +713,52 @@
              x-transition:leave-start="translate-y-0 sm:opacity-100 sm:scale-100"
              x-transition:leave-end="translate-y-full sm:translate-y-0 sm:opacity-0 sm:scale-95"
              dir="{{ $isRtl ? 'rtl' : 'ltr' }}">
-            <div class="relative px-6 pt-6 pb-4 border-b border-[#ebebeb]">
-                <button type="button" @click="closeSheet()"
-                        class="absolute top-5 {{ $isRtl ? 'right-5' : 'left-5' }} w-9 h-9 flex items-center justify-center hover:bg-[#f7f7f7] rounded-full transition-colors">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                </button>
-                <div class="text-center font-semibold text-[#222] {{ $fa }}">{{ $isRtl ? 'كل ما يقدمه هذا المكان' : 'What this place offers' }}</div>
+            <div class="relative flex items-center justify-center shrink-0" style="padding: 16px 20px 12px;">
+                <button type="button" @click="closeSheet()" aria-label="{{ $isRtl ? 'إغلاق' : 'Close' }}"
+                        class="calm-press calm-round absolute flex items-center justify-center bg-white text-black"
+                        style="inset-inline-start: 16px; width: 42px; height: 42px; border-radius: 50%; box-shadow: 0 0 25px rgba(0,0,0,0.08); font-size: 16px;">✕</button>
+                <h2 class="font-bold text-black {{ $fa }}" style="font-size: 18px;">{{ $isRtl ? 'كل المرافق و المميزات' : 'All amenities & features' }}</h2>
             </div>
-            <div class="overflow-y-auto p-6 sm:p-8 {{ $start }}">
-                @foreach($groupedAmenities as $i => $group)
-                    <div class="{{ $i > 0 ? 'mt-8 pt-8 border-t border-[#ebebeb]' : '' }}">
-                        <h3 class="text-[14px] font-bold text-[#717171] uppercase tracking-wide mb-4 {{ $fa }}">{{ $group['label'] }}</h3>
-                        @foreach($group['items'] as $pa)
-                            <div class="flex items-center gap-4 py-3 border-b border-[#ebebeb] last:border-b-0">
-                                <span class="text-[22px] leading-none w-8 text-center shrink-0">{{ $pa->attribute->icon ?: '·' }}</span>
-                                <span class="text-[16px] text-[#222] {{ $fa }}">{{ $isRtl ? $pa->attribute->name_ar : $pa->attribute->name_en }}</span>
-                            </div>
-                        @endforeach
+            <div class="overflow-y-auto {{ $start }}"
+                 style="padding: 14px 20px 40px; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;">
+                @foreach($groupedAll as $gi => $group)
+                    <div style="{{ $gi > 0 ? 'margin-top: 28px;' : '' }}">
+                        <h3 class="font-bold text-black {{ $fa }}" style="font-size: 18px;">{{ $group['label'] }}</h3>
+                        <div class="bg-white" style="margin-top: 14px; border-radius: 24px; corner-shape: squircle; -webkit-corner-shape: squircle; box-shadow: 0 0 30px rgba(0,0,0,0.05); padding: 4px 18px;">
+                            @foreach($group['items'] as $pa)
+                                <div class="flex items-center justify-between" style="padding: 16px 0; gap: 12px;{{ $loop->last ? '' : ' border-bottom: 1px solid #F5F5F5;' }}">
+                                    <div class="flex items-start min-w-0" style="gap: 12px;">
+                                        <span style="font-size: 22px; line-height: 1.2;">{{ $pa->attribute->icon ?: '·' }}</span>
+                                        <div class="min-w-0">
+                                            <div class="font-bold text-black {{ $fa }}" style="font-size: 15px;">{{ $isRtl ? $pa->attribute->name_ar : $pa->attribute->name_en }}</div>
+                                            @if($pa->description)
+                                                <div class="{{ $fa }}" style="font-size: 12.5px; color: #AAAAAA; margin-top: 4px;">{{ $pa->description }}</div>
+                                            @endif
+                                        </div>
+                                    </div>
+                                    <span class="calm-round shrink-0 flex items-center justify-center font-bold text-white tabular-nums"
+                                          style="width: 26px; height: 26px; border-radius: 50%; background-color: #1A1A1A; font-size: 12px;">{{ (int) $pa->value }}</span>
+                                </div>
+                            @endforeach
+                        </div>
                     </div>
                 @endforeach
             </div>
         </div>
     </div>
 
-    {{-- ─────────── REVIEWS MODAL — filters-style header (X circle + centred title) ─────────── --}}
+    {{-- ─────────── REVIEWS MODAL — histogram summary + hairline-separated list ─────────── --}}
     @if($place->publishedReviews->isNotEmpty())
+        @php
+            $revTotal = max(1, $place->publishedReviews->count());
+            $revDist = [];
+            for ($lv = 5; $lv >= 1; $lv--) {
+                $revDist[$lv] = $place->publishedReviews->filter(fn ($r) => (int) round($r->rate) === $lv)->count();
+            }
+        @endphp
         <div x-show="sheet === 'reviews'" x-cloak class="fixed inset-0 z-50">
             <div class="absolute inset-0" style="background-color: rgba(0,0,0,0.5);" @click="closeSheet()" x-transition.opacity></div>
-            <div class="absolute inset-x-0 bottom-0 sm:inset-0 sm:m-auto sm:max-w-2xl sm:h-fit bg-white flex flex-col"
+            <div class="absolute inset-x-0 bottom-0 sm:inset-0 sm:m-auto sm:max-w-2xl sm:h-fit bg-white flex flex-col overflow-hidden"
                  style="border-radius: 28px 28px 0 0; corner-shape: squircle; max-height: calc(100% - 56px);"
                  x-show="sheet === 'reviews'"
                  x-transition:enter="transition ease-out duration-300"
@@ -718,19 +772,38 @@
                     <button type="button" @click="closeSheet()" aria-label="{{ $isRtl ? 'إغلاق' : 'Close' }}"
                             class="calm-press calm-round absolute flex items-center justify-center bg-white text-black"
                             style="inset-inline-start: 16px; width: 42px; height: 42px; border-radius: 50%; box-shadow: 0 0 25px rgba(0,0,0,0.08); font-size: 16px;">✕</button>
-                    <h2 class="font-bold text-black {{ $fa }}" style="font-size: 18px;">{{ $isRtl ? 'التقييمات' : 'Reviews' }}</h2>
+                    <h2 class="font-bold text-black {{ $fa }}" style="font-size: 18px;">
+                        <bdi dir="ltr" class="tabular-nums">{{ number_format($ratingAvg, 1) }}</bdi> · {{ $ratingCount }} {{ $isRtl ? 'تقييم' : 'reviews' }}
+                    </h2>
                 </div>
-                <div class="overflow-y-auto {{ $start }}" style="padding: 14px 20px 40px;">
-                    <div class="text-center">
-                        <div class="font-bold text-black tabular-nums" style="font-size: 42px; line-height: 1;">{{ number_format($ratingAvg, 1) }}</div>
-                        <div dir="ltr" style="font-size: 15px; letter-spacing: 3px; margin-top: 8px;">
-                            @for($st = 1; $st <= 5; $st++)<span style="color: {{ $st <= round($ratingAvg) ? '#F5B60F' : '#E3E3E3' }};">★</span>@endfor
+                <div class="overflow-y-auto {{ $start }}"
+                     style="padding: 14px 24px 40px; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;">
+                    {{-- Summary: rating histogram (start side) + big average --}}
+                    <div class="flex items-center" style="gap: 24px; padding: 8px 2px 0;">
+                        <div class="flex-1 flex flex-col" style="gap: 9px;">
+                            @for($lv = 5; $lv >= 1; $lv--)
+                                <div class="flex items-center" style="gap: 10px;">
+                                    <span class="tabular-nums" style="font-size: 12px; color: #1A1A1A; width: 10px; text-align: center;">{{ $lv }}</span>
+                                    <div class="flex-1" style="height: 5px; border-radius: 3px; background-color: #F1F1F1; overflow: hidden;">
+                                        <div style="height: 100%; border-radius: 3px; background-color: #1A1A1A; width: {{ round($revDist[$lv] / $revTotal * 100) }}%;"></div>
+                                    </div>
+                                </div>
+                            @endfor
                         </div>
-                        <div class="{{ $fa }}" style="font-size: 13px; color: #AAAAAA; margin-top: 6px;">{{ $ratingCount }} {{ $isRtl ? 'تقييم' : 'reviews' }}</div>
+                        <div class="text-center shrink-0" style="min-width: 96px;">
+                            <div class="font-bold text-black tabular-nums" style="font-size: 40px; line-height: 1;">{{ number_format($ratingAvg, 1) }}</div>
+                            <div dir="ltr" style="font-size: 13px; letter-spacing: 2px; margin-top: 8px;">
+                                @for($st = 1; $st <= 5; $st++)<span style="color: {{ $st <= round($ratingAvg) ? '#1A1A1A' : '#E3E3E3' }};">★</span>@endfor
+                            </div>
+                            <div class="{{ $fa }}" style="font-size: 12px; color: #AAAAAA; margin-top: 5px;">{{ $ratingCount }} {{ $isRtl ? 'تقييم' : 'reviews' }}</div>
+                        </div>
                     </div>
-                    <div class="flex flex-col" style="gap: 14px; margin-top: 26px;">
+                    {{-- Reviews, separated by hairlines (no cards) --}}
+                    <div style="margin-top: 22px; border-top: 1px solid #F1F1F1;">
                         @foreach($place->publishedReviews as $review)
-                            @include('partials._web_review_item', ['review' => $review])
+                            <div style="padding: 22px 0;{{ $loop->last ? '' : ' border-bottom: 1px solid #F1F1F1;' }}">
+                                @include('partials._web_review_item', ['review' => $review])
+                            </div>
                         @endforeach
                     </div>
                 </div>
@@ -738,7 +811,7 @@
         </div>
     @endif
 
-    {{-- ─────────── PHOTO TOUR GALLERY MODAL ─────────── --}}
+    {{-- ─────────── PHOTO TOUR GALLERY MODAL ─────────── --}}    {{-- ─────────── PHOTO TOUR GALLERY MODAL ─────────── --}}
     <div x-show="gallery" x-cloak x-transition.opacity id="gallery-scroll"
          style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 60; background-color: #ffffff; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch;"
          dir="{{ $isRtl ? 'rtl' : 'ltr' }}">
@@ -747,13 +820,28 @@
             <div class="max-w-7xl mx-auto flex items-center justify-between px-6 sm:px-10 lg:px-20 h-20">
                 <button type="button" @click="closeGallery()"
                         class="w-10 h-10 flex items-center justify-center text-[#222] hover:bg-[#f7f7f7] transition-colors"
-                        style="border-radius: 999px; corner-shape: squircle;" aria-label="close">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                        <line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>
+                        style="border-radius: 999px; corner-shape: squircle;" aria-label="{{ $isRtl ? 'رجوع' : 'Back' }}">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="{{ $isRtl ? '' : 'transform: scaleX(-1);' }}">
+                        <polyline points="9 18 15 12 9 6"></polyline>
                     </svg>
                 </button>
                 <h2 class="text-[16px] sm:text-[18px] font-bold text-[#222] {{ $fa }}">{{ $isRtl ? 'جولة بالصور' : 'Photo tour' }}</h2>
-                <div class="w-10 h-10"></div>
+                <div class="flex items-center">
+                    <button type="button" @click="sharePlace()"
+                            class="w-10 h-10 flex items-center justify-center text-[#222] hover:bg-[#f7f7f7] transition-colors"
+                            style="border-radius: 999px; corner-shape: squircle;" aria-label="{{ $isRtl ? 'مشاركة' : 'Share' }}">
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line>
+                        </svg>
+                    </button>
+                    <button type="button" @click="toggleLike()"
+                            class="w-10 h-10 flex items-center justify-center hover:bg-[#f7f7f7] transition-colors calm-press-like"
+                            style="border-radius: 999px; corner-shape: squircle;" aria-label="{{ $isRtl ? 'إضافة إلى المفضلة' : 'Save to favorites' }}">
+                        <svg width="19" height="19" viewBox="0 0 24 24" :fill="liked ? '#F88379' : 'none'" :stroke="liked ? '#F88379' : '#1A1A1A'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                        </svg>
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -799,10 +887,14 @@
                         @if($f->description)
                             <p class="mt-2 text-[14px] sm:text-[15px] text-[#6B7280] {{ $fa }}" style="line-height: 1.6;">{{ $f->description }}</p>
                         @endif
-                        <div class="mt-6 space-y-5">
-                            @foreach($facImages as $img)
-                                <img src="{{ $img->url }}" class="w-full block bg-[#f7f7f7]"
-                                     style="border-radius: 40px; corner-shape: squircle;" alt="" loading="lazy">
+                        <div class="mt-5 calm-gallery-grid">
+                            @foreach($galleryRows($facImages) as $row)
+                                <div class="flex" style="gap: 6px;{{ $loop->first ? '' : ' margin-top: 6px;' }}">
+                                    @foreach($row as $img)
+                                        <img src="{{ $img->url }}" class="block bg-[#f7f7f7]" alt="" loading="lazy"
+                                             style="flex: 1 1 0; min-width: 0; {{ count($row) === 2 ? 'aspect-ratio: 1 / 1;' : 'aspect-ratio: 4 / 3;' }} object-fit: cover; border-radius: 0;">
+                                    @endforeach
+                                </div>
                             @endforeach
                         </div>
                     </section>
@@ -817,10 +909,14 @@
                     <p class="mt-2 text-[14px] text-[#6B7280] {{ $fa }}">
                         {{ $extraImages->count() }} {{ $isRtl ? 'صورة' : ($extraImages->count() === 1 ? 'photo' : 'photos') }}
                     </p>
-                    <div class="mt-5 space-y-4">
-                        @foreach($extraImages as $img)
-                            <img src="{{ $img->url }}" class="w-full block bg-[#f7f7f7]"
-                                 style="border-radius: 20px; corner-shape: squircle;" alt="" loading="lazy">
+                    <div class="mt-5 calm-gallery-grid">
+                        @foreach($galleryRows($extraImages) as $row)
+                            <div class="flex" style="gap: 6px;{{ $loop->first ? '' : ' margin-top: 6px;' }}">
+                                @foreach($row as $img)
+                                    <img src="{{ $img->url }}" class="block bg-[#f7f7f7]" alt="" loading="lazy"
+                                         style="flex: 1 1 0; min-width: 0; {{ count($row) === 2 ? 'aspect-ratio: 1 / 1;' : 'aspect-ratio: 4 / 3;' }} object-fit: cover; border-radius: 0;">
+                                @endforeach
+                            </div>
                         @endforeach
                     </div>
                 </section>
@@ -833,6 +929,9 @@
 <style>
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    /* Photo-tour grid: edge-to-edge on mobile, back inside the container on sm+. */
+    .calm-gallery-grid { margin-inline: -24px; }
+    @media (min-width: 640px) { .calm-gallery-grid { margin-inline: 0; } }
     [x-cloak] { display: none !important; }
     .calm-hide-scroll { scrollbar-width: none; }
     .calm-hide-scroll::-webkit-scrollbar { display: none; }
