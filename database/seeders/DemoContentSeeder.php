@@ -164,7 +164,7 @@ class DemoContentSeeder extends Seeder
             // no-rating card state stays visible on the home page too).
             $place->reviews()->forceDelete();
             if ($i !== 2) {
-                $count = 2 + ($i % 2);
+                $count = 2 + ($i % 4);
                 for ($r = 0; $r < $count; $r++) {
                     [$name, $rate, $comment] = $reviewPool[($i + $r) % count($reviewPool)];
                     PlaceReview::query()->create([

@@ -47,6 +47,8 @@ class PlaceController extends Controller
         return view('places.show', [
             'place' => $place,
             'preview' => false,
+            // Floating heart on the mobile hero.
+            'viewerLiked' => $viewer !== null && $place->likes()->where('user_id', $viewer->id)->exists(),
             // Owner/admin get a status banner pinned to the top (review +
             // active status) so they know what state the listing is in while
             // viewing it exactly as a guest would.
