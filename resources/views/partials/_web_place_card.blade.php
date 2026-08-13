@@ -34,10 +34,13 @@
     $heartSize = 30;
     $priceLabel = 'SR '.number_format((int) $p->price);
 @endphp
-<div class="calm-press-card group relative shrink-0" @if($compact) style="width: clamp(126px, 37vw, 172px);" @endif>
-    <a href="{{ route('places.show', $p) }}" class="block" style="-webkit-user-drag: none;">
-        <div class="relative overflow-hidden"
-             style="background-color: #F3F4F6; border-radius: 28px; corner-shape: squircle; -webkit-corner-shape: squircle; aspect-ratio: 1; {{ $compact ? 'width: 100%;' : '' }}"
+<div class="group relative shrink-0" @if($compact) style="width: clamp(126px, 37vw, 172px);" @endif>
+    {{-- Photo area lives OUTSIDE the link — iOS hijacks horizontal pans on
+         <a><img> as native drag-and-drop, killing carousel swipes. A tap
+         still navigates; drag-clicks are suppressed by calmDragScroll. --}}
+        <div class="relative overflow-hidden" role="link" tabindex="0"
+             onclick="window.location.href = this.dataset.href" data-href="{{ route('places.show', $p) }}"
+             style="background-color: #F3F4F6; border-radius: 28px; corner-shape: squircle; -webkit-corner-shape: squircle; aspect-ratio: 1; cursor: pointer; {{ $compact ? 'width: 100%;' : '' }}"
              @if(! $compact && $carousel->count() > 1) x-data="{ ci: 0 }" @endif>
             @if($compact)
                 @if($cover)
@@ -46,7 +49,7 @@
                 @endif
             @elseif($carousel->count() > 1)
                 {{-- Featured-photos carousel (scroll-snap + app-spec dots) --}}
-                <div class="flex overflow-x-auto calm-hide-scroll w-full h-full" style="scroll-snap-type: x mandatory; cursor: grab; touch-action: pan-x pan-y;"
+                <div class="flex overflow-x-auto calm-hide-scroll w-full h-full" style="scroll-snap-type: x mandatory; cursor: grab; touch-action: pan-x pan-y; overscroll-behavior-x: contain;"
                      x-init="window.calmDragScroll && calmDragScroll($el)"
                      @scroll="ci = Math.min({{ $carousel->count() - 1 }}, Math.round(Math.abs($el.scrollLeft) / $el.clientWidth))">
                     @foreach($carousel as $u)
@@ -67,6 +70,7 @@
                      class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.04]">
             @endif
         </div>
+    <a href="{{ route('places.show', $p) }}" class="block calm-press-card" style="-webkit-user-drag: none;">
         <div style="padding-top: 10px; display: flex; flex-direction: column; gap: 3px;">
             <span class="font-bold text-black truncate {{ $fa }}" style="font-size: {{ $compact ? '13px' : '15px' }}; line-height: 1.35;">{{ $p->localized_title }}</span>
             @if($subtitle !== '')

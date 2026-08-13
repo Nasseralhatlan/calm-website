@@ -52,6 +52,16 @@
                 this.fetchPage(this.page + 1, params);
             },
 
+            // Place URL — carries the searched stay so the place page's
+            // booking modal can skip straight to the summary step.
+            cardHref(p) {
+                const a = this.applied;
+                if (a && a.checkIn && a.checkOut) {
+                    return `/places/${p.id}?check_in=${a.checkIn}&check_out=${a.checkOut}`;
+                }
+                return `/places/${p.id}`;
+            },
+
             cardTitle(p) {
                 return (CALM_WEB.locale === 'ar'
                     ? (p.title_ar || p.title_en)

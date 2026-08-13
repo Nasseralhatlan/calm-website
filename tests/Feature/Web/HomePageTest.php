@@ -130,12 +130,18 @@ it('gates the tab pages inline: prompts for guests, content when signed in', fun
     $this->actingAs($this->host, 'api')->get('/account')->assertOk()->assertSee('تسجيل الخروج');
 });
 
-it('shows the booking CTA on a live place page, linking to the funnel', function (): void {
+it('shows the booking CTA on a live place page, wired to the booking modal', function (): void {
     $place = homePagePlace($this->host);
 
     $this->get(route('places.show', $place))
         ->assertOk()
-        ->assertSee(route('book.show', $place));
+        // Reserve button opens the modal…
+        ->assertSee('احجز الآن')
+        ->assertSee('calm-open-booking')
+        // …with the dates step + summary inside (the funnel endpoint itself
+        // is covered by the BookingFunnel feature tests).
+        ->assertSee('اختر التواريخ')
+        ->assertSee('ملخص الحجز');
 });
 
 it('shows the rating chip and recent published reviews on the place page', function (): void {

@@ -10,12 +10,17 @@
     $isRtl = $locale === 'ar';
     $fa = $isRtl ? 'font-arabic' : '';
 @endphp
-<div class="calm-press-card group relative">
-    <a :href="`/places/${p.id}`" class="block" style="-webkit-user-drag: none;">
-        <div class="relative overflow-hidden" style="background-color: #F3F4F6; border-radius: 24px; corner-shape: squircle; -webkit-corner-shape: squircle; aspect-ratio: 1;"
+<div class="group relative">
+    {{-- Photo area lives OUTSIDE the link — iOS hijacks horizontal pans on
+         <a><img> as native drag-and-drop, killing carousel swipes. A tap
+         still navigates; drag-clicks are suppressed by calmDragScroll. --}}
+        <div class="relative overflow-hidden" role="link" tabindex="0"
+             @click="window.location.href = cardHref(p)"
+             @keydown.enter="window.location.href = cardHref(p)"
+             style="background-color: #F3F4F6; border-radius: 24px; corner-shape: squircle; -webkit-corner-shape: squircle; aspect-ratio: 1; cursor: pointer;"
              x-data="{ ci: 0, imgs() { const l = (p.carousel_photos && p.carousel_photos.length ? p.carousel_photos : [p.cover_photo_url]).filter(Boolean); return l; } }">
             {{-- Photo carousel — scroll-snap over the backend-capped set (≤10) --}}
-            <div class="flex overflow-x-auto calm-hide-scroll w-full h-full" style="scroll-snap-type: x mandatory; cursor: grab; touch-action: pan-x pan-y;"
+            <div class="flex overflow-x-auto calm-hide-scroll w-full h-full" style="scroll-snap-type: x mandatory; cursor: grab; touch-action: pan-x pan-y; overscroll-behavior-x: contain;"
                  x-init="window.calmDragScroll && calmDragScroll($el)"
                  @scroll="ci = Math.min(imgs().length - 1, Math.round(Math.abs($el.scrollLeft) / $el.clientWidth))">
                 <template x-for="(u, ui) in imgs()" :key="ui">
@@ -34,6 +39,7 @@
                 </template>
             </div>
         </div>
+    <a :href="cardHref(p)" class="block calm-press-card" style="-webkit-user-drag: none;">
         <div style="padding-top: 12px; display: flex; flex-direction: column; gap: 4px;">
             <div class="flex items-center justify-between" style="gap: 8px;">
                 <h3 class="font-bold text-black truncate {{ $fa }}" style="font-size: 16px; line-height: 21px;" x-text="cardTitle(p)"></h3>

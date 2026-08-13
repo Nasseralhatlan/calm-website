@@ -668,13 +668,18 @@
                     <div class="font-bold text-black tabular-nums" style="font-size: 20px; line-height: 24px;"><bdi dir="ltr">{{ number_format((int) $place->price) }} SR</bdi></div>
                     <div class="{{ $fa }}" style="font-size: 12px; line-height: 16px; margin-top: 3px; color: #AAAAAA;">{{ $isRtl ? 'لليلة الواحدة' : 'per night' }}</div>
                 </div>
-                <a href="{{ route('book.show', $place) }}"
-                   class="calm-press inline-flex items-center justify-center font-medium text-white bg-[#F88379] hover:bg-[#E66E64] transition-colors {{ $fa }}"
-                   style="padding: 14px 48px; border-radius: 15px; font-size: 15px; line-height: 20px; box-shadow: 0 6px 12px rgba(248,131,121,0.3);">
+                <button type="button" @click="window.dispatchEvent(new CustomEvent('calm-open-booking'))"
+                        class="calm-press inline-flex items-center justify-center font-medium text-white bg-[#F88379] hover:bg-[#E66E64] transition-colors {{ $fa }}"
+                        style="padding: 14px 48px; border-radius: 15px; font-size: 15px; line-height: 20px; box-shadow: 0 6px 12px rgba(248,131,121,0.3);">
                     {{ $isRtl ? 'احجز الآن' : 'Reserve' }}
-                </a>
+                </button>
             </div>
         </div>
+    @endif
+
+    {{-- ─────────── BOOKING MODAL — dates → summary → pay/login ─────────── --}}
+    @if($place->isVisible())
+        @include('partials._web_booking_modal')
     @endif
 
     {{-- ─────────── DESCRIPTION MODAL ─────────── --}}

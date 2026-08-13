@@ -296,6 +296,9 @@ function bookingFunnel(init) {
     const AR_DAYS = ['ح', 'ن', 'ث', 'ر', 'خ', 'ج', 'س'];
     const EN_DAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
     const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    // Parse 'YYYY-MM-DD' as a LOCAL date — new Date(str) is UTC midnight and
+    // shifts a day for viewers west of UTC.
+    const parseD = (s) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
     const todayIso = iso(new Date());
     const MONTHS_AHEAD = 12; // a full year of dates ahead
 
@@ -387,7 +390,7 @@ function bookingFunnel(init) {
             this.fetchQuote();
         },
         rangeFree(a, b) {
-            const cur = new Date(a); const end = new Date(b);
+            const cur = parseD(a); const end = parseD(b);
             while (cur < end) { if (this.unavailable.has(iso(cur))) return false; cur.setDate(cur.getDate() + 1); }
             return true;
         },
@@ -430,15 +433,15 @@ function bookingFunnel(init) {
         rangeSubtitle() {
             if (!this.checkIn || !this.checkOut) return '';
             if (this.checkIn === this.checkOut) {
-                const d = hijriFmt ? (() => { try { return hijriFmt.format(new Date(this.checkIn)); } catch (e) { return this.checkIn; } })() : this.checkIn;
+                const d = hijriFmt ? (() => { try { return hijriFmt.format(parseD(this.checkIn)); } catch (e) { return this.checkIn; } })() : this.checkIn;
                 return d + (this.isRtl ? ' — اضغط يوماً لاحقاً للتمديد' : ' — tap a later day to extend');
             }
             if (!hijriFmt) return '';
-            try { return `${hijriFmt.format(new Date(this.checkIn))} – ${hijriFmt.format(new Date(this.checkOut))}`; } catch (e) { return ''; }
+            try { return `${hijriFmt.format(parseD(this.checkIn))} – ${hijriFmt.format(parseD(this.checkOut))}`; } catch (e) { return ''; }
         },
         nights() {
             // Inclusive DAY count (app semantics: Jul 26 → Jul 31 = 6 أيام).
-            return Math.round((new Date(this.checkOut) - new Date(this.checkIn)) / 86400000) + 1;
+            return Math.round((parseD(this.checkOut) - parseD(this.checkIn)) / 86400000) + 1;
         },
 
         // ── step navigation ──
@@ -483,12 +486,12 @@ function bookingFunnel(init) {
         fmtMoney(v) { return v == null ? '' : Number(v).toLocaleString(); },
         fmtDay(dateStr) {
             if (!dateStr) return '';
-            try { return gregFmt.format(new Date(dateStr)); } catch (e) { return dateStr; }
+            try { return gregFmt.format(parseD(dateStr)); } catch (e) { return dateStr; }
         },
         checkoutDay() {
             if (!this.checkOut) return null;
             if (!init.checkoutNextDay) return this.checkOut;
-            const d = new Date(this.checkOut);
+            const d = parseD(this.checkOut);
             return iso(d);
         },
 
