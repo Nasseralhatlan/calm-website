@@ -232,38 +232,6 @@
 
     <main class="max-w-7xl mx-auto w-full px-6 sm:px-10 lg:px-20 py-8 sm:py-10" style="padding-bottom: 110px;">
 
-        {{-- TITLE BLOCK — centered --}}
-        <div class="text-center mb-6">
-            <h1 class="text-[26px] sm:text-[32px] font-bold tracking-tight text-[#222] {{ $fa }}" style="line-height: 1.2;">
-                {{ $place->localized_title ?: $placeLabel }}
-            </h1>
-            <div class="flex flex-wrap items-center justify-center {{ $fa }}" style="gap: 8px; margin-top: 12px;">
-                <span class="inline-flex items-center text-[13px] text-[#717171] bg-[#fafafa]" style="gap: 6px; padding: 4px 12px; border-radius: 999px; corner-shape: squircle;">
-                    <span>{{ $place->type?->icon ?: '🏠' }}</span>
-                    <span>{{ $placeLabel }}</span>
-                </span>
-                @php $city = $place->cityArea?->city; @endphp
-                @if($city)
-                    <span class="inline-flex items-center text-[13px] text-[#717171] bg-[#fafafa]" style="gap: 6px; padding: 4px 12px; border-radius: 999px; corner-shape: squircle;">
-                        <span>{{ $city->avatar ?: '📍' }}</span>
-                        <span>{{ $isRtl ? ($place->cityArea?->name_ar.' · '.$city->name_ar) : ($place->cityArea?->name_en.' · '.$city->name_en) }}</span>
-                    </span>
-                @endif
-                @if($facilities->count() > 0)
-                    <span class="text-[13px] text-[#717171] bg-[#fafafa]" style="padding: 4px 12px; border-radius: 999px; corner-shape: squircle;">
-                        {{ $facilities->count() }} {{ $isRtl ? 'مرافق' : 'facilities' }}
-                    </span>
-                @endif
-                @if(($place->published_reviews_count ?? 0) > 0)
-                    <span class="inline-flex items-center text-[13px] text-[#1A1A1A] bg-[#fafafa] tabular-nums" style="gap: 4px; padding: 4px 12px; border-radius: 999px; corner-shape: squircle;">
-                        <span>★</span>
-                        <span class="font-bold">{{ number_format((float) $place->published_reviews_avg_rate, 1) }}</span>
-                        <span class="text-[#6B7280]">({{ $place->published_reviews_count }})</span>
-                    </span>
-                @endif
-            </div>
-        </div>
-
         {{-- AIRBNB-STYLE MOSAIC (desktop) / SCROLL CAROUSEL (mobile) --}}
         @if($heroImages->count() > 0)
             @php $imgCount = $heroImages->count(); @endphp
@@ -381,342 +349,127 @@
             </div>
         @endif
 
-        {{-- ── TITLE + PRICE summary row directly under the hero ── --}}
-        <div class="flex items-end justify-between flex-wrap {{ $fa }}"
-             style="gap: 16px; margin-top: 32px; padding-bottom: 28px; border-bottom: 1px solid #ebebeb;">
-            <div class="{{ $start }}">
-                <h2 class="text-[20px] sm:text-[24px] font-bold text-[#222]" style="line-height: 1.25;">
-                    {{ $place->localized_title ?: $placeLabel }}
-                </h2>
-                <p class="text-[14px] text-[#717171]" style="margin-top: 4px;">
-                    @if($city)
-                        {{ $isRtl ? ($place->cityArea?->name_ar.' · '.$city->name_ar) : ($place->cityArea?->name_en.' · '.$city->name_en) }}
-                    @else
-                        {{ $placeLabel }}
-                    @endif
-                </p>
-            </div>
-            <div class="text-end {{ $fa }}">
-                <div class="text-[24px] sm:text-[28px] font-bold text-[#222] tabular-nums" dir="ltr" style="line-height: 1.1;">
-                    {{ number_format($place->price) }} <span class="text-[14px] text-[#717171]">SAR</span>
+        {{-- ══ App-parity content (mobile-app layout) ══ --}}
+        @php
+            // 12h clock like the app («2:00 AM»).
+            $fmtTime = function (?string $t): string {
+                if (! $t) return '';
+                [$h, $m] = explode(':', $t);
+                $h = (int) $h;
+                return ($h % 12 ?: 12).':'.$m.' '.($h < 12 ? 'AM' : 'PM');
+            };
+            $facilitiesWithPhotos = $facilities->filter(fn ($pa) => $facilityImages($pa)->isNotEmpty())->values();
+            $galleryFirstKey = $facilitiesWithPhotos->isNotEmpty()
+                ? 'attr-'.$facilitiesWithPhotos->first()->attribute_id
+                : 'extras';
+            $ratingAvg = $place->published_reviews_avg_rate !== null ? round((float) $place->published_reviews_avg_rate, 1) : 0.0;
+            $ratingCount = (int) ($place->published_reviews_count ?? 0);
+        @endphp
+        <div class="mx-auto w-full {{ $start }}" style="max-width: 720px; padding-top: 26px;">
+
+            {{-- Title --}}
+            <h1 class="text-center font-bold text-black {{ $fa }}" style="font-size: 26px; line-height: 1.3;">
+                {{ $place->localized_title ?: $placeLabel }}
+            </h1>
+
+            {{-- Stats row: guests | rating | city/area --}}
+            <div class="flex items-stretch" style="max-width: 560px; margin: 22px auto 0;">
+                <div class="flex-1 text-center">
+                    <div class="font-bold text-black tabular-nums" style="font-size: 22px;">{{ (int) $place->max_guests }}</div>
+                    <div class="{{ $fa }}" style="font-size: 13px; color: #AAAAAA; margin-top: 2px;">{{ $isRtl ? 'ضيف' : 'guests' }}</div>
                 </div>
-                <div class="text-[12px] text-[#717171]" style="margin-top: 2px;">{{ $isRtl ? 'السعر الأساسي / ليلة' : 'Base price / night' }}</div>
+                <span class="shrink-0" style="width: 1px; background: #F1F1F1;"></span>
+                <div class="flex-1 text-center">
+                    <div class="font-bold text-black tabular-nums" style="font-size: 22px;">{{ number_format($ratingAvg, 1) }}</div>
+                    <div dir="ltr" style="font-size: 12px; letter-spacing: 2px; margin-top: 1px;">
+                        @for($st = 1; $st <= 5; $st++)<span style="color: {{ $st <= round($ratingAvg) ? '#F5B60F' : '#E3E3E3' }};">★</span>@endfor
+                    </div>
+                    <div class="{{ $fa }}" style="font-size: 13px; color: #AAAAAA; margin-top: 1px;">{{ $ratingCount }} {{ $isRtl ? 'تقييم' : 'reviews' }}</div>
+                </div>
+                <span class="shrink-0" style="width: 1px; background: #F1F1F1;"></span>
+                <div class="flex-1 text-center">
+                    <div class="font-bold text-black {{ $fa }}" style="font-size: 17px; line-height: 1.4;">{{ $isRtl ? $place->cityArea?->city?->name_ar : $place->cityArea?->city?->name_en }}</div>
+                    <div class="{{ $fa }}" style="font-size: 13px; color: #AAAAAA; margin-top: 2px;">{{ $isRtl ? $place->cityArea?->name_ar : $place->cityArea?->name_en }}</div>
+                </div>
             </div>
-        </div>
 
-        {{-- FULL-WIDTH BODY --}}
-        <div style="margin-top: 48px;">
-
-            {{-- DESCRIPTION (line-clamp 6 so more of the text shows by default;
-                 Show-more button is smaller + only fires for genuinely long copy) --}}
-            @if($description)
-                <section class="{{ $start }} border-b border-[#ebebeb]" style="padding-bottom: 56px;">
-                    <h2 class="text-[22px] sm:text-2xl font-semibold text-[#222] {{ $fa }}" style="margin-bottom: 20px;">
-                        {{ $isRtl ? 'الوصف' : 'About this place' }}
-                    </h2>
-                    <p class="text-[16px] text-[#222] {{ $fa }}"
-                       style="line-height: 1.7; white-space: pre-line; display: -webkit-box; -webkit-line-clamp: 6; line-clamp: 6; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis;">{{ $description }}</p>
-                    @if(mb_strlen($description) > 400)
+            {{-- وصف --}}
+            @if($description !== '')
+                <section style="margin-top: 44px;">
+                    <h2 class="font-bold text-black {{ $fa }}" style="font-size: 20px;">{{ $isRtl ? 'وصف' : 'Description' }}</h2>
+                    <p class="text-black {{ $fa }}" style="font-size: 15px; line-height: 1.9; margin-top: 14px; white-space: pre-line; display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical; overflow: hidden;">{{ $description }}</p>
+                    @if(mb_strlen($description) > 220)
                         <button type="button" @click="openDescription()"
-                                class="inline-flex items-center font-semibold text-[#222] hover:bg-[#ebebeb] transition-colors {{ $fa }}"
-                                style="margin-top: 14px; padding: 8px 16px; font-size: 13px; background-color: #f7f7f7; border-radius: 12px; corner-shape: squircle;">
-                            <span>{{ $isRtl ? 'عرض المزيد' : 'Show more' }}</span>
+                                class="calm-press font-bold text-black underline {{ $fa }}" style="margin-top: 10px; font-size: 14px;">
+                            {{ $isRtl ? 'عرض المزيد' : 'Show more' }}
                         </button>
                     @endif
                 </section>
             @endif
 
-            {{-- ── PER-DAY PRICING — only renders when at least one day differs
-                 from the base price; the title-row above already shows base. ── --}}
-            @if($hasPerDay)
-                <section class="border-b border-[#ebebeb]" style="padding-top: 56px; padding-bottom: 56px;">
-                    <h2 class="text-[22px] sm:text-2xl font-semibold text-[#222] {{ $start }} {{ $fa }}" style="margin-bottom: 20px;">
-                        {{ $isRtl ? 'السعر لكل يوم' : 'Per-day pricing' }}
-                    </h2>
-                    <div class="grid grid-cols-7" style="gap: 8px;">
-                        @foreach($dayLabels as $day => $label)
-                            @php
-                                $p = $dayPrices[$day] > 0 ? $dayPrices[$day] : (int) $place->price;
-                                $isCustom = $dayPrices[$day] > 0 && $dayPrices[$day] !== (int) $place->price;
-                            @endphp
-                            <div class="text-center" style="padding: 12px 6px; border-radius: 14px; corner-shape: squircle; background-color: {{ $isCustom ? '#fff1ef' : '#fafafa' }};">
-                                <div class="text-[11px] font-bold uppercase {{ $isCustom ? 'text-[#F88379]' : 'text-[#717171]' }} {{ $fa }}">{{ $label }}</div>
-                                <div class="text-[15px] font-bold text-[#222] tabular-nums" dir="ltr" style="margin-top: 4px;">{{ number_format($p) }}</div>
+            {{-- الإقامة — facility rows with count badges --}}
+            @if($facilities->isNotEmpty())
+                <section style="margin-top: 44px;">
+                    <h2 class="font-bold text-black {{ $fa }}" style="font-size: 20px;">{{ $isRtl ? 'الإقامة' : 'The stay' }}</h2>
+                    <div style="margin-top: 8px;">
+                        @foreach($facilities as $pa)
+                            <div class="flex items-start justify-between" style="padding: 15px 0; gap: 12px;">
+                                <div class="min-w-0">
+                                    <div class="flex items-center" style="gap: 10px;">
+                                        <span style="font-size: 20px; line-height: 1;">{{ $pa->attribute->icon ?: '•' }}</span>
+                                        <span class="font-bold text-black {{ $fa }}" style="font-size: 16px;">{{ $isRtl ? $pa->attribute->name_ar : $pa->attribute->name_en }}</span>
+                                    </div>
+                                    @if($pa->description)
+                                        <div class="{{ $fa }}" style="font-size: 13px; color: #AAAAAA; margin-top: 6px;">{{ $pa->description }}</div>
+                                    @endif
+                                </div>
+                                <span class="calm-round shrink-0 flex items-center justify-center font-bold text-black tabular-nums"
+                                      style="width: 34px; height: 34px; border-radius: 50%; background-color: #F5F5F5; font-size: 13px;">{{ (int) $pa->value }}</span>
                             </div>
                         @endforeach
                     </div>
                 </section>
             @endif
 
-            {{-- قائمة المرافق — grouped by AttributeGroup, with attribute emojis,
-                 limited preview, and a Show-all sheet (same pattern as amenities). --}}
-            @php
-                // Group facilities by their AttributeGroup so reviewers see the
-                // facilities sorted by living-area / outdoor / activities / etc.
-                $facilitiesByGroup = $facilities->groupBy(fn ($pa) => $pa->attribute->group?->id);
-                // Inline preview cap — anything beyond fits behind the Show-all sheet.
-                $facilityPreviewLimit = 6;
-                $facilitiesPreview = $facilities->take($facilityPreviewLimit);
-                $facilitiesPreviewByGroup = $facilitiesPreview->groupBy(fn ($pa) => $pa->attribute->group?->id);
-            @endphp
-            @if($facilities->count() > 0)
-                <section class="border-b border-[#ebebeb]" style="padding-top: 56px; padding-bottom: 56px;">
-                    <h2 class="text-[22px] sm:text-2xl font-semibold text-[#222] {{ $start }} {{ $fa }}" style="margin-bottom: 6px;">
-                        {{ $isRtl ? 'قائمة المرافق' : 'Facilities list' }}
-                    </h2>
-                    <p class="text-[15px] text-[#717171] {{ $start }} {{ $fa }}" style="margin-bottom: 24px;">
-                        {{ $facilities->count() }} {{ $isRtl ? 'مرفق مختار' : 'facilities selected' }}
-                    </p>
-
-                    @foreach($facilitiesPreviewByGroup as $groupId => $items)
-                        @php $group = $items->first()->attribute->group; @endphp
-                        @if($group)
-                            <h3 class="text-[13px] font-bold text-[#717171] uppercase tracking-wider {{ $fa }}"
-                                style="margin-top: {{ $loop->first ? '0' : '24px' }}; margin-bottom: 12px;">
-                                {{ $isRtl ? $group->name_ar : $group->name_en }}
-                            </h3>
-                        @endif
-                        <ul class="{{ $start }} {{ $fa }}" style="list-style: none; padding: 0; margin: 0;">
-                            @foreach($items as $f)
-                                <li style="padding: 14px 0; border-bottom: 1px solid #ebebeb;" x-data="{ expanded: false }">
-                                    <div class="flex items-center" style="gap: 14px;">
-                                        <span class="shrink-0" style="font-size: 22px; line-height: 1; width: 32px; text-align: center;">{{ $f->attribute->icon ?: '·' }}</span>
-                                        <span class="text-[15px] sm:text-[16px] text-[#222] flex-1 font-medium">{{ $isRtl ? $f->attribute->name_ar : $f->attribute->name_en }}</span>
-                                        <span class="text-[14px] font-bold text-[#222] tabular-nums" dir="ltr">×{{ (int) ($f->value ?: 1) }}</span>
-                                    </div>
-                                    @if($f->description)
-                                        <div style="padding-{{ $isRtl ? 'right' : 'left' }}: 46px; margin-top: 8px;">
-                                            <p class="text-[14px] text-[#717171]"
-                                               :style="expanded ? 'line-height: 1.65;' : 'line-height: 1.65; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;'">{{ $f->description }}</p>
-                                            @if(mb_strlen($f->description) > 100)
-                                                <button type="button" @click="expanded = !expanded"
-                                                        class="text-[13px] font-semibold text-[#222] underline underline-offset-2 hover:text-black" style="margin-top: 6px;">
-                                                    <span x-show="!expanded">{{ $isRtl ? 'عرض المزيد' : 'Show more' }}</span>
-                                                    <span x-show="expanded" x-cloak>{{ $isRtl ? 'عرض أقل' : 'Show less' }}</span>
-                                                </button>
-                                            @endif
-                                        </div>
-                                    @endif
-                                </li>
-                            @endforeach
-                        </ul>
-                    @endforeach
-
-                    @if($facilities->count() > $facilityPreviewLimit)
-                        <button type="button" @click="openSheet('facilities')"
-                                class="inline-flex items-center font-semibold text-[#222] bg-white hover:bg-[#f7f7f7] transition-colors {{ $fa }}"
-                                style="margin-top: 24px; padding: 12px 22px; border: 1px solid #222; border-radius: 12px; corner-shape: squircle;">
-                            {{ $isRtl ? "عرض كل المرافق ({$facilities->count()})" : "Show all {$facilities->count()} facilities" }}
-                        </button>
-                    @endif
-                </section>
-            @endif
-
-            {{-- FACILITIES IMAGES (carousel — transform-based, always LTR) --}}
-            @if($facilities->count() > 0)
-                <section class="border-b border-[#ebebeb]" dir="ltr"
-                         style="padding-top: 56px; padding-bottom: 56px; direction: ltr; unicode-bidi: isolate;"
-                         x-data="{
-                            idx: 0, total: {{ $facilities->count() }}, slideWidth: 200,
-                            startX: 0, deltaX: 0, dragging: false, dragged: false,
-                            init() { this.measure(); window.addEventListener('resize', () => this.measure()); },
-                            measure() { const t = this.$refs.track; const first = t && t.firstElementChild; if (first) this.slideWidth = first.offsetWidth + 20; },
-                            onStart(e) { this.dragging = true; this.startX = (e.touches ? e.touches[0].clientX : e.clientX); this.deltaX = 0; },
-                            onMove(e) { if (!this.dragging) return; const x = (e.touches ? e.touches[0].clientX : e.clientX); this.deltaX = x - this.startX; },
-                            onEnd() {
-                                if (!this.dragging) return;
-                                this.dragging = false;
-                                if (Math.abs(this.deltaX) > 5) { this.dragged = true; setTimeout(() => this.dragged = false, 80); }
-                                if (this.deltaX < -50) this.next();
-                                else if (this.deltaX > 50) this.prev();
-                                this.deltaX = 0;
-                            },
-                            offset() { return -this.idx * this.slideWidth + this.deltaX; },
-                            go(i) { this.idx = ((i % this.total) + this.total) % this.total; },
-                            next() { this.go(this.idx + 1); }, prev() { this.go(this.idx - 1); },
-                         }">
-                    <div class="flex items-end justify-between gap-4">
-                        <div style="text-align: start;" class="{{ $fa }}">
-                            <h2 class="text-[22px] sm:text-2xl font-semibold text-[#222]">
-                                {{ $isRtl ? 'صور المرافق' : 'Facilities images' }}
-                            </h2>
-                            <p class="text-[15px] text-[#717171]" style="margin-top: 4px;">
-                                {{ $isRtl ? 'استكشف كل مساحات المكان' : 'Browse every space of the place' }}
-                            </p>
-                        </div>
-                        <div class="flex items-center shrink-0" style="gap: 10px;">
-                            <button type="button" @click="prev()" aria-label="previous"
-                                    class="flex items-center justify-center text-[#222] hover:text-black active:scale-95 transition-all"
-                                    style="width: 40px; height: 40px; border-radius: 999px; corner-shape: squircle; background-color: rgba(255,255,255,0.7); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(0,0,0,0.08); box-shadow: 0 2px 8px rgba(0,0,0,0.06);">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+            {{-- صور المرافق — photo-group cards + «عرض كل الصور» --}}
+            @if($facilitiesWithPhotos->isNotEmpty())
+                <section style="margin-top: 44px;">
+                    <h2 class="font-bold text-black {{ $fa }}" style="font-size: 20px;">{{ $isRtl ? 'صور المرافق' : 'Space photos' }}</h2>
+                    <div class="flex overflow-x-auto calm-hide-scroll" style="gap: 14px; margin-top: 16px; padding: 4px 2px 8px;">
+                        @foreach($facilitiesWithPhotos as $fi => $pa)
+                            @php $fImgs = $facilityImages($pa); @endphp
+                            <button type="button" @click="openGallery('attr-{{ $pa->attribute_id }}')" class="calm-press-card shrink-0 text-start">
+                                <span class="block overflow-hidden bg-[#F3F4F6]"
+                                      style="width: {{ $fi === 0 ? '300px' : '150px' }}; height: 150px; border-radius: 20px; corner-shape: squircle; -webkit-corner-shape: squircle;">
+                                    <img src="{{ $fImgs->first()->url }}" alt="" loading="lazy" class="w-full h-full object-cover">
+                                </span>
+                                <span class="block font-bold text-black {{ $fa }}" style="font-size: 14px; margin-top: 9px;">{{ $isRtl ? $pa->attribute->name_ar : $pa->attribute->name_en }}</span>
+                                @if($pa->description)
+                                    <span class="block truncate {{ $fa }}" style="font-size: 12px; color: #AAAAAA; margin-top: 2px; max-width: {{ $fi === 0 ? '300px' : '150px' }};">{{ $pa->description }}</span>
+                                @endif
                             </button>
-                            <button type="button" @click="next()" aria-label="next"
-                                    class="flex items-center justify-center text-[#222] hover:text-black active:scale-95 transition-all"
-                                    style="width: 40px; height: 40px; border-radius: 999px; corner-shape: squircle; background-color: rgba(255,255,255,0.7); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(0,0,0,0.08); box-shadow: 0 2px 8px rgba(0,0,0,0.06);">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="overflow-hidden" dir="ltr"
-                         style="margin-top: 28px; touch-action: pan-y; direction: ltr;"
-                         @touchstart.passive="onStart" @touchmove.passive="onMove" @touchend.passive="onEnd">
-                        <div x-ref="track" dir="ltr" class="flex flex-row"
-                             :style="'direction: ltr; width: max-content; gap: 20px; transform: translateX(' + offset() + 'px); transition: transform ' + (dragging ? '0ms' : '300ms') + ' ease; will-change: transform;'">
-                            @foreach($facilities as $f)
-                                @php
-                                    $facImages = $facilityImages($f);
-                                    $firstImg = $facImages->first();
-                                    $sectionKey = 'attr-' . $f->attribute_id;
-                                @endphp
-                                <div class="shrink-0" style="width: 180px; text-align: start;" x-data="{ expanded: false }">
-                                    <button type="button"
-                                            @click="{{ $firstImg ? "openGallery('".$sectionKey."')" : '' }}"
-                                            class="block group {{ $firstImg ? 'cursor-zoom-in' : 'cursor-default' }}"
-                                            style="width: 180px;" @if(! $firstImg) disabled @endif>
-                                        @if($firstImg)
-                                            <div class="overflow-hidden bg-[#f7f7f7]" style="width: 180px; height: 180px; border-radius: 20px; corner-shape: squircle;">
-                                                <img src="{{ $firstImg->url }}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" alt="" loading="lazy">
-                                            </div>
-                                        @else
-                                            <div class="flex items-center justify-center text-4xl text-[#cecece] bg-[#f7f7f7]" style="width: 180px; height: 180px; border-radius: 20px; corner-shape: squircle;">
-                                                {{ $f->attribute->icon ?: '🏠' }}
-                                            </div>
-                                        @endif
-                                        <div class="flex items-center gap-2 {{ $fa }}" style="margin-top: 12px;">
-                                            <h3 class="text-[15px] font-bold text-[#222]">
-                                                {{ $isRtl ? $f->attribute->name_ar : $f->attribute->name_en }}
-                                            </h3>
-                                            <span class="text-xs font-bold text-[#222] bg-[#f7f7f7] tabular-nums"
-                                                  style="padding: 3px 9px; border-radius: 999px; corner-shape: squircle;">
-                                                {{ (int) ($f->value ?: 1) }}
-                                            </span>
-                                        </div>
-                                    </button>
-                                    @if($f->description)
-                                        <div class="{{ $fa }}" style="margin-top: 4px;">
-                                            <p class="text-[13px] text-[#717171]"
-                                               :style="expanded ? 'line-height: 1.55;' : 'line-height: 1.55; display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;'">{{ $f->description }}</p>
-                                            @if(mb_strlen($f->description) > 90)
-                                                <button type="button" @click.stop="expanded = !expanded"
-                                                        class="text-[12px] font-semibold text-[#222] underline underline-offset-2" style="margin-top: 4px;">
-                                                    <span x-show="!expanded">{{ $isRtl ? 'عرض المزيد' : 'Show more' }}</span>
-                                                    <span x-show="expanded" x-cloak>{{ $isRtl ? 'عرض أقل' : 'Show less' }}</span>
-                                                </button>
-                                            @endif
-                                        </div>
-                                    @endif
-                                </div>
-                            @endforeach
-                        </div>
-                    </div>
-
-                    @if($facilities->count() > 1 && $facilities->count() <= 20)
-                        <div class="flex flex-row justify-center items-center" style="gap: 6px; margin-top: 20px; direction: ltr;" dir="ltr">
-                            @foreach($facilities as $i => $f)
-                                <button type="button" @click="go({{ $i }})" aria-label="go to slide {{ $i + 1 }}"
-                                        class="block transition-all"
-                                        :style="idx === {{ $i }} ? 'width: 24px; height: 6px; background: #222; border-radius: 999px;' : 'width: 6px; height: 6px; background: #cbd5e1; border-radius: 999px;'"></button>
-                            @endforeach
-                        </div>
-                    @endif
-                </section>
-            @endif
-
-            {{-- AMENITIES (preview + show-all sheet, grouped by AttributeGroup in the sheet) --}}
-            @if($amenities->count() > 0)
-                <section class="border-b border-[#ebebeb]" style="padding-top: 56px; padding-bottom: 56px;">
-                    <h2 class="text-[22px] sm:text-2xl font-semibold text-[#222] mb-1 {{ $start }} {{ $fa }}">
-                        {{ $isRtl ? 'ما يقدمه هذا المكان' : 'What this place offers' }}
-                    </h2>
-                    <p class="text-[15px] text-[#717171] mb-6 {{ $start }} {{ $fa }}">
-                        {{ $amenities->count() }} {{ $isRtl ? 'ميزة متوفرة' : 'amenities available' }}
-                    </p>
-
-                    @if($highlightedAmenities->count() > 0)
-                        <div style="margin-bottom: 28px;">
-                            <h3 class="inline-flex items-center text-[14px] font-bold text-[#222] {{ $start }} {{ $fa }}" style="gap: 8px; margin-bottom: 14px;">
-                                <span>⭐</span><span>{{ $isRtl ? 'أبرز المميزات' : 'Highlights' }}</span>
-                            </h3>
-                            <div class="flex flex-wrap" style="gap: 12px;">
-                                @foreach($highlightedAmenities as $a)
-                                    <div class="inline-flex items-center bg-[#fff8f7] hover:-translate-y-0.5 transition-all duration-200"
-                                         style="gap: 10px; padding: 14px 18px; border-radius: 16px; corner-shape: squircle; border: 1px solid #F88379;">
-                                        <span class="leading-none shrink-0" style="font-size: 22px;">{{ $a->attribute->icon ?: '·' }}</span>
-                                        <span class="text-[15px] font-semibold text-[#222] whitespace-nowrap {{ $fa }}">{{ $isRtl ? $a->attribute->name_ar : $a->attribute->name_en }}</span>
-                                    </div>
-                                @endforeach
-                            </div>
-                        </div>
-                    @endif
-
-                    <div class="flex flex-wrap" style="gap: 12px; margin-top: 24px;">
-                        @foreach($previewAmenities as $a)
-                            <div class="inline-flex items-center bg-white hover:-translate-y-0.5 transition-all duration-200"
-                                 style="gap: 10px; padding: 14px 18px; border-radius: 16px; corner-shape: squircle; box-shadow: 0 6px 18px rgba(0,0,0,0.06);">
-                                <span class="leading-none shrink-0" style="font-size: 22px;">{{ $a->attribute->icon ?: '·' }}</span>
-                                <span class="text-[15px] font-medium text-[#222] whitespace-nowrap {{ $fa }}">{{ $isRtl ? $a->attribute->name_ar : $a->attribute->name_en }}</span>
-                            </div>
                         @endforeach
                     </div>
-
-                    @if($amenities->count() > 10)
-                        <button type="button" @click="openSheet('amenities')"
-                                class="mt-6 inline-flex items-center font-semibold text-[#222] bg-white hover:bg-[#f7f7f7] transition-colors {{ $fa }}"
-                                style="padding: 12px 22px; border: 1px solid #222; border-radius: 12px; corner-shape: squircle;">
-                            {{ $isRtl ? "عرض جميع المميزات ({$amenities->count()})" : "Show all {$amenities->count()} amenities" }}
-                        </button>
-                    @endif
+                    <button type="button" @click="openGallery('{{ $galleryFirstKey }}')"
+                            class="calm-press w-full font-bold text-black {{ $fa }}"
+                            style="margin-top: 14px; padding: 15px; border-radius: 18px; background-color: #F5F5F5; font-size: 14px;">
+                        {{ $isRtl ? 'عرض كل الصور' : 'View all photos' }} ({{ $totalImages }})
+                    </button>
                 </section>
             @endif
 
-            {{-- ── CHECK-IN / CHECK-OUT — moved here so it lands right before
-                 the rules, after the facilities sections. Arabic heading:
-                 "وقت الدخول و الخروج". ── --}}
-            <section class="border-b border-[#ebebeb]" style="padding-top: 56px; padding-bottom: 56px;">
-                <h2 class="text-[22px] sm:text-2xl font-semibold text-[#222] {{ $start }} {{ $fa }}" style="margin-bottom: 24px;">
-                    {{ $isRtl ? 'وقت الدخول و الخروج' : 'Check-in & check-out' }}
-                </h2>
-                <div class="grid grid-cols-1 sm:grid-cols-2" style="gap: 16px;">
-                    <div class="flex items-center bg-white {{ $start }}" style="gap: 16px; padding: 20px; border-radius: 20px; border: 1px solid #ebebeb; corner-shape: squircle;">
-                        <span class="flex items-center justify-center bg-[#f7f7f7] shrink-0" style="width: 48px; height: 48px; border-radius: 16px; corner-shape: squircle; font-size: 22px;">🕒</span>
-                        <div class="{{ $fa }}">
-                            <div class="text-[12px] font-semibold text-[#717171] uppercase tracking-wider">{{ $isRtl ? 'الدخول' : 'Check-in' }}</div>
-                            <div class="text-[20px] font-bold text-[#222] tabular-nums" dir="ltr" style="margin-top: 2px;">{{ $place->check_in_time }}</div>
-                        </div>
-                    </div>
-                    <div class="flex items-center bg-white {{ $start }}" style="gap: 16px; padding: 20px; border-radius: 20px; border: 1px solid #ebebeb; corner-shape: squircle;">
-                        <span class="flex items-center justify-center bg-[#f7f7f7] shrink-0" style="width: 48px; height: 48px; border-radius: 16px; corner-shape: squircle; font-size: 22px;">🕛</span>
-                        <div class="{{ $fa }}">
-                            <div class="text-[12px] font-semibold text-[#717171] uppercase tracking-wider">{{ $isRtl ? 'الخروج' : 'Check-out' }}</div>
-                            <div class="text-[20px] font-bold text-[#222] tabular-nums" dir="ltr" style="margin-top: 2px;">{{ $place->check_out_time }}</div>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            {{-- REVIEWS — latest published; imported reviews fall back to
-                 reviewer_name. First name only, like the app. --}}
-            @if($place->publishedReviews->isNotEmpty())
-                <section style="padding-top: 56px; padding-bottom: 24px;">
-                    <h2 class="text-[22px] sm:text-2xl font-semibold text-[#222] {{ $start }} {{ $fa }}" style="margin-bottom: 6px;">
-                        {{ $isRtl ? 'التقييمات' : 'Reviews' }}
-                    </h2>
-                    <div class="flex items-center {{ $fa }}" style="gap: 6px; margin-bottom: 20px;">
-                        <span class="text-[15px] text-[#1A1A1A] tabular-nums"><span>★</span> <span class="font-bold">{{ number_format((float) $place->published_reviews_avg_rate, 1) }}</span></span>
-                        <span class="text-[13px] text-[#6B7280]">· {{ $place->published_reviews_count }} {{ $isRtl ? 'تقييم' : 'reviews' }}</span>
-                    </div>
-                    <div class="flex overflow-x-auto calm-hide-scroll" style="gap: 14px; padding-bottom: 6px;">
-                        @foreach($place->publishedReviews as $review)
-                            @php $reviewerName = \Illuminate\Support\Str::of((string) ($review->guest?->name ?? $review->reviewer_name))->trim()->explode(' ')->first() ?: ($isRtl ? 'ضيف' : 'Guest'); @endphp
-                            <div class="shrink-0 bg-white border border-[#E5E7EB] {{ $start }}" style="width: 280px; border-radius: 20px; padding: 16px 18px;">
-                                <div class="flex items-center justify-between" style="gap: 8px;">
-                                    <span class="font-bold text-[#1A1A1A] text-[14px] truncate {{ $fa }}">{{ $reviewerName }}</span>
-                                    <span class="shrink-0 text-[13px] text-[#1A1A1A] tabular-nums">★ <span class="font-bold">{{ $review->rate }}</span></span>
-                                </div>
-                                <div class="text-[12px] text-[#6B7280] {{ $fa }}" style="margin-top: 2px;">{{ $review->created_at?->translatedFormat($isRtl ? 'F Y' : 'M Y') }}</div>
-                                @if($review->comment)
-                                    <p class="text-[13px] text-[#222] {{ $fa }}" style="margin-top: 10px; line-height: 1.6; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden;">{{ $review->comment }}</p>
+            {{-- المميزات البارزة — highlighted amenities as centered circles --}}
+            @if($highlightedAmenities->isNotEmpty())
+                <section style="margin-top: 44px; border-top: 1px solid #F1F1F1; border-bottom: 1px solid #F1F1F1; padding: 30px 0 34px;">
+                    <h2 class="font-bold text-black {{ $fa }}" style="font-size: 20px;">{{ $isRtl ? 'المميزات البارزة' : 'Highlights' }}</h2>
+                    <div class="flex items-start justify-around" style="margin-top: 26px; gap: 12px;">
+                        @foreach($highlightedAmenities->take(3) as $pa)
+                            <div class="text-center" style="min-width: 0;">
+                                <span class="calm-round inline-flex items-center justify-center bg-white"
+                                      style="width: 92px; height: 92px; border-radius: 50%; box-shadow: 0 0 30px rgba(0,0,0,0.08); font-size: 34px;">{{ $pa->attribute->icon ?: '✨' }}</span>
+                                <div class="font-bold text-black {{ $fa }}" style="font-size: 15px; margin-top: 14px;">{{ $isRtl ? $pa->attribute->name_ar : $pa->attribute->name_en }}</div>
+                                @if($pa->description)
+                                    <div class="{{ $fa }}" style="font-size: 13px; color: #AAAAAA; margin-top: 3px;">{{ $pa->description }}</div>
                                 @endif
                             </div>
                         @endforeach
@@ -724,16 +477,90 @@
                 </section>
             @endif
 
-            {{-- HOUSE RULES — text content the host wrote in the wizard --}}
-            @if($place->localized_rules)
-                <section style="padding-top: 56px; padding-bottom: 56px;">
-                    <h2 class="text-[22px] sm:text-2xl font-semibold text-[#222] {{ $start }} {{ $fa }}" style="margin-bottom: 20px;">
-                        {{ $isRtl ? 'قواعد المكان' : 'House rules' }}
-                    </h2>
-                    <p class="text-[15px] sm:text-[16px] text-[#222] leading-relaxed whitespace-pre-line {{ $start }} {{ $fa }}">{{ $place->localized_rules }}</p>
+            {{-- المرافق و المميزات — first 5 + show-all sheet --}}
+            @if($amenities->isNotEmpty())
+                <section style="margin-top: 44px;">
+                    <h2 class="font-bold text-black {{ $fa }}" style="font-size: 20px;">{{ $isRtl ? 'المرافق و المميزات' : 'Amenities & features' }}</h2>
+                    <div style="margin-top: 8px;">
+                        @foreach($amenities->take(5) as $pa)
+                            <div class="flex items-center" style="padding: 13px 0; gap: 12px;">
+                                <span style="font-size: 20px; line-height: 1;">{{ $pa->attribute->icon ?: '•' }}</span>
+                                <span class="font-semibold text-black {{ $fa }}" style="font-size: 15px;">{{ $isRtl ? $pa->attribute->name_ar : $pa->attribute->name_en }}</span>
+                            </div>
+                        @endforeach
+                    </div>
+                    @if($amenities->count() > 5)
+                        <button type="button" @click="openSheet('amenities')"
+                                class="calm-press w-full font-bold text-black {{ $fa }}"
+                                style="margin-top: 10px; padding: 15px; border-radius: 18px; background-color: #F5F5F5; font-size: 14px;">
+                            {{ $isRtl ? 'عرض جميع المرافق' : 'Show all amenities' }} ({{ $amenities->count() }})
+                        </button>
+                    @endif
                 </section>
             @endif
 
+            {{-- أوقات الدخول والمغادرة --}}
+            <section style="margin-top: 44px;">
+                <h2 class="font-bold text-black {{ $fa }}" style="font-size: 20px;">{{ $isRtl ? 'أوقات الدخول والمغادرة' : 'Check-in & check-out' }}</h2>
+                <div class="flex items-center bg-white" style="margin-top: 16px; border-radius: 28px; corner-shape: squircle; -webkit-corner-shape: squircle; box-shadow: 0 0 50px rgba(0,0,0,0.06); padding: 26px 18px; gap: 8px;">
+                    <div class="flex-1 text-center min-w-0">
+                        <div class="{{ $fa }}" style="font-size: 14px; color: #AAAAAA;">{{ $isRtl ? 'الدخول' : 'Check-in' }}</div>
+                        <div class="font-bold text-black tabular-nums" dir="ltr" style="font-size: 24px; margin-top: 6px;">{{ $fmtTime($place->check_in_time) }}</div>
+                        <div class="{{ $fa }}" style="font-size: 12px; color: #AAAAAA; margin-top: 6px;">{{ $isRtl ? 'فى أول يوم من الحجز' : "On the booking's first day" }}</div>
+                    </div>
+                    <span class="calm-round shrink-0 flex items-center justify-center" style="width: 44px; height: 44px; border-radius: 50%; background-color: #F5F5F5;">
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#1A1A1A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M7 10l-4-3 4-3M3 7h13a5 5 0 0 1 5 5M17 14l4 3-4 3M21 17H8a5 5 0 0 1-5-5"></path>
+                        </svg>
+                    </span>
+                    <div class="flex-1 text-center min-w-0">
+                        <div class="{{ $fa }}" style="font-size: 14px; color: #AAAAAA;">{{ $isRtl ? 'المغادرة' : 'Check-out' }}</div>
+                        <div class="font-bold text-black tabular-nums" dir="ltr" style="font-size: 24px; margin-top: 6px;">{{ $fmtTime($place->check_out_time) }}</div>
+                        <div class="{{ $fa }}" style="font-size: 12px; color: #AAAAAA; margin-top: 6px;">
+                            {{ $place->checkout_next_day
+                                ? ($isRtl ? 'فى اليوم التالى لآخر يوم من الحجز' : 'The morning after the last booked day')
+                                : ($isRtl ? 'فى آخر يوم من الحجز' : 'On the last booked day') }}
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+        {{-- REVIEWS — latest published; imported reviews fall back to
+             reviewer_name. First name only, like the app. --}}
+        @if($place->publishedReviews->isNotEmpty())
+            <section style="padding-top: 56px; padding-bottom: 24px;">
+                <h2 class="text-[22px] sm:text-2xl font-semibold text-[#222] {{ $start }} {{ $fa }}" style="margin-bottom: 6px;">
+                    {{ $isRtl ? 'التقييمات' : 'Reviews' }}
+                </h2>
+                <div class="flex items-center {{ $fa }}" style="gap: 6px; margin-bottom: 20px;">
+                    <span class="text-[15px] text-[#1A1A1A] tabular-nums"><span>★</span> <span class="font-bold">{{ number_format((float) $place->published_reviews_avg_rate, 1) }}</span></span>
+                    <span class="text-[13px] text-[#6B7280]">· {{ $place->published_reviews_count }} {{ $isRtl ? 'تقييم' : 'reviews' }}</span>
+                </div>
+                <div class="flex overflow-x-auto calm-hide-scroll" style="gap: 14px; padding-bottom: 6px;">
+                    @foreach($place->publishedReviews as $review)
+                        @php $reviewerName = \Illuminate\Support\Str::of((string) ($review->guest?->name ?? $review->reviewer_name))->trim()->explode(' ')->first() ?: ($isRtl ? 'ضيف' : 'Guest'); @endphp
+                        <div class="shrink-0 bg-white border border-[#E5E7EB] {{ $start }}" style="width: 280px; border-radius: 20px; padding: 16px 18px;">
+                            <div class="flex items-center justify-between" style="gap: 8px;">
+                                <span class="font-bold text-[#1A1A1A] text-[14px] truncate {{ $fa }}">{{ $reviewerName }}</span>
+                                <span class="shrink-0 text-[13px] text-[#1A1A1A] tabular-nums">★ <span class="font-bold">{{ $review->rate }}</span></span>
+                            </div>
+                            <div class="text-[12px] text-[#6B7280] {{ $fa }}" style="margin-top: 2px;">{{ $review->created_at?->translatedFormat($isRtl ? 'F Y' : 'M Y') }}</div>
+                            @if($review->comment)
+                                <p class="text-[13px] text-[#222] {{ $fa }}" style="margin-top: 10px; line-height: 1.6; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden;">{{ $review->comment }}</p>
+                            @endif
+                        </div>
+                    @endforeach
+                </div>
+            </section>
+        @endif
+
+            {{-- تعليمات هامة و القواعد --}}
+            @if($place->localized_rules)
+                <section style="margin-top: 44px; padding-bottom: 20px;">
+                    <h2 class="font-bold text-black {{ $fa }}" style="font-size: 20px;">{{ $isRtl ? 'تعليمات هامة و القواعد' : 'Important instructions & rules' }}</h2>
+                    <p class="text-black {{ $fa }}" style="font-size: 15px; line-height: 2; margin-top: 14px; white-space: pre-line;">{{ $place->localized_rules }}</p>
+                </section>
+            @endif
         </div>
 
         {{-- FOOTER --}}
@@ -758,10 +585,8 @@
              style="background-color: rgba(255,255,255,0.8); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); box-shadow: 0 0 25px rgba(0,0,0,0.05);">
             <div class="mx-auto flex items-center" dir="ltr" style="max-width: 1200px; padding: 16px 20px 14px; gap: 12px;">
                 <div class="flex-1 min-w-0 text-left">
-                    <div class="font-bold text-[#1A1A1A] tabular-nums" style="font-size: 17px; line-height: 22px;">
-                        {{ number_format((int) $place->price) }} {{ $isRtl ? 'ر.س' : 'SAR' }}
-                    </div>
-                    <div class="text-[#6B7280] {{ $fa }}" style="font-size: 12px; line-height: 16px; margin-top: 2px;">/ {{ $isRtl ? 'الليلة' : 'night' }}</div>
+                    <div class="font-bold text-black tabular-nums" style="font-size: 20px; line-height: 24px;"><bdi dir="ltr">{{ number_format((int) $place->price) }} SR</bdi></div>
+                    <div class="{{ $fa }}" style="font-size: 12px; line-height: 16px; margin-top: 3px; color: #AAAAAA;">{{ $isRtl ? 'لليلة الواحدة' : 'per night' }}</div>
                 </div>
                 <a href="{{ route('book.show', $place) }}"
                    class="calm-press inline-flex items-center justify-center font-medium text-white bg-[#F88379] hover:bg-[#E66E64] transition-colors {{ $fa }}"
@@ -792,51 +617,6 @@
         </div>
         <div class="max-w-3xl mx-auto px-6 sm:px-10 {{ $start }}" style="padding-top: 32px; padding-bottom: 160px;">
             <p class="text-[16px] sm:text-[17px] text-[#222] {{ $fa }}" style="line-height: 1.8; white-space: pre-line;">{{ $description }}</p>
-        </div>
-    </div>
-
-    {{-- ─────────── FACILITIES SHEET (grouped by AttributeGroup) ─────────── --}}
-    <div x-show="sheet === 'facilities'" x-cloak class="fixed inset-0 z-50">
-        <div class="absolute inset-0" style="background-color: rgba(0,0,0,0.5);" @click="closeSheet()" x-transition.opacity></div>
-        <div class="absolute inset-x-0 bottom-0 sm:inset-0 sm:m-auto sm:max-w-2xl sm:max-h-[85vh] sm:h-fit bg-white flex flex-col"
-             style="border-radius: 28px 28px 0 0; corner-shape: squircle;"
-             x-show="sheet === 'facilities'"
-             x-transition:enter="transition ease-out duration-300"
-             x-transition:enter-start="translate-y-full sm:translate-y-0 sm:opacity-0 sm:scale-95"
-             x-transition:enter-end="translate-y-0 sm:opacity-100 sm:scale-100"
-             x-transition:leave="transition ease-in duration-200"
-             x-transition:leave-start="translate-y-0 sm:opacity-100 sm:scale-100"
-             x-transition:leave-end="translate-y-full sm:translate-y-0 sm:opacity-0 sm:scale-95"
-             dir="{{ $isRtl ? 'rtl' : 'ltr' }}">
-            <div class="relative px-6 pt-6 pb-4 border-b border-[#ebebeb]">
-                <button type="button" @click="closeSheet()"
-                        class="absolute top-5 {{ $isRtl ? 'right-5' : 'left-5' }} w-9 h-9 flex items-center justify-center hover:bg-[#f7f7f7] rounded-full transition-colors">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                </button>
-                <div class="text-center font-semibold text-[#222] {{ $fa }}">{{ $isRtl ? 'كل المرافق' : 'All facilities' }}</div>
-            </div>
-            <div class="overflow-y-auto p-6 sm:p-8 {{ $start }}">
-                @foreach($facilitiesByGroup as $gid => $items)
-                    @php $group = $items->first()->attribute->group; @endphp
-                    <div class="{{ ! $loop->first ? 'mt-8 pt-8 border-t border-[#ebebeb]' : '' }}">
-                        @if($group)
-                            <h3 class="text-[14px] font-bold text-[#717171] uppercase tracking-wide mb-4 {{ $fa }}">
-                                {{ $isRtl ? $group->name_ar : $group->name_en }}
-                            </h3>
-                        @endif
-                        @foreach($items as $f)
-                            <div class="flex items-center gap-4 py-3 border-b border-[#ebebeb] last:border-b-0">
-                                <span class="text-[22px] leading-none w-8 text-center shrink-0">{{ $f->attribute->icon ?: '·' }}</span>
-                                <span class="text-[16px] text-[#222] flex-1 {{ $fa }}">{{ $isRtl ? $f->attribute->name_ar : $f->attribute->name_en }}</span>
-                                <span class="text-[14px] font-bold text-[#222] tabular-nums" dir="ltr">×{{ (int) ($f->value ?: 1) }}</span>
-                            </div>
-                            @if($f->description)
-                                <p class="text-[13px] text-[#717171] {{ $fa }}" style="margin: 4px 0 8px 44px; line-height: 1.5;">{{ $f->description }}</p>
-                            @endif
-                        @endforeach
-                    </div>
-                @endforeach
-            </div>
         </div>
     </div>
 
