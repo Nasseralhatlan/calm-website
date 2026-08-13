@@ -208,6 +208,20 @@
             fetch('/api/places/{{ $place->id }}/like', { method: this.liked ? 'POST' : 'DELETE', headers: { 'Accept': 'application/json' }, credentials: 'same-origin' }).catch(() => {});
         },
         shareCopied: false,
+        goBack() {
+            // Never history.back(): after returning from payment the previous
+            // entry can be Moyasar. Same-origin results/list referrers keep
+            // their search context; anything else lands on home.
+            try {
+                const ref = document.referrer ? new URL(document.referrer) : null;
+                if (ref && ref.origin === window.location.origin
+                    && (ref.pathname === '/' || ref.pathname.startsWith('/lists'))) {
+                    window.location.href = ref.href;
+                    return;
+                }
+            } catch (e) { /* fall through */ }
+            window.location.href = '{{ route('landing') }}';
+        },
         sharePlace() {
             // Clean listing URL (no ?check_in etc.).
             const url = window.location.origin + window.location.pathname;
@@ -326,7 +340,7 @@
         <div class="absolute inset-0"
              :style="'transition: opacity 0.25s; border-bottom: 1px solid #F1F1F1; background-color: rgba(255,255,255,0.92); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); opacity: ' + (sc ? 1 : 0) + ';'"></div>
         <div class="relative flex items-center justify-between" style="padding: 10px 16px; padding-top: calc(10px + env(safe-area-inset-top));">
-            <button type="button" @click="history.length > 1 ? history.back() : (window.location = '{{ route('landing') }}')"
+            <button type="button" @click="goBack()"
                     class="calm-round calm-press flex items-center justify-center text-black"
                     style="pointer-events: auto; width: 40px; height: 40px; border-radius: 50%; background-color: rgba(255,255,255,0.92); box-shadow: 0 2px 12px rgba(0,0,0,0.14); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);"
                     aria-label="{{ $isRtl ? 'رجوع' : 'Back' }}">

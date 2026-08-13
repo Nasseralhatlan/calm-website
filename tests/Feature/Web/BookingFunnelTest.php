@@ -51,9 +51,9 @@ it('renders the checkout page for valid dates and bounces invalid ones back', fu
     // Valid stay → summary page with the place + CTA wiring.
     $this->get(route('book.checkout', ['place' => $place, 'check_in' => $in, 'check_out' => $out]))
         ->assertOk()
-        ->assertSee('ملخص الحجز')
+        ->assertSee('تأكيد و دفع')
         ->assertSee($place->title_ar)
-        ->assertSee('الضيوف');
+        ->assertSee('الإجمالى');
 
     // Missing, malformed, inverted, or past dates → back to the listing.
     $this->get(route('book.checkout', $place))

@@ -1,10 +1,10 @@
 @extends('layouts.app')
 
-{{-- Checkout summary PAGE — dates modal's «التالي» lands here. Status-page
-     styling: clean white column, X to close back to the listing, fixed
-     bottom CTA. Signed-in guests POST to book.store → Moyasar; signed-out
-     guests get the login modal (it reloads this same URL, so the flow
-     resumes right here already authenticated). --}}
+{{-- «تأكيد و دفع» — checkout page the dates modal lands on. App parity: one
+     simple white card (place row + rating, الوصول with تغيير, المغادرة with
+     the next-day hint, stay/VAT/total rows), black fixed CTA. Signed-in
+     guests POST to book.store → Moyasar; signed-out guests get the login
+     modal, which reloads this same URL so the flow resumes authenticated. --}}
 @php
     use Illuminate\Support\Carbon;
     $locale = app()->getLocale();
@@ -12,102 +12,99 @@
     $fa = $isRtl ? 'font-arabic' : '';
     $fmtTime = fn (?string $t) => $t ? Carbon::parse($t)->format('g:i A') : '—';
     $cover = $place->coverPhoto?->url;
-    $city = $place->cityArea?->city;
+    $ratingCount = (int) ($place->published_reviews_count ?? 0);
+    $ratingAvg = (float) ($place->published_reviews_avg_rate ?? 0);
+    $isFavorite = $ratingAvg >= 4.8 && $ratingCount >= 2;
 @endphp
 
-@section('title', ($isRtl ? 'ملخص الحجز' : 'Booking summary').' — Calm')
+@section('title', ($isRtl ? 'تأكيد و دفع' : 'Confirm & pay').' — Calm')
 
 @section('body')
-<div dir="{{ $isRtl ? 'rtl' : 'ltr' }}" class="min-h-screen bg-white {{ $fa }}"
+<div dir="{{ $isRtl ? 'rtl' : 'ltr' }}" class="min-h-screen {{ $fa }}" style="background-color: #FBFBFB;"
      x-data="calmCheckout(@js([
         'placeId' => $place->id,
-        'placeUrl' => route('places.show', $place),
         'submitUrl' => route('book.store', $place),
         'checkIn' => $checkIn,
         'checkOut' => $checkOut,
         'guests' => $guests,
-        'maxGuests' => (int) ($place->max_guests ?: 1),
         'checkoutNextDay' => (bool) $place->checkout_next_day,
         'authed' => auth('api')->check(),
         'isRtl' => $isRtl,
      ]))" x-init="load()">
 
     {{-- Header — X closes the checkout back to the listing --}}
-    <header class="sticky top-0 z-30" style="background-color: rgba(255,255,255,0.85); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-bottom: 1px solid #F1F1F1;">
-        <div class="relative mx-auto w-full flex items-center justify-center" style="max-width: 560px; padding: 14px 20px;">
+    <header class="sticky top-0 z-30" style="background-color: rgba(251,251,251,0.9); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);">
+        <div class="relative mx-auto w-full flex items-center justify-center" style="max-width: 560px; padding: 16px 20px;">
             <a href="{{ route('places.show', $place) }}" aria-label="{{ $isRtl ? 'إغلاق' : 'Close' }}"
                class="calm-press calm-round absolute flex items-center justify-center bg-white text-black"
                style="inset-inline-start: 16px; width: 42px; height: 42px; border-radius: 50%; box-shadow: 0 0 25px rgba(0,0,0,0.08); font-size: 16px;">✕</a>
-            <h1 class="font-bold text-black" style="font-size: 18px;">{{ $isRtl ? 'ملخص الحجز' : 'Booking summary' }}</h1>
+            <h1 class="font-bold text-black" style="font-size: 18px;">{{ $isRtl ? 'تأكيد و دفع' : 'Confirm & pay' }}</h1>
         </div>
     </header>
 
-    <main class="mx-auto w-full" style="max-width: 560px; padding: 24px 20px 170px;">
+    <main class="mx-auto w-full" style="max-width: 560px; padding: 16px 20px 170px;">
 
-        {{-- Place row --}}
-        <div class="flex items-center" style="gap: 14px;">
-            <span class="shrink-0 overflow-hidden" style="width: 82px; height: 82px; border-radius: 22px; corner-shape: squircle; -webkit-corner-shape: squircle; background-color: #F3F4F6;">
-                @if($cover)<img src="{{ $cover }}" alt="" class="w-full h-full object-cover">@endif
-            </span>
-            <div class="min-w-0">
-                <div class="font-bold text-black truncate" style="font-size: 17px;">{{ $place->localized_title }}</div>
-                <div class="truncate" style="font-size: 13px; color: #AAAAAA; margin-top: 4px;">
-                    {{ $isRtl ? $place->type?->name_ar : $place->type?->name_en }} · {{ $city ? ($isRtl ? $city->name_ar : $city->name_en) : '' }}
+        {{-- The one summary card (app style) --}}
+        <div class="bg-white" style="border-radius: 28px; corner-shape: squircle; -webkit-corner-shape: squircle; box-shadow: 0 0 30px rgba(0,0,0,0.05); padding: 22px 20px;">
+
+            {{-- Place row + rating --}}
+            <div class="flex items-center" style="gap: 14px;">
+                <span class="shrink-0 overflow-hidden" style="width: 84px; height: 84px; border-radius: 24px; corner-shape: squircle; -webkit-corner-shape: squircle; background-color: #F3F4F6;">
+                    @if($cover)<img src="{{ $cover }}" alt="" class="w-full h-full object-cover">@endif
+                </span>
+                <div class="min-w-0">
+                    <div class="font-bold text-black truncate" style="font-size: 17px;">{{ $place->localized_title }}</div>
+                    <div style="font-size: 13px; color: #1A1A1A; margin-top: 5px;">
+                        <bdi dir="ltr">★{{ number_format($ratingAvg, 2) }} ({{ $ratingCount }})</bdi>@if($isFavorite) · {{ $isRtl ? 'مميز' : 'Guest favorite' }}@endif
+                    </div>
                 </div>
             </div>
-        </div>
 
-        {{-- Dates card --}}
-        <div class="bg-white" style="margin-top: 22px; border-radius: 24px; corner-shape: squircle; -webkit-corner-shape: squircle; box-shadow: 0 0 30px rgba(0,0,0,0.05); padding: 4px 18px;">
-            <div class="flex items-center justify-between" style="padding: 15px 0; border-bottom: 1px solid #F5F5F5; gap: 12px;">
-                <span style="font-size: 14px; color: #AAAAAA;">{{ $isRtl ? 'الدخول' : 'Check-in' }}</span>
-                <span class="font-bold text-black" style="font-size: 13.5px;"><span x-text="fmtDay(checkIn)"></span> · <bdi dir="ltr">{{ $fmtTime($place->check_in_time) }}</bdi></span>
-            </div>
-            <div class="flex items-center justify-between" style="padding: 15px 0; border-bottom: 1px solid #F5F5F5; gap: 12px;">
-                <span style="font-size: 14px; color: #AAAAAA;">{{ $isRtl ? 'المغادرة' : 'Check-out' }}</span>
-                <span class="font-bold text-black" style="font-size: 13.5px;"><span x-text="fmtDay(checkoutDay())"></span> · <bdi dir="ltr">{{ $fmtTime($place->check_out_time) }}</bdi></span>
-            </div>
-            <div class="flex items-center justify-between" style="padding: 15px 0;">
-                <span style="font-size: 14px; color: #AAAAAA;">{{ $isRtl ? 'مدة الإقامة' : 'Stay' }}</span>
-                <a href="{{ route('places.show', $place) }}#dates" class="font-bold text-black underline" style="font-size: 13px;">
-                    <span x-text="stayLabel()"></span> — {{ $isRtl ? 'تغيير' : 'change' }}
+            <div style="border-top: 1px solid #F5F5F5; margin: 18px 0;"></div>
+
+            {{-- الوصول + تغيير --}}
+            <div class="flex items-center justify-between" style="gap: 12px;">
+                <div class="min-w-0">
+                    <div class="font-bold text-black" style="font-size: 16px;">{{ $isRtl ? 'الوصول' : 'Arrival' }}</div>
+                    <div style="font-size: 13.5px; margin-top: 5px;"><span x-text="fmtDay(checkIn)"></span> · <bdi dir="ltr">{{ $fmtTime($place->check_in_time) }}</bdi></div>
+                </div>
+                <a href="{{ route('places.show', $place) }}#dates"
+                   class="calm-press shrink-0 font-bold text-black" style="font-size: 13px; background-color: #F5F5F5; padding: 12px 20px; border-radius: 16px; corner-shape: squircle; -webkit-corner-shape: squircle;">
+                    {{ $isRtl ? 'تغيير' : 'Change' }}
                 </a>
             </div>
-        </div>
 
-        {{-- Guests stepper --}}
-        <div class="flex items-center justify-between" style="margin-top: 24px;">
+            <div style="border-top: 1px solid #F5F5F5; margin: 18px 0;"></div>
+
+            {{-- المغادرة --}}
             <div>
-                <div class="font-bold text-black" style="font-size: 15px;">{{ $isRtl ? 'الضيوف' : 'Guests' }}</div>
-                <div style="font-size: 12.5px; color: #AAAAAA; margin-top: 2px;">{{ $isRtl ? "بحد أقصى {$place->max_guests} ضيوف" : "Up to {$place->max_guests} guests" }}</div>
+                <div class="font-bold text-black" style="font-size: 16px;">{{ $isRtl ? 'المغادرة' : 'Departure' }}</div>
+                <div style="font-size: 13.5px; margin-top: 5px;">
+                    <span x-text="fmtDay(checkoutDay())"></span> · <bdi dir="ltr">{{ $fmtTime($place->check_out_time) }}</bdi>@if($place->checkout_next_day) ({{ $isRtl ? 'اليوم التالى' : 'next day' }})@endif
+                </div>
             </div>
-            <div class="flex items-center" style="gap: 14px;">
-                <button type="button" @click="guests = Math.max(1, guests - 1)"
-                        class="calm-press calm-round flex items-center justify-center text-black"
-                        style="width: 38px; height: 38px; border-radius: 50%; border: 1px solid #E9E9E9; font-size: 18px;">−</button>
-                <span class="font-bold text-black tabular-nums" style="font-size: 16px; min-width: 22px; text-align: center;" x-text="guests"></span>
-                <button type="button" @click="guests = Math.min({{ (int) ($place->max_guests ?: 1) }}, guests + 1)"
-                        class="calm-press calm-round flex items-center justify-center text-black"
-                        style="width: 38px; height: 38px; border-radius: 50%; border: 1px solid #E9E9E9; font-size: 18px;">+</button>
-            </div>
-        </div>
 
-        {{-- Price breakdown --}}
-        <div style="margin-top: 24px; border-top: 1px solid #F1F1F1; padding-top: 18px;">
-            <div class="flex items-center justify-between" style="padding: 6px 0;">
-                <span style="font-size: 14px; color: #AAAAAA;"><bdi dir="ltr">{{ number_format((int) $place->price) }} SR</bdi> × <span x-text="quote ? quote.days : '…'"></span> {{ $isRtl ? 'أيام' : 'days' }}</span>
+            <div style="border-top: 1px solid #F5F5F5; margin: 18px 0;"></div>
+
+            {{-- Stay · nights + subtotal / VAT / total --}}
+            <div class="flex items-center justify-between" style="padding: 4px 0;">
+                <span style="font-size: 14.5px; color: #AAAAAA;">{{ $isRtl ? 'الإقامة' : 'Stay' }} · <span x-text="stayLabel()"></span></span>
                 <span class="font-bold text-black tabular-nums" dir="ltr"><span x-text="fmtMoney(quote?.pricing.subtotal)"></span> SR</span>
             </div>
-            <div class="flex items-center justify-between" style="padding: 6px 0;">
-                <span style="font-size: 14px; color: #AAAAAA;">{{ $isRtl ? 'الضريبة' : 'VAT' }}</span>
+            <div class="flex items-center justify-between" style="padding: 10px 0 4px;">
+                <span style="font-size: 14.5px; color: #AAAAAA;">{{ $isRtl ? 'ضريبة القيمة المضافة' : 'VAT' }} (<span x-text="vatPct()"></span>%)</span>
                 <span class="font-bold text-black tabular-nums" dir="ltr"><span x-text="fmtMoney(quote?.pricing.vat)"></span> SR</span>
             </div>
-            <div class="flex items-center justify-between" style="padding: 12px 0; border-top: 1px solid #F1F1F1; margin-top: 8px;">
-                <span class="font-bold text-black" style="font-size: 15px;">{{ $isRtl ? 'الإجمالي' : 'Total' }}</span>
-                <span class="font-bold text-black tabular-nums" style="font-size: 18px;" dir="ltr"><span x-text="fmtMoney(quote?.pricing.total)"></span> SR</span>
+
+            <div style="border-top: 1px solid #F5F5F5; margin: 16px 0 4px;"></div>
+
+            <div class="flex items-center justify-between" style="padding: 10px 0 2px;">
+                <span class="font-bold text-black" style="font-size: 16px;">{{ $isRtl ? 'الإجمالى' : 'Total' }}</span>
+                <span class="font-bold text-black tabular-nums" style="font-size: 19px;" dir="ltr"><span x-text="fmtMoney(quote?.pricing.total)"></span> SR</span>
             </div>
-            <p x-show="quoteError" x-cloak style="font-size: 13px; color: #dc2626; margin-top: 8px;" x-text="quoteError"></p>
-            <p x-show="submitError" x-cloak style="font-size: 13px; color: #dc2626; margin-top: 8px;" x-text="submitError"></p>
+
+            <p x-show="quoteError" x-cloak style="font-size: 13px; color: #dc2626; margin-top: 10px;" x-text="quoteError"></p>
+            <p x-show="submitError" x-cloak style="font-size: 13px; color: #dc2626; margin-top: 10px;" x-text="submitError"></p>
             <a x-show="quoteError" x-cloak href="{{ route('places.show', $place) }}#dates"
                class="calm-press inline-flex items-center font-bold text-black underline" style="font-size: 13px; margin-top: 6px;">
                 {{ $isRtl ? 'اختيار تواريخ أخرى' : 'Pick different dates' }}
@@ -115,19 +112,19 @@
         </div>
     </main>
 
-    {{-- FIXED bottom CTA --}}
+    {{-- FIXED bottom CTA — black, app style --}}
     <div class="fixed inset-x-0 bottom-0 z-30"
-         style="background-color: rgba(255,255,255,0.85); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); box-shadow: 0 0 25px rgba(0,0,0,0.05);">
+         style="background-color: rgba(251,251,251,0.9); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);">
         <div class="mx-auto w-full" style="max-width: 560px; padding: 14px 20px calc(16px + env(safe-area-inset-bottom));">
             <button type="button" @click="proceed()" :disabled="!quote || submitting"
                     class="calm-press w-full font-bold text-white"
-                    :style="'padding: 17px; border-radius: 18px; font-size: 16px; transition: opacity 0.2s; background-color: #F88379; box-shadow: 0 6px 12px rgba(248,131,121,0.3); opacity: ' + (quote && !submitting ? 1 : 0.5) + ';'">
+                    :style="'padding: 18px; border-radius: 20px; font-size: 16px; transition: opacity 0.2s; background-color: #1A1A1A; opacity: ' + (quote && !submitting ? 1 : 0.4) + ';'">
                 <span x-text="submitting
                     ? '{{ $isRtl ? 'جاري التحويل…' : 'Redirecting…' }}'
-                    : (@js(auth('api')->check()) ? '{{ $isRtl ? 'التالي — الدفع' : 'Next — pay' }}' : '{{ $isRtl ? 'التالي — تسجيل الدخول' : 'Next — sign in' }}')"></span>
+                    : (@js(auth('api')->check()) ? '{{ $isRtl ? 'متابعة للدفع' : 'Continue to pay' }}' : '{{ $isRtl ? 'تسجيل الدخول والمتابعة' : 'Sign in to continue' }}')"></span>
             </button>
             <p class="text-center" style="margin-top: 8px; font-size: 11.5px; color: #AAAAAA;">
-                {{ $isRtl ? 'بالمتابعة، أوافق على شروط الحجز.' : 'By continuing, I agree to the booking terms.' }}
+                {{ $isRtl ? 'بالضغط، أوافق على شروط الحجز.' : 'By tapping, I agree to the booking terms.' }}
             </p>
         </div>
     </div>
@@ -145,14 +142,10 @@ function calmCheckout(init) {
     return {
         checkIn: init.checkIn,
         checkOut: init.checkOut,
-        guests: init.guests,
         quote: null, quoteError: '', quoteSeq: 0,
         submitting: false, submitError: '',
 
-        load() {
-            this.fetchQuote();
-            this.$watch('guests', () => this.fetchQuote());
-        },
+        load() { this.fetchQuote(); },
 
         fmtDay(dateStr) {
             if (!dateStr) return '';
@@ -168,15 +161,19 @@ function calmCheckout(init) {
                 ? this.quote.days
                 : Math.round((parseD(this.checkOut) - parseD(this.checkIn)) / 86400000) + 1;
             if (!init.isRtl) return n === 1 ? '1 day' : `${n} days`;
-            return n === 1 ? 'يوم واحد' : (n === 2 ? 'يومان' : `${n} أيام`);
+            return n === 1 ? '1 يوم' : (n === 2 ? 'يومان' : `${n} أيام`);
         },
         fmtMoney(v) { return v == null ? '…' : Number(v).toLocaleString(); },
+        vatPct() {
+            if (!this.quote || !this.quote.pricing.subtotal) return 15;
+            return Math.round((this.quote.pricing.vat / this.quote.pricing.subtotal) * 100);
+        },
 
         async fetchQuote() {
             const seq = ++this.quoteSeq;
             this.quoteError = '';
             try {
-                const q = new URLSearchParams({ check_in: this.checkIn, check_out: this.checkOut, guests: this.guests });
+                const q = new URLSearchParams({ check_in: this.checkIn, check_out: this.checkOut, guests: init.guests });
                 const res = await fetch(`/api/places/${init.placeId}/quote?${q}`, { headers: { Accept: 'application/json' } });
                 const json = await res.json();
                 if (seq !== this.quoteSeq) return;
@@ -184,9 +181,7 @@ function calmCheckout(init) {
                 if (!res.ok || !data) { this.quote = null; this.quoteError = json.message || 'Error'; return; }
                 if (!data.bookable) {
                     this.quote = null;
-                    this.quoteError = !data.guests_ok
-                        ? (init.isRtl ? `الحد الأقصى ${data.max_guests} ضيوف لهذا المكان.` : `This place hosts up to ${data.max_guests} guests.`)
-                        : (init.isRtl ? 'التواريخ المختارة لم تعد متاحة.' : 'Those dates are no longer available.');
+                    this.quoteError = init.isRtl ? 'التواريخ المختارة لم تعد متاحة.' : 'Those dates are no longer available.';
                     return;
                 }
                 this.quote = data;
@@ -209,7 +204,7 @@ function calmCheckout(init) {
                 const res = await fetch(init.submitUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-TOKEN': csrf },
-                    body: JSON.stringify({ check_in: this.checkIn, check_out: this.checkOut, guests: this.guests }),
+                    body: JSON.stringify({ check_in: this.checkIn, check_out: this.checkOut, guests: init.guests }),
                 });
                 const json = await res.json();
                 if (!res.ok) {

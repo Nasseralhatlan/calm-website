@@ -71,6 +71,8 @@ class BookingFunnelController extends Controller
         }
 
         $place->load(['type', 'cityArea.city', 'coverPhoto']);
+        // Rating line on the summary card (★ 5.00 (2) · مميز).
+        $place->loadCount('publishedReviews')->loadAvg('publishedReviews', 'rate');
 
         return view('booking.checkout', [
             'place' => $place,
