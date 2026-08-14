@@ -303,12 +303,20 @@
                     this.close();
                     const s = this.sel;
                     const selection = { cityId: s.cityId, areaIds: [...s.areaIds], typeIds: [...s.typeIds], checkIn: s.checkIn, checkOut: s.checkOut };
+                    const q = new URLSearchParams({ city: selection.cityId });
+                    if (selection.areaIds.length) q.set('area', selection.areaIds.join(','));
+                    if (selection.typeIds.length) q.set('type', selection.typeIds.join(','));
+                    if (selection.checkIn) { q.set('in', selection.checkIn); q.set('out', selection.checkOut || selection.checkIn); }
+                    const resultsUrl = `/?${q}`;
+
+                    // Web view: results open in their own tab, so the page the
+                    // search was started from stays where it was.
+                    if (window.calmIsDesktop && window.calmIsDesktop()) {
+                        window.open(resultsUrl, '_blank', 'noopener');
+                        return;
+                    }
                     if (this.opts.redirect) {
-                        const q = new URLSearchParams({ city: selection.cityId });
-                        if (selection.areaIds.length) q.set('area', selection.areaIds.join(','));
-                        if (selection.typeIds.length) q.set('type', selection.typeIds.join(','));
-                        if (selection.checkIn) { q.set('in', selection.checkIn); q.set('out', selection.checkOut || selection.checkIn); }
-                        window.location.href = `/?${q}`;
+                        window.location.href = resultsUrl;
                         return;
                     }
                     this.$dispatch('calm-search-apply', selection);

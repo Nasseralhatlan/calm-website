@@ -41,7 +41,7 @@
          <a><img> as native drag-and-drop, killing carousel swipes. A tap
          still navigates; drag-clicks are suppressed by calmDragScroll. --}}
         <div class="relative overflow-hidden" role="link" tabindex="0"
-             onclick="window.location.href = this.dataset.href" data-href="{{ route('places.show', $p) }}"
+             onclick="calmOpen(this.dataset.href)" data-href="{{ route('places.show', $p) }}"
              style="background-color: #F3F4F6; border-radius: {{ $cardRadius }}px; corner-shape: squircle; -webkit-corner-shape: squircle; aspect-ratio: 1; cursor: pointer; {{ $compact ? 'width: 100%;' : '' }}"
              @if(! $compact && $carousel->count() > 1) x-data="{ ci: 0 }" @endif>
             @if($compact)
@@ -72,7 +72,7 @@
                      class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.04]">
             @endif
         </div>
-    <a href="{{ route('places.show', $p) }}" class="block calm-press-card" style="-webkit-user-drag: none;">
+    <a href="{{ route('places.show', $p) }}" data-newtab class="block calm-press-card" style="-webkit-user-drag: none;">
         <div style="padding-top: 10px; display: flex; flex-direction: column; gap: 3px;">
             <span class="font-bold text-black truncate {{ $fa }}" style="font-size: {{ $compact ? '13px' : '15px' }}; line-height: 1.35;">{{ $p->localized_title }}</span>
             @if($subtitle !== '')

@@ -15,8 +15,8 @@
          <a><img> as native drag-and-drop, killing carousel swipes. A tap
          still navigates; drag-clicks are suppressed by calmDragScroll. --}}
         <div class="relative overflow-hidden" role="link" tabindex="0"
-             @click="window.location.href = cardHref(p)"
-             @keydown.enter="window.location.href = cardHref(p)"
+             @click="calmOpen(cardHref(p))"
+             @keydown.enter="calmOpen(cardHref(p))"
              style="background-color: #F3F4F6; border-radius: 24px; corner-shape: squircle; -webkit-corner-shape: squircle; aspect-ratio: 1; cursor: pointer;"
              x-data="{ ci: 0, imgs() { const l = (p.carousel_photos && p.carousel_photos.length ? p.carousel_photos : [p.cover_photo_url]).filter(Boolean); return l; } }">
             {{-- Photo carousel — scroll-snap over the backend-capped set (≤10) --}}
@@ -39,7 +39,7 @@
                 </template>
             </div>
         </div>
-    <a :href="cardHref(p)" class="block calm-press-card" style="-webkit-user-drag: none;">
+    <a :href="cardHref(p)" data-newtab class="block calm-press-card" style="-webkit-user-drag: none;">
         <div style="padding-top: 12px; display: flex; flex-direction: column; gap: 4px;">
             <div class="flex items-center justify-between" style="gap: 8px;">
                 <h3 class="font-bold text-black truncate {{ $fa }}" style="font-size: 16px; line-height: 21px;" x-text="cardTitle(p)"></h3>

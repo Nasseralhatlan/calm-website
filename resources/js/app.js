@@ -7,6 +7,30 @@ window.Alpine = Alpine;
 // x-sort: reactive drag-and-drop reordering that plays nicely with x-for
 // (used on the merged admin attributes page).
 Alpine.plugin(sort);
+// ── Open-in-new-tab (desktop only) ──────────────────────────────────────────
+// On the web view a search or a place opens in its own tab so the browse/
+// results page you came from stays put. Mobile + tablet keep app-style
+// in-place navigation, where extra tabs are a nuisance.
+window.calmIsDesktop = () => window.matchMedia('(min-width: 1024px)').matches;
+
+window.calmOpen = (href) => {
+    if (!href) return;
+    if (window.calmIsDesktop()) window.open(href, '_blank', 'noopener');
+    else window.location.href = href;
+};
+
+// Anchors opt in with data-newtab. Delegated so it also covers cards Alpine
+// renders later (search results, favorites). Modifier/middle clicks are left
+// to the browser.
+document.addEventListener('click', (e) => {
+    if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    if (!window.calmIsDesktop()) return;
+    const link = e.target.closest('a[data-newtab]');
+    if (!link || !link.href) return;
+    e.preventDefault();
+    window.open(link.href, '_blank', 'noopener');
+});
+
 // Mouse drag-to-scroll for card photo carousels (touch scrolls natively).
 // Suppresses the card link's click after a real drag and blocks native
 // image dragging so the gesture always pans the carousel.
