@@ -37,16 +37,20 @@
             style="background-color: rgba(255,255,255,0.85); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); box-shadow: 0 0 50px rgba(0,0,0,0.05);">
         {{-- LTR row so the logo sits visually LEFT and the buttons RIGHT even in
              Arabic (the Calm wordmark is Latin — kept on the left by request). --}}
-        <div class="mx-auto flex items-center justify-between" dir="ltr" style="max-width: 1240px; padding: 16px 24px; gap: 20px;">
+        <div class="mx-auto relative flex items-center justify-between" dir="ltr" style="max-width: 1240px; padding: 16px 24px; gap: 20px;">
             {{-- Logo left --}}
             <a href="{{ route('landing') }}" class="shrink-0 flex items-center">
                 <img src="/assets/logo/logo.png" alt="Calm" style="height: 38px; width: auto;" draggable="false">
             </a>
 
-            {{-- Center search --}}
+            {{-- Search — absolutely centred on the page, NOT flex-centred: the
+                 side groups have different widths (and the right one changes
+                 between «تسجيل الدخول» and the avatar), which would shift a
+                 flex-centred bar off-centre. The width backs off on narrower
+                 desktops so it can never collide with either side. --}}
             <button type="button" @click="$dispatch('calm-open-search')"
-                    class="calm-press calm-round flex-1 flex items-center justify-center bg-white"
-                    style="max-width: 440px; height: 52px; border-radius: 999px; border: 1px solid #F1F1F1; box-shadow: 0 0 50px rgba(0,0,0,0.05); gap: 9px;">
+                    class="calm-press calm-round flex items-center justify-center bg-white"
+                    style="position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(440px, calc(100% - 580px)); height: 52px; border-radius: 999px; border: 1px solid #F1F1F1; box-shadow: 0 0 50px rgba(0,0,0,0.05); gap: 9px;">
                 <span dir="ltr" class="flex items-center" style="gap: 9px;">
                     <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M13.125 13.125L11.25 11.25" stroke="black" stroke-width="1.5" stroke-linecap="round"/>
