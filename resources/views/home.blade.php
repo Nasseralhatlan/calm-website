@@ -244,11 +244,36 @@
                         </a>
                     </div>
 
-                    {{-- Desktop: full grid — all items visible, none hidden in a scroll --}}
+                    {{-- Desktop: full grid — all items visible, none hidden in a
+                         scroll — ending with the same animated «عرض الكل» deck
+                         tile the mobile row uses. --}}
                     <div class="calm-home-grid">
-                        @foreach($list->places->take(12) as $p)
-                            @include('partials._web_place_card', ['p' => $p, 'compact' => false])
+                        @foreach($list->places->take(11) as $p)
+                            @include('partials._web_place_card', ['p' => $p, 'compact' => false, 'cardRadius' => 32])
                         @endforeach
+
+                        {{-- $seeAllCovers is built by the mobile row above (same
+                             loop iteration) — reuse it, no extra photo lookups. --}}
+                        <a href="{{ route('web.list', $list) }}"
+                           x-data="{ shown: false }"
+                           x-init="new IntersectionObserver((entries) => { shown = entries[0].isIntersecting; }, { threshold: 0.5 }).observe($el)"
+                           :class="shown ? 'is-open' : ''"
+                           class="calm-press calm-seeall flex flex-col items-center justify-center bg-white"
+                           style="align-self: start; width: 100%; aspect-ratio: 1; border-radius: 32px; corner-shape: squircle; -webkit-corner-shape: squircle; gap: 14px; box-shadow: 0 0 50px rgba(0,0,0,0.08);">
+                            <span class="relative block" style="width: 78px; height: 58px;">
+                                @foreach($seeAllCovers as $ci => $cUrl)
+                                    <img src="{{ $cUrl }}" alt="" loading="lazy"
+                                         class="calm-seeall-img calm-seeall-img-{{ $ci }} object-cover">
+                                @endforeach
+                            </span>
+                            <span class="flex items-center text-[13px] font-bold text-black {{ $fa }}" style="gap: 4px;">
+                                <span>{{ $isRtl ? 'عرض الكل' : 'See all' }}</span>
+                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"
+                                     style="{{ $isRtl ? 'transform: scaleX(-1);' : '' }}">
+                                    <path d="M9 5l7 7-7 7"></path>
+                                </svg>
+                            </span>
+                        </a>
                     </div>
                 </section>
             @endforeach
@@ -500,7 +525,7 @@
         .calm-home-main { max-width: 1240px; }
         .calm-home-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(212px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
             gap: 34px 22px;
             padding: 20px 24px 8px;
         }

@@ -13,6 +13,8 @@
     $fa = $isRtl ? 'font-arabic' : '';
     $me = auth('api')->user();
     $compact = $compact ?? false;
+    // Photo corner radius — callers can round more (the desktop home grid does).
+    $cardRadius = $cardRadius ?? 28;
 
     $cover = $p->coverPhoto?->url ?? $p->visiblePhotos()->first()?->url;
     // Card carousel = the host-curated "shown outside" set (featured_order),
@@ -40,7 +42,7 @@
          still navigates; drag-clicks are suppressed by calmDragScroll. --}}
         <div class="relative overflow-hidden" role="link" tabindex="0"
              onclick="window.location.href = this.dataset.href" data-href="{{ route('places.show', $p) }}"
-             style="background-color: #F3F4F6; border-radius: 28px; corner-shape: squircle; -webkit-corner-shape: squircle; aspect-ratio: 1; cursor: pointer; {{ $compact ? 'width: 100%;' : '' }}"
+             style="background-color: #F3F4F6; border-radius: {{ $cardRadius }}px; corner-shape: squircle; -webkit-corner-shape: squircle; aspect-ratio: 1; cursor: pointer; {{ $compact ? 'width: 100%;' : '' }}"
              @if(! $compact && $carousel->count() > 1) x-data="{ ci: 0 }" @endif>
             @if($compact)
                 @if($cover)
