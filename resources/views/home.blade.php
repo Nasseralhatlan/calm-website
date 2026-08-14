@@ -23,8 +23,122 @@
      x-on:calm-filters-apply.window="onFiltersApply($event.detail)"
      x-on:calm-search-state.window="searchState = $event.detail">
 
+    {{-- ══ Desktop header (≥1024px): logo left · search · language + profile
+         dropdown. Mobile/tablet keep the app-style centered header below. ══ --}}
+    @php
+        $me = auth('api')->user();
+        $meIsAdmin = $me?->isAdmin() ?? false;
+        $meInitial = strtoupper(mb_substr($me?->name ?: ($me?->phone ?? '?'), 0, 1));
+        $localeSwitchUrl = url('/locale/'.($locale === 'ar' ? 'en' : 'ar'));
+    @endphp
+    <header class="calm-show-desktop sticky top-0 z-40" x-show="mode === 'browse'"
+            style="background-color: rgba(255,255,255,0.85); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); box-shadow: 0 0 50px rgba(0,0,0,0.05);">
+        {{-- LTR row so the logo sits visually LEFT and the buttons RIGHT even in
+             Arabic (the Calm wordmark is Latin — kept on the left by request). --}}
+        <div class="mx-auto flex items-center justify-between" dir="ltr" style="max-width: 1240px; padding: 16px 24px; gap: 20px;">
+            {{-- Logo left --}}
+            <a href="{{ route('landing') }}" class="shrink-0 flex items-center">
+                <img src="/assets/logo/logo.png" alt="Calm" style="height: 38px; width: auto;" draggable="false">
+            </a>
+
+            {{-- Center search --}}
+            <button type="button" @click="$dispatch('calm-open-search')"
+                    class="calm-press calm-round flex-1 flex items-center justify-center bg-white"
+                    style="max-width: 440px; height: 52px; border-radius: 999px; border: 1px solid #F1F1F1; box-shadow: 0 0 50px rgba(0,0,0,0.05); gap: 9px;">
+                <span dir="ltr" class="flex items-center" style="gap: 9px;">
+                    <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M13.125 13.125L11.25 11.25" stroke="black" stroke-width="1.5" stroke-linecap="round"/>
+                        <ellipse cx="6.875" cy="7.49997" rx="5.625" ry="5.62497" stroke="black" stroke-width="1.5"/>
+                    </svg>
+                    <span class="text-[15px] font-semibold text-black {{ $fa }}">{{ $isRtl ? 'ابدء البحث' : 'Start searching' }}</span>
+                </span>
+            </button>
+
+            {{-- Right: language toggle + sign-in / profile dropdown --}}
+            <div class="shrink-0 flex items-center" style="gap: 6px;">
+                <form method="POST" action="{{ $localeSwitchUrl }}" class="m-0">
+                    @csrf
+                    <button type="submit" style="padding: 9px 12px; border-radius: 999px;"
+                            class="calm-press text-[14px] font-semibold text-black hover:bg-[#F5F5F5] transition-colors {{ $locale === 'en' ? 'font-arabic' : '' }}">
+                        {{ $locale === 'ar' ? 'English' : 'العربية' }}
+                    </button>
+                </form>
+
+                @if($me)
+                    <div x-data="{ open: false }" class="relative" @keydown.escape.window="open = false">
+                        <button type="button" @click="open = !open" :aria-expanded="open"
+                                class="calm-press flex items-center bg-white hover:shadow-md transition-shadow"
+                                style="gap: 9px; padding: 6px 6px; padding-inline-start: 14px; border: 1px solid #EBEBEB; border-radius: 999px;">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#222" stroke-width="2" stroke-linecap="round">
+                                <line x1="3" y1="7" x2="21" y2="7"></line><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="17" x2="21" y2="17"></line>
+                            </svg>
+                            <span class="flex items-center justify-center text-white font-bold" style="width: 34px; height: 34px; border-radius: 50%; background-color: #000; font-size: 13px;">{{ $meInitial }}</span>
+                        </button>
+                        <div x-show="open" x-cloak @click.outside="open = false"
+                             dir="{{ $isRtl ? 'rtl' : 'ltr' }}"
+                             x-transition:enter="transition ease-out duration-150"
+                             x-transition:enter-start="opacity-0 -translate-y-1"
+                             x-transition:enter-end="opacity-100 translate-y-0"
+                             class="absolute bg-white {{ $isRtl ? 'text-right' : 'text-left' }}"
+                             style="top: calc(100% + 10px); right: 0; width: 256px; border-radius: 20px; corner-shape: squircle; -webkit-corner-shape: squircle; box-shadow: 0 10px 44px rgba(0,0,0,0.16); padding: 8px; z-index: 50;">
+                            <div style="padding: 10px 12px 12px;">
+                                <div class="font-bold text-black truncate {{ $fa }}" style="font-size: 15px;">{{ $me->name ?: ($isRtl ? 'مرحباً' : 'Welcome') }}</div>
+                                @if($me->phone)
+                                    <div dir="ltr" class="{{ $isRtl ? 'text-right' : 'text-left' }} tabular-nums" style="font-size: 12px; color: #AAAAAA; margin-top: 3px;">0{{ $me->phone }}</div>
+                                @endif
+                            </div>
+                            <div style="border-top: 1px solid #F1F1F1;"></div>
+                            @php
+                                $ddItems = [
+                                    [route('user.trips'), $isRtl ? 'الحجوزات' : 'Reservations', '<rect x="3" y="5" width="18" height="16" rx="3"></rect><line x1="3" y1="10" x2="21" y2="10"></line><line x1="8" y1="2.5" x2="8" y2="6.5"></line><line x1="16" y1="2.5" x2="16" y2="6.5"></line>'],
+                                    [route('user.favorites'), $isRtl ? 'المفضلة' : 'Wishlist', '<path d="M12 20.5s-7.5-4.8-9.5-9.2C1 7.6 3.2 4.5 6.4 4.5c2 0 3.6 1.1 5.6 3.3 2-2.2 3.6-3.3 5.6-3.3 3.2 0 5.4 3.1 3.9 6.8-2 4.4-9.5 9.2-9.5 9.2z"></path>'],
+                                    [route('user.account'), $isRtl ? 'الملف الشخصي' : 'Profile', '<circle cx="12" cy="8" r="4"></circle><path d="M4 21c0-4 3.6-6.5 8-6.5s8 2.5 8 6.5"></path>'],
+                                ];
+                            @endphp
+                            <div style="padding: 6px 0;">
+                                @foreach($ddItems as [$href, $label, $icon])
+                                    <a href="{{ $href }}" class="calm-press flex items-center hover:bg-[#F7F7F7]"
+                                       style="gap: 12px; padding: 11px 12px; border-radius: 12px;">
+                                        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#1A1A1A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">{!! $icon !!}</svg>
+                                        <span class="font-semibold text-black {{ $fa }}" style="font-size: 14px;">{{ $label }}</span>
+                                    </a>
+                                @endforeach
+                                @if($isHost)
+                                    <a href="{{ route('user.places') }}" class="calm-press flex items-center hover:bg-[#F7F7F7]" style="gap: 12px; padding: 11px 12px; border-radius: 12px;">
+                                        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#1A1A1A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21V9l9-6 9 6v12"></path><rect x="9" y="13" width="6" height="8"></rect></svg>
+                                        <span class="font-semibold text-black {{ $fa }}" style="font-size: 14px;">{{ $isRtl ? 'وضع المضيف' : 'Host mode' }}</span>
+                                    </a>
+                                @endif
+                                @if($meIsAdmin)
+                                    <a href="{{ route('admin.dashboard') }}" class="calm-press flex items-center hover:bg-[#F7F7F7]" style="gap: 12px; padding: 11px 12px; border-radius: 12px;">
+                                        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#1A1A1A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"></rect><rect x="14" y="3" width="7" height="5"></rect><rect x="14" y="12" width="7" height="9"></rect><rect x="3" y="16" width="7" height="5"></rect></svg>
+                                        <span class="font-semibold text-black {{ $fa }}" style="font-size: 14px;">{{ $isRtl ? 'لوحة التحكم' : 'Dashboard' }}</span>
+                                    </a>
+                                @endif
+                            </div>
+                            <div style="border-top: 1px solid #F1F1F1;"></div>
+                            <form method="POST" action="{{ route('logout') }}" class="m-0" style="padding: 6px 0 2px;">
+                                @csrf
+                                <button type="submit" class="calm-press flex items-center w-full hover:bg-[#F7F7F7]" style="gap: 12px; padding: 11px 12px; border-radius: 12px;">
+                                    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#DC2626" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+                                    <span class="font-semibold {{ $fa }}" style="font-size: 14px; color: #DC2626;">{{ $isRtl ? 'تسجيل الخروج' : 'Log out' }}</span>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                @else
+                    <button type="button" @click="$dispatch('calm-open-login')"
+                            class="calm-press inline-flex items-center text-[14px] font-bold text-white hover:opacity-90 transition-opacity {{ $fa }}"
+                            style="padding: 12px 24px; border-radius: 16px; corner-shape: squircle; -webkit-corner-shape: squircle; background-color: #000;">
+                        {{ $isRtl ? 'تسجيل الدخول' : 'Sign in' }}
+                    </button>
+                @endif
+            </div>
+        </div>
+    </header>
+
     {{-- ══ App header: centered logo + «ابدء البحث» bar (sticky, blurred) ══ --}}
-    <header class="sticky top-0 z-30" x-show="mode === 'browse'"
+    <header class="calm-hide-desktop sticky top-0 z-30" x-show="mode === 'browse'"
             style="background-color: rgba(255,255,255,0.85); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);">
         <div class="mx-auto" style="max-width: 720px; padding: 14px 20px 14px;">
             <div class="flex items-center justify-center">
@@ -44,7 +158,7 @@
         </div>
     </header>
 
-    <main class="mx-auto w-full" style="max-width: 720px; padding: 10px 0 36px;">
+    <main class="mx-auto w-full calm-home-main" style="padding: 10px 0 36px;">
 
         {{-- ══ Browse mode ══ --}}
         <div x-show="mode === 'browse'">
@@ -52,7 +166,7 @@
                 <h1 class="font-bold text-black text-[22px] sm:text-[26px] {{ $fa }}" style="line-height: 1.25;">{{ $isRtl ? 'اهـلا بك' : 'Welcome' }}</h1>
                 @if($isHost)
                     <a href="{{ route('user.places') }}"
-                       class="calm-press inline-flex items-center text-white font-bold {{ $fa }}"
+                       class="calm-press lg:hidden inline-flex items-center text-white font-bold {{ $fa }}"
                        style="padding: 10px 16px; border-radius: 999px; gap: 6px; font-size: 12px; background-color: rgba(30,30,30,0.9);">
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M7 16l-4-4 4-4M17 8l4 4-4 4"></path>
@@ -62,8 +176,8 @@
                 @endif
             </div>
 
-            {{-- Type boxes (app: 3 white squares) --}}
-            <div class="grid grid-cols-3" style="gap: 14px; margin-top: 22px; padding-inline: 20px;">
+            {{-- Type boxes (app: 3 white squares) — hidden on desktop --}}
+            <div class="grid grid-cols-3 lg:hidden" style="gap: 14px; margin-top: 22px; padding-inline: 20px;">
                 @foreach($placeTypes->take(3) as $i => $t)
                     <button type="button" @click="$dispatch('calm-open-search', { typeId: @js($t->id) })"
                             class="calm-enter calm-press flex flex-col items-center justify-center bg-white min-w-0"
@@ -82,16 +196,26 @@
                         <h2 class="font-bold text-black truncate text-[17px] sm:text-[19px] {{ $fa }}" style="line-height: 1.3;">
                             {{ $isRtl ? $list->name_ar : $list->name_en }}@if($list->icon)&nbsp;{{ $list->icon }}@endif
                         </h2>
+                        {{-- See-all: chevron circle on mobile, text link on desktop --}}
                         <a href="{{ route('web.list', $list) }}" aria-label="{{ $isRtl ? 'عرض الكل' : 'See all' }}"
-                           class="calm-press calm-round shrink-0 flex items-center justify-center text-black"
+                           class="calm-press calm-round lg:hidden shrink-0 flex items-center justify-center text-black"
                            style="width: 36px; height: 36px; border-radius: 50%; background-color: #F5F5F5;">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"
                                  style="{{ $isRtl ? 'transform: scaleX(-1);' : '' }}">
                                 <path d="M9 5l7 7-7 7"></path>
                             </svg>
                         </a>
+                        <a href="{{ route('web.list', $list) }}"
+                           class="calm-press hidden lg:inline-flex items-center shrink-0 font-bold text-black hover:bg-[#F5F5F5] transition-colors {{ $fa }}"
+                           style="gap: 5px; padding: 9px 16px; border-radius: 999px; font-size: 14px;">
+                            <span>{{ $isRtl ? 'عرض الكل' : 'See all' }}</span>
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"
+                                 style="{{ $isRtl ? 'transform: scaleX(-1);' : '' }}">
+                                <path d="M9 5l7 7-7 7"></path>
+                            </svg>
+                        </a>
                     </div>
-                    <div x-ref="list{{ $li }}" class="flex overflow-x-auto calm-hide-scroll" style="gap: 16px; margin-top: 4px; padding: 16px 20px 26px;">
+                    <div x-ref="list{{ $li }}" class="flex overflow-x-auto calm-hide-scroll lg:hidden" style="gap: 16px; margin-top: 4px; padding: 16px 20px 26px;">
                         @foreach($list->places->take(5) as $p)
                             @include('partials._web_place_card', ['p' => $p, 'compact' => true])
                         @endforeach
@@ -118,6 +242,13 @@
                                 </svg>
                             </span>
                         </a>
+                    </div>
+
+                    {{-- Desktop: full grid — all items visible, none hidden in a scroll --}}
+                    <div class="calm-home-grid">
+                        @foreach($list->places->take(12) as $p)
+                            @include('partials._web_place_card', ['p' => $p, 'compact' => false])
+                        @endforeach
                     </div>
                 </section>
             @endforeach
@@ -204,19 +335,22 @@
         </div>
     </main>
 
-    {{-- Floating «ابدء بحث جديد» (browse mode, like the app) --}}
-    <button type="button" x-show="mode === 'browse'" @click="$dispatch('calm-open-search')"
-            class="calm-press calm-round fixed z-30 inline-flex items-center text-white font-bold {{ $fa }}"
-            style="bottom: calc(84px + env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%); padding: 10px 18px; border-radius: 9999px; gap: 7px; font-size: 13px; background-color: rgba(30,30,30,0.55); backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px); box-shadow: 0 8px 22px rgba(0,0,0,0.18); white-space: nowrap;">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-            <circle cx="12" cy="12" r="9"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line>
-        </svg>
-        <span>{{ $isRtl ? 'ابدء بحث جديد' : 'Start a new search' }}</span>
-    </button>
+    {{-- Floating «ابدء بحث جديد» (browse mode, like the app) — mobile/tablet only --}}
+    <div class="calm-hide-desktop">
+        <button type="button" x-show="mode === 'browse'" @click="$dispatch('calm-open-search')"
+                class="calm-press calm-round fixed z-30 inline-flex items-center text-white font-bold {{ $fa }}"
+                style="bottom: calc(84px + env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%); padding: 10px 18px; border-radius: 9999px; gap: 7px; font-size: 13px; background-color: rgba(30,30,30,0.55); backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px); box-shadow: 0 8px 22px rgba(0,0,0,0.18); white-space: nowrap;">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                <circle cx="12" cy="12" r="9"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line>
+            </svg>
+            <span>{{ $isRtl ? 'ابدء بحث جديد' : 'Start a new search' }}</span>
+        </button>
+    </div>
 
     @include('partials._web_search_modal', ['searchModalRedirect' => false])
     @include('partials._web_filters_modal')
-    <div x-show="mode === 'browse'">
+    {{-- App tab bar — mobile/tablet only; on desktop nav lives in the header dropdown --}}
+    <div class="calm-hide-desktop" x-show="mode === 'browse'">
         @include('partials._web_floating_nav')
     </div>
     @include('partials._web_footer')
@@ -350,6 +484,26 @@
         .calm-seeall-img { transition: none; }
         .calm-seeall.is-open .calm-seeall-img-0 { transform: translate(-15px, 3px) rotate(-10deg); }
         .calm-seeall.is-open .calm-seeall-img-1 { transform: translate(15px, -3px) rotate(8deg); }
+    }
+
+    /* ── Desktop-only home layout (≥1024px). Tablet + mobile keep the app view.
+       These are self-contained display classes (not Tailwind lg:hidden) because
+       Alpine's x-show writes an inline `display`, which beats a utility class —
+       reverting to the stylesheet lets x-show and the breakpoint compose. ── */
+    .calm-hide-desktop { display: block; }
+    .calm-show-desktop { display: none; }
+    .calm-home-main { max-width: 720px; }
+    .calm-home-grid { display: none; }
+    @media (min-width: 1024px) {
+        .calm-hide-desktop { display: none; }
+        .calm-show-desktop { display: block; }
+        .calm-home-main { max-width: 1240px; }
+        .calm-home-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(212px, 1fr));
+            gap: 34px 22px;
+            padding: 20px 24px 8px;
+        }
     }
 </style>
 @endsection
