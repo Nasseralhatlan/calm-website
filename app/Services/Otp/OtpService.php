@@ -133,15 +133,20 @@ final class OtpService
 
     private function generateCode(OtpType $type, string $identifier): string
     {
-        // Dev convenience: the mock SMS driver doesn't deliver to a real phone,
-        // so a random code would just clutter the log and force the dev to
-        // open it on every login. Hard-code "111111" so anyone running the
-        // app locally (or in CI) can sign in without checking laravel.log.
-        // The real `sms_saudi` driver still gets a fresh random code — EXCEPT
-        // for whitelisted phones (testers / App Store review), which also get
-        // the fixed code so they can log in without receiving a real SMS.
-        if (config('sms.driver') === 'mock'
-            || ($type === OtpType::Phone && $this->mockPhones->has($identifier))) {
+        // Whitelisted phones (testers / App Store reviewers, from
+        // SMS_MOCK_PHONES) always get the fixed code — on ANY driver, including
+        // the real `sms_saudi` one in production — so a reviewer can sign in
+        // without receiving a real SMS. This is the intended review path.
+        if ($type === OtpType::Phone && $this->mockPhones->has($identifier)) {
+            return str_repeat('1', self::OTP_LENGTH);
+        }
+
+        // Local/CI convenience: the mock SMS driver only logs, so a random code
+        // is just noise — hand out "111111" so devs sign in without opening
+        // laravel.log. NEVER in production: a mock driver there is a
+        // misconfiguration (OtpServiceProvider refuses to bind it), and the
+        // fixed code must never reach real users — that would be an auth bypass.
+        if (config('sms.driver') === 'mock' && ! app()->isProduction()) {
             return str_repeat('1', self::OTP_LENGTH);
         }
 

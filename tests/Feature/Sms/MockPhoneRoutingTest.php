@@ -73,3 +73,34 @@ it('issues a random code to a non-whitelisted phone on the real driver', functio
     // Not the fixed code (random) — astronomically unlikely to be 111111.
     expect(app(OtpService::class)->verify($user, OtpType::Phone, '111111'))->toBeFalse();
 });
+
+it('refuses to bind the mock SMS driver in production (no global 111111)', function (): void {
+    app()->detectEnvironment(fn () => 'production');
+    config(['sms.driver' => 'mock', 'sms.mock_phones' => []]);
+
+    expect(fn () => app(SmsDeliveryContract::class))->toThrow(RuntimeException::class);
+});
+
+it('never hands the fixed code to a real user if the mock driver leaks into production', function (): void {
+    app()->detectEnvironment(fn () => 'production');
+    config(['sms.driver' => 'mock', 'sms.mock_phones' => []]);
+    // Override the contract so issue() doesn't hit the bind-time production guard.
+    app()->instance(SmsDeliveryContract::class, new TestSmsDelivery);
+
+    $user = User::factory()->create(['phone' => '509999999']);
+    app(OtpService::class)->issue($user, OtpType::Phone, '509999999');
+
+    expect(app(OtpService::class)->verify($user, OtpType::Phone, '111111'))->toBeFalse();
+});
+
+it('still issues 111111 to a whitelisted reviewer in production on the real driver', function (): void {
+    // The App Store review path must keep working, even in production.
+    app()->detectEnvironment(fn () => 'production');
+    config(['sms.driver' => 'sms_saudi', 'sms.mock_phones' => ['501234567']]);
+    app()->instance(SmsDeliveryContract::class, new TestSmsDelivery);
+
+    $user = User::factory()->create(['phone' => '501234567']);
+    app(OtpService::class)->issue($user, OtpType::Phone, '501234567');
+
+    expect(app(OtpService::class)->verify($user, OtpType::Phone, '111111'))->toBeTrue();
+});

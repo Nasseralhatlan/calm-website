@@ -19,7 +19,7 @@ class OtpServiceProvider extends ServiceProvider
         $this->app->bind(SmsDeliveryContract::class, function (): SmsDeliveryContract {
             $primary = match (config('sms.driver')) {
                 'sms_saudi' => $this->makeSmsSaudi(),
-                'mock', null => new MockSmsDelivery,
+                'mock', null => $this->makeMock(),
                 default => throw new RuntimeException(
                     'Unknown SMS driver: '.((string) config('sms.driver')),
                 ),
@@ -34,6 +34,26 @@ class OtpServiceProvider extends ServiceProvider
 
             return new RoutingSmsDelivery($primary, new MockSmsDelivery, $registry);
         });
+    }
+
+    /**
+     * The mock driver is for local/CI only. In production it would mean real
+     * users receive the fixed test OTP and no SMS is ever sent — an auth
+     * bypass — so refuse to bind it and fail loudly instead. Whitelisted
+     * tester/reviewer numbers are unaffected: they ride the real driver and are
+     * routed to the mock per-recipient via RoutingSmsDelivery + SMS_MOCK_PHONES.
+     */
+    private function makeMock(): MockSmsDelivery
+    {
+        if ($this->app->isProduction()) {
+            throw new RuntimeException(
+                'SMS_DRIVER is "mock"/unset in production — refusing to bind it '
+                .'(it would issue the fixed OTP to every user). Set SMS_DRIVER=sms_saudi; '
+                .'tester numbers still work via SMS_MOCK_PHONES.',
+            );
+        }
+
+        return new MockSmsDelivery;
     }
 
     private function makeSmsSaudi(): SmsSaudiDelivery
