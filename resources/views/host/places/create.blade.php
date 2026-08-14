@@ -127,8 +127,8 @@
     $editing = (bool) ($editConfig['enabled'] ?? false);
     // Step-nav labels for the edit-mode jump bar (admin gets the extra step).
     $wizardStepLabels = $isRtl
-        ? ['النوع', 'العنوان', 'المدينة', 'الحي', 'التسعير', 'العناصر', 'الإعداد', 'الصور', 'القواعد']
-        : ['Type', 'Title', 'City', 'Area', 'Pricing', 'Amenities', 'Configure', 'Photos', 'Rules'];
+        ? ['النوع', 'العنوان', 'المدينة', 'الحي', 'التسعير', 'العناصر', 'الإعداد', 'الصور', 'الوحدات', 'القواعد']
+        : ['Type', 'Title', 'City', 'Area', 'Pricing', 'Amenities', 'Configure', 'Photos', 'Units', 'Rules'];
     $wizardAdminLabel = $isRtl ? 'المشرف' : 'Admin';
     $jsonEdit = $editConfig ? [
         'enabled' => true,
@@ -840,8 +840,44 @@
                     </template>
                 </section>
 
-                {{-- ── Step 9: check-in/out + rules + submit ── --}}
+                {{-- ── Step 9: identical units (optional) ── --}}
                 <section x-show="step === 9" x-transition.opacity>
+                    <h2 class="text-3xl sm:text-[34px] font-bold tracking-tight text-[#222] {{ $fa }}">{{ $isRtl ? 'الوحدات' : 'Units' }}</h2>
+                    <p class="mt-2 text-[#717171] text-base {{ $fa }}">{{ $isRtl ? 'هل لديك أكثر من وحدة متطابقة؟ (اختياري)' : 'Do you have multiple identical units? (optional)' }}</p>
+
+                    {{-- Capacity = row count; each booking auto-lands in a free
+                         unit so the host knows which one it took. --}}
+                    <div class="mt-10">
+                        <div class="flex items-center flex-wrap" style="gap: 10px;">
+                            {{-- Live total so the host always knows the capacity they configured. --}}
+                            <span x-show="units.filter(u => (u.name || '').trim() !== '').length > 0" x-cloak
+                                  class="inline-flex items-center font-bold text-white bg-[#222] tabular-nums {{ $fa }}"
+                                  style="padding: 4px 14px; border-radius: 999px; font-size: 13px;"
+                                  x-text="'{{ $isRtl ? 'إجمالي الوحدات: ' : 'Total units: ' }}' + units.filter(u => (u.name || '').trim() !== '').length"></span>
+                        </div>
+                        <p class="mt-2 text-[14px] text-[#717171] leading-relaxed {{ $fa }}">
+                            {{ $isRtl ? 'إذا كان لديك عدة وحدات بنفس المواصفات، أضف اسماً لكل وحدة. يظهر إعلانك مرة واحدة، ولا يُقفل اليوم في التقويم إلا بعد امتلاء كل الوحدات، ويصلك كل حجز باسم الوحدة التي نزل فيها. اتركه فارغاً إذا كانت وحدة واحدة.' : 'If you have several units with the same spec, name each one. Your listing shows once, a day only closes when all units are booked, and every booking arrives labeled with its unit. Leave empty for a single unit.' }}
+                        </p>
+                        <template x-for="(u, idx) in units" :key="idx">
+                            <div class="mt-3 flex items-center" style="gap: 10px;">
+                                <input type="text" x-model="u.name" maxlength="100"
+                                       :placeholder="'{{ $isRtl ? 'اسم الوحدة، مثال: وحدة' : 'Unit name, e.g. Unit' }} ' + (idx + 1)"
+                                       class="flex-1 border border-[#dddddd] focus:border-[#222] transition-all bg-white shadow-card r-ios-lg outline-none text-[15px] text-[#222] {{ $fa }}"
+                                       style="padding: 13px 16px;">
+                                <button type="button" @click="units.splice(idx, 1)"
+                                        class="text-[#bbb] hover:text-[#dc2626] text-[18px] leading-none shrink-0" title="{{ $isRtl ? 'حذف الوحدة' : 'Remove unit' }}">✕</button>
+                            </div>
+                        </template>
+                        <button type="button" @click="units.push({ id: null, name: '' })"
+                                class="mt-4 inline-flex items-center border border-[#dddddd] hover:border-[#222] bg-white shadow-card r-ios-lg text-[14px] font-semibold text-[#222] transition-all {{ $fa }}"
+                                style="padding: 11px 20px; gap: 6px;">
+                            {{ $isRtl ? '+ إضافة وحدة' : '+ Add unit' }}
+                        </button>
+                    </div>
+                </section>
+
+                {{-- ── Step 10: check-in/out + rules + submit ── --}}
+                <section x-show="step === 10" x-transition.opacity>
                     <h2 class="text-3xl sm:text-[34px] font-bold tracking-tight text-[#222] {{ $fa }}">{{ $isRtl ? 'تفاصيل الإقامة' : 'House rules & timing' }}</h2>
                     <p class="mt-2 text-[#717171] text-base {{ $fa }}">{{ $isRtl ? 'الوقت والقواعد التي تحدد تجربة الضيوف.' : 'Set the timing and the rules guests should follow.' }}</p>
 
@@ -908,37 +944,6 @@
                         </div>
                     </label>
 
-                    {{-- Identical units (optional, last thing before submit):
-                         capacity = row count; each booking auto-lands in a free
-                         unit so the host knows which one it took. --}}
-                    <div class="mt-10 border-t border-[#ebebeb]" style="padding-top: 28px;">
-                        <div class="flex items-center flex-wrap" style="gap: 10px;">
-                            <span class="text-lg font-bold text-[#222] {{ $fa }}">{{ $isRtl ? 'هل لديك أكثر من وحدة متطابقة؟ (اختياري)' : 'Do you have multiple identical units? (optional)' }}</span>
-                            {{-- Live total so the host always knows the capacity they configured. --}}
-                            <span x-show="units.filter(u => (u.name || '').trim() !== '').length > 0" x-cloak
-                                  class="inline-flex items-center font-bold text-white bg-[#222] tabular-nums {{ $fa }}"
-                                  style="padding: 4px 14px; border-radius: 999px; font-size: 13px;"
-                                  x-text="'{{ $isRtl ? 'إجمالي الوحدات: ' : 'Total units: ' }}' + units.filter(u => (u.name || '').trim() !== '').length"></span>
-                        </div>
-                        <p class="mt-2 text-[14px] text-[#717171] leading-relaxed {{ $fa }}">
-                            {{ $isRtl ? 'إذا كان لديك عدة وحدات بنفس المواصفات، أضف اسماً لكل وحدة. يظهر إعلانك مرة واحدة، ولا يُقفل اليوم في التقويم إلا بعد امتلاء كل الوحدات، ويصلك كل حجز باسم الوحدة التي نزل فيها. اتركه فارغاً إذا كانت وحدة واحدة.' : 'If you have several units with the same spec, name each one. Your listing shows once, a day only closes when all units are booked, and every booking arrives labeled with its unit. Leave empty for a single unit.' }}
-                        </p>
-                        <template x-for="(u, idx) in units" :key="idx">
-                            <div class="mt-3 flex items-center" style="gap: 10px;">
-                                <input type="text" x-model="u.name" maxlength="100"
-                                       :placeholder="'{{ $isRtl ? 'اسم الوحدة، مثال: وحدة' : 'Unit name, e.g. Unit' }} ' + (idx + 1)"
-                                       class="flex-1 border border-[#dddddd] focus:border-[#222] transition-all bg-white shadow-card r-ios-lg outline-none text-[15px] text-[#222] {{ $fa }}"
-                                       style="padding: 13px 16px;">
-                                <button type="button" @click="units.splice(idx, 1)"
-                                        class="text-[#bbb] hover:text-[#dc2626] text-[18px] leading-none shrink-0" title="{{ $isRtl ? 'حذف الوحدة' : 'Remove unit' }}">✕</button>
-                            </div>
-                        </template>
-                        <button type="button" @click="units.push({ id: null, name: '' })"
-                                class="mt-4 inline-flex items-center border border-[#dddddd] hover:border-[#222] bg-white shadow-card r-ios-lg text-[14px] font-semibold text-[#222] transition-all {{ $fa }}"
-                                style="padding: 11px 20px; gap: 6px;">
-                            {{ $isRtl ? '+ إضافة وحدة' : '+ Add unit' }}
-                        </button>
-                    </div>
                 </section>
 
                 {{-- ── Admin settings step (admins only, edit mode) ── --}}
@@ -1066,7 +1071,7 @@ function registerWizard() {
 
     return {
         step: 1,
-        totalSteps: 9,
+        totalSteps: 10,
         submitting: false,
         draftSaving: false,
         draftError: '',
@@ -1226,7 +1231,7 @@ function registerWizard() {
             // Edit mode: admins get an extra "Admin settings" step; always
             // start at step 1 (the host is reviewing, not resuming a draft).
             if (this.editing) {
-                this.totalSteps = this.isAdmin ? 10 : 9;
+                this.totalSteps = this.isAdmin ? 11 : 10;
                 this.step = 1;
             }
         },
@@ -1296,7 +1301,8 @@ function registerWizard() {
                         .filter((e) => e.attribute.photoRule === 'required')
                         .every((e) => this.uploadCountFor(e.id, true) > 0);            // photos
 
-                case 9: return this.checkInTime.trim().length > 0 && this.checkOutTime.trim().length > 0;
+                case 9: return true; // units are optional
+                case 10: return this.checkInTime.trim().length > 0 && this.checkOutTime.trim().length > 0;
                 default: return true;
             }
         },

@@ -37,11 +37,16 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', [LandingController::class, 'index'])->name('landing');
 Route::post('/locale/{locale}', [LandingController::class, 'switchLocale'])->name('locale.switch');
 Route::get('/places/{place}', [PlaceController::class, 'show'])->name('places.show');
+// «عرض الكل» — a curated home list's full set of places.
+Route::get('/lists/{placeList}', [LandingController::class, 'list'])->name('web.list');
 
 // Web booking funnel — the link hosts share ("احجز عبر الرابط"). The page is
 // public; creating the booking and the status page need the JWT cookie the
 // inline OTP login sets (same api guard as the dashboard).
 Route::get('/book/{place}', [BookingFunnelController::class, 'show'])->name('book.show');
+// Checkout summary page — the place page's dates modal lands here. Public:
+// guests review the stay first and sign in from the CTA when needed.
+Route::get('/book/{place}/checkout', [BookingFunnelController::class, 'checkout'])->name('book.checkout');
 Route::middleware('auth:api')->group(function (): void {
     Route::post('/book/{place}', [BookingFunnelController::class, 'store'])->name('book.store');
     Route::get('/book/status/{booking}', [BookingFunnelController::class, 'status'])->name('book.status');
@@ -70,6 +75,13 @@ Route::get('/faqs', [PageController::class, 'faq'])->name('pages.faq');
 // the controller hash_equals-checks it and 404s on mismatch.
 Route::get('/ical/places/{place}/{token}.ics', CalendarFeedController::class)
     ->name('calendar.export');
+
+// Guest-web tab pages — PUBLIC on purpose: like the app, the tabs always
+// render; guests get an inline sign-in prompt while signed-in users see
+// their data (fetched client-side via the JWT cookie).
+Route::get('/favorites', [UserDashboardController::class, 'favorites'])->name('user.favorites');
+Route::get('/trips', [UserDashboardController::class, 'trips'])->name('user.trips');
+Route::get('/account', [UserDashboardController::class, 'account'])->name('user.account');
 
 // ─── Auth (web, OTP → JWT cookie) ────────────────────────────────────────────
 Route::middleware('guest')->group(function (): void {
@@ -129,7 +141,6 @@ Route::middleware('auth:api')->group(function (): void {
     // Booking detail — guest or host of that booking only.
     Route::get('/bookings/{booking}', [UserDashboardController::class, 'showBooking'])->name('user.bookings.show');
     Route::get('/financials', [UserDashboardController::class, 'financials'])->name('user.financials');
-    Route::get('/favorites', [UserDashboardController::class, 'favorites'])->name('user.favorites');
     // Support inside the dashboard chrome (sidebar). Public /support redirects here when logged in.
     Route::get('/account/support', [PageController::class, 'userSupport'])->name('user.support');
 });

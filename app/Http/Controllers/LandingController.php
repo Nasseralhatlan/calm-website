@@ -2,24 +2,35 @@
 
 namespace App\Http\Controllers;
 
-use App\Services\Place\SettingService;
+use App\Models\PlaceList;
+use App\Services\Place\PlaceListService;
+use App\Services\Place\PlaceService;
+use App\Services\Web\WebHomeService;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\View\View;
 
 class LandingController extends Controller
 {
-    public function __construct(private readonly SettingService $settings) {}
+    public function __construct(private readonly WebHomeService $home) {}
 
-    public function index()
+    /**
+     * The browse home — app-style: pill search bar, quick place-type boxes,
+     * curated lists, and an inline search-results grid. Replaces the old
+     * marketing landing (its content lives on at /about).
+     */
+    public function index(): View
     {
-        // Pull support contact info from the admin-editable settings table.
-        // Lookup is a single keyed-IN query — same service call rule as the
-        // rest of the codebase.
-        $support = $this->settings->byKeys(['support_email', 'support_phone']);
+        return view('home', $this->home->data(auth('api')->user()));
+    }
 
-        return view('landing', [
-            'supportEmail' => $support['support_email'] ?? null,
-            'supportPhone' => $support['support_phone'] ?? null,
-        ]);
+    /** «عرض الكل» — one curated list's places on their own page. */
+    public function list(PlaceList $placeList, PlaceListService $lists, PlaceService $places): View
+    {
+        $list = $lists->findForWeb($placeList, $places, auth('api')->user());
+
+        abort_if($list === null, 404);
+
+        return view('list', ['list' => $list]);
     }
 
     public function switchLocale(string $locale): RedirectResponse

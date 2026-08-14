@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Place;
 
+use App\Enums\GeoStatus;
 use App\Models\Place;
 use App\Models\PlaceList;
 use App\Models\User;
@@ -56,6 +57,25 @@ final class PlaceListService
             ->get()
             ->filter(fn (PlaceList $list) => $list->places->isNotEmpty())
             ->values();
+    }
+
+    /**
+     * One list for the guest-web «عرض الكل» page: active lists only, with
+     * their visible places eager-loaded for cards (likes-aware). Returns
+     * null when the list is inactive or has nothing visible to show.
+     */
+    public function findForWeb(PlaceList $list, PlaceService $places, ?User $viewer = null): ?PlaceList
+    {
+        if ($list->status !== GeoStatus::Active) {
+            return null;
+        }
+
+        $list->load(['places' => function ($q) use ($places, $viewer): void {
+            $q->visible();
+            $places->eagerHomeFields($q, $viewer);
+        }]);
+
+        return $list->places->isEmpty() ? null : $list;
     }
 
     /** @param  array<string, mixed>  $data */

@@ -12,6 +12,7 @@ use App\Models\Country;
 use App\Models\Place;
 use App\Services\Booking\BookingFunnelService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -46,6 +47,39 @@ class BookingFunnelController extends Controller
             ->get(['id', 'country_code', 'dial_code', 'avatar', 'name_ar', 'name_en']);
 
         return view('booking.funnel', ['place' => $place, 'countries' => $countries]);
+    }
+
+    /**
+     * Checkout summary page — reached from the place page's dates modal (or
+     * directly from search with the stay in the query string). Invalid or
+     * past dates bounce back to the place page instead of erroring.
+     */
+    public function checkout(Request $request, Place $place): View|RedirectResponse
+    {
+        abort_unless(
+            $place->status === PlaceStatus::Active
+            && $place->review_status === PlaceReviewStatus::Approved,
+            404,
+        );
+
+        $checkIn = (string) $request->query('check_in', '');
+        $checkOut = (string) $request->query('check_out', '');
+        $isDate = fn (string $d): bool => (bool) preg_match('/^\d{4}-\d{2}-\d{2}$/', $d) && strtotime($d) !== false;
+
+        if (! $isDate($checkIn) || ! $isDate($checkOut) || $checkOut < $checkIn || $checkIn < now()->toDateString()) {
+            return redirect()->route('places.show', $place);
+        }
+
+        $place->load(['type', 'cityArea.city', 'coverPhoto']);
+        // Rating line on the summary card (★ 5.00 (2) · مميز).
+        $place->loadCount('publishedReviews')->loadAvg('publishedReviews', 'rate');
+
+        return view('booking.checkout', [
+            'place' => $place,
+            'checkIn' => $checkIn,
+            'checkOut' => $checkOut,
+            'guests' => min(max(1, (int) $request->query('guests', 1)), (int) ($place->max_guests ?: 1)),
+        ]);
     }
 
     public function store(StoreFunnelBookingRequest $request, Place $place): JsonResponse

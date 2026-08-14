@@ -232,7 +232,9 @@ it('reflects is_liked for an authenticated viewer', function (): void {
 });
 
 it('paginates results', function (): void {
-    config(['pagination.per_page' => 2]); // page size is server-controlled now, not ?per_page=
+    // Page size is server-controlled (not ?per_page=), and search has its own
+    // key so the web results grid can load whole rows.
+    config(['pagination.search_per_page' => 2]);
     $city = searchCity();
     $area = searchArea($city);
     searchPlace($area);

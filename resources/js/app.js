@@ -7,6 +7,99 @@ window.Alpine = Alpine;
 // x-sort: reactive drag-and-drop reordering that plays nicely with x-for
 // (used on the merged admin attributes page).
 Alpine.plugin(sort);
+// ── Open-in-new-tab (desktop only) ──────────────────────────────────────────
+// On the web view a search or a place opens in its own tab so the browse/
+// results page you came from stays put. Mobile + tablet keep app-style
+// in-place navigation, where extra tabs are a nuisance.
+window.calmIsDesktop = () => window.matchMedia('(min-width: 1024px)').matches;
+
+window.calmOpen = (href) => {
+    if (!href) return;
+    if (window.calmIsDesktop()) window.open(href, '_blank', 'noopener');
+    else window.location.href = href;
+};
+
+// Anchors opt in with data-newtab. Delegated so it also covers cards Alpine
+// renders later (search results, favorites). Modifier/middle clicks are left
+// to the browser.
+document.addEventListener('click', (e) => {
+    if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    if (!window.calmIsDesktop()) return;
+    const link = e.target.closest('a[data-newtab]');
+    if (!link || !link.href) return;
+    e.preventDefault();
+    window.open(link.href, '_blank', 'noopener');
+});
+
+// Mouse drag-to-scroll for card photo carousels (touch scrolls natively).
+// Suppresses the card link's click after a real drag and blocks native
+// image dragging so the gesture always pans the carousel.
+window.calmDragScroll = (el) => {
+    let down = false;
+    let moved = false;
+    let startX = 0;
+    let startLeft = 0;
+    const snapValue = el.style.scrollSnapType; // restore the ORIGINAL inline value
+
+    el.addEventListener('dragstart', (e) => e.preventDefault());
+
+    el.addEventListener('pointerdown', (e) => {
+        if (e.pointerType !== 'mouse') return;
+        down = true;
+        moved = false;
+        startX = e.clientX;
+        startLeft = el.scrollLeft;
+        // Keep receiving moves even when the cursor exits the small card.
+        try { el.setPointerCapture(e.pointerId); } catch (err) { /* no-op */ }
+        // Mandatory snap re-snaps every partial position — pause it while dragging.
+        el.style.scrollSnapType = 'none';
+    });
+
+    el.addEventListener('pointermove', (e) => {
+        if (!down) return;
+        const dx = e.clientX - startX;
+        if (Math.abs(dx) > 5) moved = true;
+        el.scrollLeft = startLeft - dx;
+    });
+
+    const settle = () => {
+        if (!down) return;
+        down = false;
+        const w = el.clientWidth || 1;
+        // Page one slide in the drag direction once past a 20% pull —
+        // rounding alone made short drags spring back.
+        const startIdx = Math.round(Math.abs(startLeft) / w);
+        const delta = el.scrollLeft - startLeft;
+        // The carousel's own direction — card carousels are dir=ltr even on RTL pages.
+        const rtl = getComputedStyle(el).direction === 'rtl';
+        const forward = rtl ? delta < 0 : delta > 0;
+        const stepped = Math.abs(delta) > w * 0.2 ? (forward ? 1 : -1) : 0;
+        const maxIdx = Math.max(0, Math.round(el.scrollWidth / w) - 1);
+        const idx = Math.min(maxIdx, Math.max(0, startIdx + stepped));
+        const sign = rtl ? -1 : 1;
+        el.scrollTo({ left: sign * idx * w, behavior: 'smooth' });
+        // Restore snapping only AFTER the smooth settle finishes — re-enabling
+        // mandatory snap mid-flight cancels the animation and yanks back.
+        const restore = () => {
+            el.style.scrollSnapType = snapValue;
+            el.removeEventListener('scrollend', restore);
+        };
+        el.addEventListener('scrollend', restore);
+        setTimeout(restore, 800);
+    };
+    el.addEventListener('pointerup', settle);
+    el.addEventListener('pointercancel', settle);
+
+    // A drag must not activate the card link.
+    el.addEventListener('click', (e) => {
+        if (moved) {
+            e.preventDefault();
+            e.stopPropagation();
+            moved = false;
+        }
+    }, true);
+};
+
 Alpine.start();
 
 // Raw SortableJS still exposed for any non-Alpine page that needs it.

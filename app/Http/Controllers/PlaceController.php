@@ -38,11 +38,17 @@ class PlaceController extends Controller
             'cityArea.city',
             'photos',
             'attributeValues.attribute.group',
+            // Rating chip + the reviews section (latest published, guest name
+            // falls back to reviewer_name for imported reviews).
+            'publishedReviews' => fn ($q) => $q->with('guest')->latest()->limit(10),
         ]);
+        $place->loadCount('publishedReviews')->loadAvg('publishedReviews', 'rate');
 
         return view('places.show', [
             'place' => $place,
             'preview' => false,
+            // Floating heart on the mobile hero.
+            'viewerLiked' => $viewer !== null && $place->likes()->where('user_id', $viewer->id)->exists(),
             // Owner/admin get a status banner pinned to the top (review +
             // active status) so they know what state the listing is in while
             // viewing it exactly as a guest would.
