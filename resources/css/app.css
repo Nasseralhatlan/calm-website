@@ -305,3 +305,16 @@ label[for], label:has(input) { cursor: pointer; }
 /* Horizontal scrollers (card rows, in-card carousels) hide their scrollbar. */
 .calm-hide-scroll { scrollbar-width: none; }
 .calm-hide-scroll::-webkit-scrollbar { display: none; }
+
+/*
+ * "Web view" (desktop ≥1024px) vs the app view kept for tablet + mobile.
+ * `calm-hide-desktop` deliberately sets NO display of its own so elements keep
+ * theirs (some are `flex`, and a block override would flatten their rows); it
+ * only hides at desktop, with !important so it also beats the inline display
+ * Alpine's x-show writes.
+ */
+.calm-show-desktop { display: none; }
+@media (min-width: 1024px) {
+    .calm-hide-desktop { display: none !important; }
+    .calm-show-desktop { display: block; }
+}

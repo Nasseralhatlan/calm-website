@@ -209,7 +209,11 @@
 
     {{-- Fixed footer: امسح الكل + ابحث --}}
     <div class="fixed inset-x-0 bottom-0" style="padding: 14px 20px calc(18px + env(safe-area-inset-bottom, 0px));">
-        <div class="mx-auto flex items-center justify-between" style="max-width: 560px;">
+        {{-- 520px, not 560: the panel above is 560 wide with 20px padding, so
+             its cards are 520 across. Matching that keeps «امسح الكل» and
+             «ابحث» flush with the section boxes on desktop (below ~600px both
+             already collapse to viewport − 40). --}}
+        <div class="mx-auto flex items-center justify-between" style="max-width: 520px;">
             <button type="button" @click="resetSelection()"
                     class="font-bold text-black underline {{ $fa }}" style="font-size: 14px;">{{ $isRtl ? 'امسح الكل' : 'Clear all' }}</button>
             <button type="button" @click="apply()"

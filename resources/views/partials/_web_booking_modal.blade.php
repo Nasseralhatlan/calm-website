@@ -227,4 +227,41 @@ function calmBookingModal(init) {
         },
     };
 }
+
+/**
+ * Desktop place-page booking box: the same calendar state and rules as the
+ * modal (availability, range picking, checkout hand-off), rendered one month
+ * at a time inside a sticky card. `init()` is overridden — the modal's version
+ * handles the #dates hash, which the box must not do.
+ */
+function calmBookingBox(init) {
+    return {
+        ...calmBookingModal(init),
+        mi: 0,
+
+        init() {
+            this.buildMonths();
+            this.loadAvail();
+
+            // Prefill a stay carried over from search (?check_in/?check_out)
+            // and open on its month.
+            const qp = new URLSearchParams(window.location.search);
+            const ok = (s) => /^\d{4}-\d{2}-\d{2}$/.test(s || '');
+            const today = new Date();
+            const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+            const qIn = qp.get('check_in');
+            const qOut = qp.get('check_out');
+            if (ok(qIn) && qIn >= todayIso) {
+                this.checkIn = qIn;
+                this.checkOut = ok(qOut) && qOut >= qIn ? qOut : qIn;
+                const [y, m] = qIn.split('-').map(Number);
+                const idx = (y - today.getFullYear()) * 12 + (m - 1 - today.getMonth());
+                this.mi = Math.max(0, Math.min(this.months.length - 1, idx));
+            }
+        },
+
+        prevMonth() { if (this.mi > 0) this.mi--; },
+        nextMonth() { if (this.mi < this.months.length - 1) this.mi++; },
+    };
+}
 </script>

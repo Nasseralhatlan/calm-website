@@ -250,7 +250,26 @@
         /* Mobile: the content column becomes an app-style sheet rising over
            the hero carousel with rounded top corners. Unlayered on purpose so
            it beats Tailwind's layered w-full inside the media query. */
-        .calm-place-sheet { padding-top: 26px; }
+        .calm-place-sheet { padding-top: 26px; max-width: 720px; }
+
+        /* Desktop (web view): title bar above the photos, then a two-column
+           body — content beside a sticky booking box. */
+        .calm-place-titlebar { display: none; }
+        .calm-place-book { display: none; }
+        @media (min-width: 1024px) {
+            .calm-place-titlebar { display: flex; }
+            .calm-place-cols { display: flex; align-items: flex-start; gap: 44px; }
+            .calm-place-content { flex: 1 1 0%; min-width: 0; max-width: none; }
+            .calm-place-book {
+                display: block;
+                flex: 0 0 360px;
+                width: 360px;
+                position: sticky;
+                top: 116px; /* clears the sticky site header */
+                margin-top: 26px;
+            }
+        }
+
         @media (max-width: 639px) {
             .calm-place-sheet {
                 position: relative;
@@ -322,11 +341,13 @@
         </div>
     @endif
 
-    {{-- HEADER — desktop only. On mobile the app shows no header: the hero
-         carousel starts at the very top with floating back/share/like circles. --}}
-    <div class="hidden sm:block">
+    {{-- HEADER — on mobile the app shows none (the hero starts at the very top
+         with floating back/share/like circles). Tablet keeps the old topbar;
+         desktop wears the same site header as the home page. --}}
+    <div class="hidden sm:block lg:hidden">
         @include('partials._web_topbar')
     </div>
+    @include('partials._web_desktop_header')
 
     {{-- MOBILE FLOATING HEADER — back/share/like stay FIXED while scrolling;
          a white blurred bar fades in once the sheet slides under them.
@@ -370,6 +391,34 @@
     </div>
 
     <main class="max-w-7xl mx-auto w-full px-6 sm:px-10 lg:px-20 pt-0 sm:pt-10" style="padding-bottom: 110px;">
+
+        {{-- DESKTOP TITLE ROW — above the photos: title on the left, share +
+             like on the right. dir=ltr pins those physical sides in Arabic too
+             (matching the site header); the title keeps its own text direction. --}}
+        <div class="calm-place-titlebar items-center justify-between" dir="ltr" style="gap: 20px; padding-bottom: 16px;">
+            <h1 class="font-bold text-black truncate {{ $fa }}" dir="{{ $isRtl ? 'rtl' : 'ltr' }}" style="font-size: 26px; line-height: 1.3;">
+                {{ $place->localized_title ?: $placeLabel }}
+            </h1>
+            <div class="shrink-0 flex items-center" style="gap: 6px;">
+                <button type="button" @click="sharePlace()"
+                        class="calm-press inline-flex items-center font-semibold text-black hover:bg-[#F5F5F5] transition-colors {{ $fa }}"
+                        style="gap: 8px; padding: 9px 14px; border-radius: 12px; font-size: 14px;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line>
+                    </svg>
+                    <span>{{ $isRtl ? 'مشاركة' : 'Share' }}</span>
+                </button>
+                <button type="button" @click="toggleLike()"
+                        class="calm-press-like inline-flex items-center font-semibold text-black hover:bg-[#F5F5F5] transition-colors {{ $fa }}"
+                        style="gap: 8px; padding: 9px 14px; border-radius: 12px; font-size: 14px;"
+                        aria-label="{{ $isRtl ? 'إضافة إلى المفضلة' : 'Save to favorites' }}">
+                    <svg width="17" height="17" viewBox="0 0 24 24" :fill="liked ? '#F88379' : 'none'" :stroke="liked ? '#F88379' : '#1A1A1A'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                    </svg>
+                    <span x-text="liked ? '{{ $isRtl ? 'محفوظ' : 'Saved' }}' : '{{ $isRtl ? 'حفظ' : 'Save' }}'"></span>
+                </button>
+            </div>
+        </div>
 
         {{-- AIRBNB-STYLE MOSAIC (desktop) / SCROLL CAROUSEL (mobile) --}}
         @if($heroImages->count() > 0)
@@ -485,10 +534,13 @@
             $ratingAvg = $place->published_reviews_avg_rate !== null ? round((float) $place->published_reviews_avg_rate, 1) : 0.0;
             $ratingCount = (int) ($place->published_reviews_count ?? 0);
         @endphp
-        <div class="calm-place-sheet mx-auto w-full {{ $start }}" style="max-width: 720px;">
+        {{-- Desktop: content column + sticky booking box. One column on
+             mobile/tablet, where the app sheet + fixed reserve bar stay. --}}
+        <div class="calm-place-cols">
+        <div class="calm-place-sheet calm-place-content mx-auto w-full {{ $start }}">
 
-            {{-- Title --}}
-            <h1 class="text-center font-bold text-black {{ $fa }}" style="font-size: 26px; line-height: 1.3;">
+            {{-- Title — desktop shows it above the photos instead --}}
+            <h1 class="calm-hide-desktop text-center font-bold text-black {{ $fa }}" style="font-size: 26px; line-height: 1.3;">
                 {{ $place->localized_title ?: $placeLabel }}
             </h1>
 
@@ -679,7 +731,81 @@
                     <p class="text-black {{ $fa }}" style="font-size: 15px; line-height: 2; margin-top: 14px; white-space: pre-line;">{{ $place->localized_rules }}</p>
                 </section>
             @endif
-        </div>
+        </div>{{-- /.calm-place-content --}}
+
+        {{-- ── Desktop booking box — sticky beside the content: price, inline
+             month picker and the reserve CTA. Replaces the fixed bottom bar,
+             which is mobile/tablet only now. ── --}}
+        @if($place->isVisible())
+            <aside class="calm-place-book">
+                <div x-data="calmBookingBox(@js([
+                        'placeId' => $place->id,
+                        'checkoutUrl' => route('book.checkout', $place),
+                        'isRtl' => $isRtl,
+                     ]))"
+                     class="bg-white {{ $start }}"
+                     style="border-radius: 24px; corner-shape: squircle; -webkit-corner-shape: squircle; box-shadow: 0 0 50px rgba(0,0,0,0.09); padding: 20px;">
+
+                    <div class="flex items-baseline" style="gap: 6px;">
+                        <span class="font-bold text-black tabular-nums" style="font-size: 22px;"><bdi dir="ltr">{{ number_format((int) $place->price) }} SR</bdi></span>
+                        <span class="{{ $fa }}" style="font-size: 13px; color: #AAAAAA;">{{ $isRtl ? 'لليلة الواحدة' : 'per night' }}</span>
+                    </div>
+
+                    {{-- Month navigation --}}
+                    <div class="flex items-center justify-between" style="margin-top: 18px;">
+                        <button type="button" @click="prevMonth()" :disabled="mi === 0"
+                                class="calm-press calm-round flex items-center justify-center text-black"
+                                :style="'width: 32px; height: 32px; border-radius: 50%; opacity: ' + (mi === 0 ? 0.3 : 1) + ';'"
+                                aria-label="{{ $isRtl ? 'الشهر السابق' : 'Previous month' }}">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="{{ $isRtl ? 'transform: scaleX(-1);' : '' }}"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                        </button>
+                        <span class="font-bold text-black {{ $fa }}" style="font-size: 15px;" x-text="months[mi] ? months[mi].label : ''"></span>
+                        <button type="button" @click="nextMonth()" :disabled="mi >= months.length - 1"
+                                class="calm-press calm-round flex items-center justify-center text-black"
+                                :style="'width: 32px; height: 32px; border-radius: 50%; opacity: ' + (mi >= months.length - 1 ? 0.3 : 1) + ';'"
+                                aria-label="{{ $isRtl ? 'الشهر التالي' : 'Next month' }}">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="{{ $isRtl ? 'transform: scaleX(-1);' : '' }}"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                        </button>
+                    </div>
+
+                    {{-- Weekday header --}}
+                    <div class="grid grid-cols-7 text-center" style="margin-top: 10px;">
+                        <template x-for="(d, i) in dayNames()" :key="'bd' + i">
+                            <span style="font-size: 11px; color: #AAAAAA;" x-text="d"></span>
+                        </template>
+                    </div>
+
+                    {{-- Days --}}
+                    <template x-if="months[mi]">
+                        <div class="grid grid-cols-7" style="margin-top: 2px;">
+                            <template x-for="cell in months[mi].cells" :key="months[mi].key + '-' + cell.key">
+                                <div class="flex items-center justify-center" :style="cellStyle(cell).replace('height: 46px', 'height: 40px')">
+                                    <button type="button" x-show="cell.day" :disabled="cell.disabled"
+                                            @click="pickDay(cell.date)"
+                                            class="flex items-center justify-center tabular-nums"
+                                            :style="dayStyle(cell).replace('width: 40px; height: 40px', 'width: 34px; height: 34px').replace('font-size: 15px', 'font-size: 13px')"
+                                            x-text="cell.day"></button>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
+
+                    <div class="text-center {{ $fa }}" style="font-size: 13px; margin-top: 10px; color: #AAAAAA;"
+                         x-text="hasRange() ? rangeTitle() : '{{ $isRtl ? 'اختر تاريخ الوصول والمغادرة' : 'Pick your arrival and departure' }}'"></div>
+                    <p x-show="rangeError" x-cloak class="text-center {{ $fa }}" style="font-size: 12.5px; color: #dc2626; margin-top: 6px;" x-text="rangeError"></p>
+
+                    <button type="button" @click="next()" :disabled="!ready()"
+                            class="calm-press w-full font-medium text-white {{ $fa }}"
+                            :style="'margin-top: 14px; padding: 15px; border-radius: 15px; font-size: 15px; transition: opacity 0.2s; background-color: #F88379; box-shadow: 0 6px 12px rgba(248,131,121,0.3); opacity: ' + (ready() ? 1 : 0.45) + ';'">
+                        {{ $isRtl ? 'احجز الآن' : 'Reserve' }}
+                    </button>
+                    <p class="text-center {{ $fa }}" style="margin-top: 8px; font-size: 11.5px; color: #AAAAAA;">
+                        {{ $isRtl ? 'لن يتم خصم أي مبلغ الآن' : "You won't be charged yet" }}
+                    </p>
+                </div>
+            </aside>
+        @endif
+        </div>{{-- /.calm-place-cols --}}
 
         {{-- FOOTER --}}
         <div class="border-t border-[#ebebeb] text-center" style="margin-top: 80px; padding-top: 56px;">
@@ -699,7 +825,8 @@
          (price visually left, CTA right in both locales), price 17/22 bold,
          unit 12/16 muted, coral CTA radius 15 with colored shadow. --}}
     @if($place->isVisible())
-        <div class="fixed inset-x-0 bottom-0 z-30"
+        {{-- Mobile/tablet only — desktop reserves from the sticky booking box. --}}
+        <div class="calm-hide-desktop fixed inset-x-0 bottom-0 z-30"
              style="background-color: rgba(255,255,255,0.8); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); box-shadow: 0 0 25px rgba(0,0,0,0.05);">
             <div class="mx-auto flex items-center" dir="ltr" style="max-width: 1200px; padding: 16px 20px 14px; gap: 12px;">
                 <div class="flex-1 min-w-0 text-left">
