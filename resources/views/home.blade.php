@@ -630,6 +630,9 @@
         }
         .calm-results-main { flex: 1 1 0%; min-width: 0; padding-inline: 0; }
         .calm-results-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 34px 24px; }
+        /* Slightly shorter photos than the square used elsewhere. !important
+           because the card partial sets aspect-ratio inline. */
+        .calm-results-grid [role="link"] { aspect-ratio: 1.12 !important; }
         .calm-results-head { display: flex; }
         .calm-results-filters {
             display: flex;

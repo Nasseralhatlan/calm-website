@@ -870,7 +870,11 @@ final class PlaceService
                 ->orderByDesc('created_at'),
         };
 
-        return $query->paginate($perPage ?? config('pagination.per_page'))->withQueryString();
+        // Search has its own (even) page size so the web results grid loads
+        // full rows; falls back to the global list size if it's unset.
+        return $query
+            ->paginate($perPage ?? config('pagination.search_per_page') ?? config('pagination.per_page'))
+            ->withQueryString();
     }
 
     /**

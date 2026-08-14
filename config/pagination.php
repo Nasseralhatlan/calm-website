@@ -16,4 +16,17 @@ return [
     */
 
     'per_page' => (int) env('PAGINATION_PER_PAGE', 20),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Place-search page size
+    |--------------------------------------------------------------------------
+    |
+    | Place search pages separately from the lists above so the web results
+    | grid always loads full rows — keep it even (the desktop grid is two
+    | cards per row), otherwise the last row ends with a dangling card.
+    |
+    */
+
+    'search_per_page' => (int) env('PAGINATION_SEARCH_PER_PAGE', 6),
 ];

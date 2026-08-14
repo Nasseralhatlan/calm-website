@@ -392,10 +392,10 @@
 
     <main class="max-w-7xl mx-auto w-full px-6 sm:px-10 lg:px-20 pt-0 sm:pt-10" style="padding-bottom: 110px;">
 
-        {{-- DESKTOP TITLE ROW — above the photos: title on the left, share +
-             like on the right. dir=ltr pins those physical sides in Arabic too
-             (matching the site header); the title keeps its own text direction. --}}
-        <div class="calm-place-titlebar items-center justify-between" dir="ltr" style="gap: 20px; padding-bottom: 16px;">
+        {{-- DESKTOP TITLE ROW — above the photos. Follows the page direction:
+             title at the start (right in Arabic, left in English) with share +
+             like at the end. --}}
+        <div class="calm-place-titlebar items-center justify-between" style="gap: 20px; padding-bottom: 16px;">
             <h1 class="font-bold text-black truncate {{ $fa }}" dir="{{ $isRtl ? 'rtl' : 'ltr' }}" style="font-size: 26px; line-height: 1.3;">
                 {{ $place->localized_title ?: $placeLabel }}
             </h1>
@@ -744,7 +744,7 @@
                         'isRtl' => $isRtl,
                      ]))"
                      class="bg-white {{ $start }}"
-                     style="border-radius: 24px; corner-shape: squircle; -webkit-corner-shape: squircle; box-shadow: 0 0 50px rgba(0,0,0,0.09); padding: 20px;">
+                     style="border-radius: 24px; corner-shape: squircle; -webkit-corner-shape: squircle; box-shadow: 0 0 50px rgba(0,0,0,0.05); padding: 20px;">
 
                     <div class="flex items-baseline" style="gap: 6px;">
                         <span class="font-bold text-black tabular-nums" style="font-size: 22px;"><bdi dir="ltr">{{ number_format((int) $place->price) }} SR</bdi></span>
