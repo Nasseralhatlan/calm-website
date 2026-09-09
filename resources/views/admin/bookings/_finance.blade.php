@@ -36,6 +36,20 @@
         FinancialMovement::STATUS_REVERSED => ['fg' => '#b91c1c', 'label' => $isRtl ? 'معكوسة' : 'Reversed'],
     ];
 
+    // Admin settlement availability. The money-real conditions only (guest
+    // actually paid, booking live, nothing in flight) — the timing gates are
+    // deliberately NOT required, that is the point of the admin override.
+    $payoutsAutoMode = $payoutsAutoMode ?? false;
+    $settleable = $booking->payout_status === 'not_paid'
+        && $booking->payment_status === 'paid'
+        && in_array($booking->booking_status, [BookingStatus::Confirmed, BookingStatus::Completed], true);
+    $earlyRelease = $settleable && ! $booking->isPayable();
+    $payoutMethods = [
+        'moyasar' => $isRtl ? 'ميسر (تلقائي)' : 'Moyasar (automatic)',
+        'bank' => $isRtl ? 'تحويل بنكي (يدوي)' : 'Bank transfer (manual)',
+        'cash' => $isRtl ? 'نقداً' : 'Cash',
+    ];
+
     $documents = $booking->financialDocuments->sortBy('created_at');
     $movements = $booking->financialMovements->sortBy('created_at');
     $payableAt = $booking->payableAt();
@@ -64,6 +78,23 @@
             @if($booking->payout_reference)
                 <span class="block text-[12px] text-[#717171] tabular-nums" dir="ltr" style="margin-top: 6px;">{{ $isRtl ? 'مرجع:' : 'Ref:' }} {{ $booking->payout_reference }}</span>
             @endif
+            {{-- How it was settled, by whom, and whether it jumped the queue. --}}
+            <div class="text-[12px] text-[#717171] {{ $fa }}" style="margin-top: 6px;">
+                @if($booking->payout_method)
+                    <span>{{ $isRtl ? 'طريقة الصرف:' : 'Method:' }} <span class="font-semibold text-[#222]">{{ $payoutMethods[$booking->payout_method] ?? $booking->payout_method }}</span></span>
+                @endif
+                @if($booking->payoutSettledBy)
+                    <span> · {{ $isRtl ? 'سجّله' : 'Recorded by' }} <span class="font-semibold text-[#222]">{{ $booking->payoutSettledBy->name ?: $booking->payoutSettledBy->phone }}</span></span>
+                @endif
+                @if($booking->payout_forced_at)
+                    <span class="inline-flex items-center text-[11px] font-semibold text-[#b45309]" style="gap: 4px; background:#fffbeb; padding: 2px 8px; border-radius: 999px; margin-inline-start: 6px;">
+                        ⚡ {{ $isRtl ? 'صرف مبكر' : 'Released early' }}
+                    </span>
+                @endif
+                @if($booking->payout_note)
+                    <span class="block" style="margin-top: 4px;">{{ $isRtl ? 'ملاحظة:' : 'Note:' }} {{ $booking->payout_note }}</span>
+                @endif
+            </div>
         @elseif($booking->payout_status === 'processing')
             <span class="inline-flex items-center text-[13px] font-semibold text-[#1d4ed8]" style="gap: 6px; background: #eff6ff; padding: 6px 14px; border-radius: 999px;">
                 ⏳ {{ $isRtl ? 'جارٍ التحويل عبر ميسر — يُسوّى تلقائياً' : 'Transfer in progress via Moyasar — settles automatically' }}
@@ -119,24 +150,62 @@
             </span>
         @endif
 
-        {{-- Manual settlement: the admin transferred from the company bank
-             (outside Moyasar) and records it here. Available on any unpaid,
-             invoiced booking — but never while a Moyasar transfer is in
-             flight (the server refuses that anyway). --}}
-        @if($booking->payout_status === 'not_paid' && $booking->financial_completed_at !== null && $booking->booking_status === BookingStatus::Completed)
-            <form method="POST" action="{{ route('admin.bookings.payout.mark-paid', $booking) }}"
-                  class="flex flex-wrap items-center" style="gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px dashed #e5e7eb;"
-                  onsubmit="return confirm('{{ $isRtl ? 'تسجيل التحويل كمدفوع يدوياً؟ سيتم إشعار المضيف وتسجيل السند.' : 'Record this payout as paid manually? The host will be notified and the voucher recorded.' }}');">
-                @csrf
-                <input type="text" name="bank_reference" required maxlength="100" dir="ltr"
-                       placeholder="{{ $isRtl ? 'مرجع التحويل البنكي' : 'Bank transfer reference' }}"
-                       class="text-[13px] tabular-nums"
-                       style="padding: 8px 12px; border: 1px solid #e5e7eb; border-radius: 10px; min-width: 220px;">
-                <button type="submit" class="font-semibold text-[#065f46] bg-[#ecfdf5] hover:bg-[#d1fae5] {{ $fa }}"
-                        style="padding: 8px 14px; border-radius: 10px; font-size: 13px; white-space: nowrap;">
-                    {{ $isRtl ? 'تسجيل كمدفوع يدوياً' : 'Mark paid manually' }}
-                </button>
-            </form>
+        {{-- ── Admin settlement ────────────────────────────────────────
+             Two deliberate escape hatches from the automatic flow:
+               • Pay now   — fire the Moyasar transfer early, before the stay
+                             completes or the hold window closes.
+               • Mark paid — the money already left the company bank by hand,
+                             or was handed to the host in cash.
+             Both issue the invoices first, so the books never lag the money.
+             Shown on any live, guest-paid, unsettled booking; the server
+             re-checks every condition. --}}
+        @if($settleable)
+            <div style="margin-top: 12px; padding-top: 12px; border-top: 1px dashed #e5e7eb;">
+                @if($earlyRelease)
+                    <p class="text-[12px] text-[#b45309] {{ $fa }}" style="background: #fffbeb; padding: 8px 12px; border-radius: 10px; margin-bottom: 10px;">
+                        ⚠ {{ $isRtl
+                            ? 'هذا الحجز لم يستحق التحويل بعد. الصرف الآن يصدر الفواتير فوراً ويُسجَّل كصرف مبكر باسمك.'
+                            : 'This booking is not payable yet. Settling now issues the invoices immediately and is recorded as an early payout under your name.' }}
+                    </p>
+                @endif
+
+                @if($payoutsAutoMode)
+                    <form method="POST" action="{{ route('admin.bookings.payout.pay-now', $booking) }}"
+                          class="flex flex-wrap items-center" style="gap: 8px; margin-bottom: 10px;"
+                          onsubmit="return confirm('{{ $isRtl ? 'تحويل المبلغ للمضيف الآن عبر ميسر؟ سيتم إصدار الفواتير أولاً.' : 'Transfer the money to the host now via Moyasar? Invoices are issued first.' }}');">
+                        @csrf
+                        <input type="text" name="note" maxlength="500"
+                               placeholder="{{ $isRtl ? 'سبب الصرف المبكر (اختياري)' : 'Reason for the early payout (optional)' }}"
+                               class="text-[13px] flex-1" style="padding: 8px 12px; border: 1px solid #e5e7eb; border-radius: 10px; min-width: 200px;">
+                        <button type="submit" class="font-bold text-white bg-[#1d4ed8] hover:bg-[#1e40af] {{ $fa }}"
+                                style="padding: 8px 14px; border-radius: 10px; font-size: 13px; white-space: nowrap;">
+                            ⚡ {{ $isRtl ? 'تحويل الآن عبر ميسر' : 'Pay now via Moyasar' }}
+                        </button>
+                    </form>
+                @endif
+
+                <form method="POST" action="{{ route('admin.bookings.payout.mark-paid', $booking) }}"
+                      class="flex flex-wrap items-center" style="gap: 8px;"
+                      onsubmit="return confirm('{{ $isRtl ? 'تسجيل المبلغ كمدفوع للمضيف؟ سيتم إصدار الفواتير والسند وإشعار المضيف.' : 'Record this payout as settled? Invoices, the voucher and the host notification all fire.' }}');">
+                    @csrf
+                    <select name="method" class="text-[13px] {{ $fa }}"
+                            style="padding: 8px 12px; border: 1px solid #e5e7eb; border-radius: 10px; background: #fff;">
+                        <option value="bank">{{ $isRtl ? 'تحويل بنكي' : 'Bank transfer' }}</option>
+                        <option value="cash">{{ $isRtl ? 'نقداً' : 'Cash' }}</option>
+                    </select>
+                    <input type="text" name="bank_reference" required maxlength="100" dir="ltr"
+                           placeholder="{{ $isRtl ? 'مرجع التحويل / رقم سند الاستلام' : 'Transfer reference / cash receipt no.' }}"
+                           class="text-[13px] tabular-nums"
+                           style="padding: 8px 12px; border: 1px solid #e5e7eb; border-radius: 10px; min-width: 200px;">
+                    <input type="text" name="note" maxlength="500"
+                           placeholder="{{ $isRtl ? 'ملاحظة (اختياري)' : 'Note (optional)' }}"
+                           class="text-[13px] flex-1" style="padding: 8px 12px; border: 1px solid #e5e7eb; border-radius: 10px; min-width: 160px;">
+                    <button type="submit" class="font-semibold text-[#065f46] bg-[#ecfdf5] hover:bg-[#d1fae5] {{ $fa }}"
+                            style="padding: 8px 14px; border-radius: 10px; font-size: 13px; white-space: nowrap;">
+                        {{ $isRtl ? 'تسجيل كمدفوع' : 'Mark as paid' }}
+                    </button>
+                </form>
+            </div>
         @endif
     </div>
 </div>

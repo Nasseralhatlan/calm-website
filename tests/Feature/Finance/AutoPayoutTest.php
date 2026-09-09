@@ -354,7 +354,7 @@ it('records a manual bank-transfer payout with the full finance trail', function
     Http::assertNothingSent();
 });
 
-it('refuses manual mark-paid while a Moyasar transfer is in flight or before invoicing', function (): void {
+it('refuses manual mark-paid while a Moyasar transfer is in flight, but allows it on a failed row', function (): void {
     Http::fake();
     $service = app(HostPayoutService::class);
 
@@ -364,18 +364,83 @@ it('refuses manual mark-paid while a Moyasar transfer is in flight or before inv
         ->toThrow(ValidationException::class);
     expect($processing->refresh()->payout_status)->toBe('processing');
 
-    // Documents-before-money holds for manual settlements too.
-    $noDocs = apoBooking($this->host, $this->guest, ['financial_completed_at' => null]);
-    expect(fn () => $service->markPaidManually($noDocs, 'REF-2'))
-        ->toThrow(ValidationException::class);
-    expect($noDocs->refresh()->payout_status)->toBe('not_paid');
-
     // A failed row CAN be marked paid manually (the escape hatch).
     $failed = apoBooking($this->host, $this->guest, ['payout_failure' => 'Moyasar payout failed (bank rejected).']);
     $service->markPaidManually($failed, 'REF-3');
     expect($failed->refresh()->payout_status)->toBe('paid')
         ->and($failed->payout_failure)->toBeNull()
         ->and($failed->payout_reference)->toBe('REF-3');
+});
+
+it('force-issues the documents when an admin settles before invoicing, instead of refusing', function (): void {
+    // Documents-before-money still holds — but an admin settling early gets
+    // the documents ISSUED rather than the payout blocked.
+    Http::fake();
+    $service = app(HostPayoutService::class);
+
+    $noDocs = apoBooking($this->host, $this->guest, ['financial_completed_at' => null]);
+    expect($noDocs->financialDocuments()->count())->toBe(0);
+
+    $service->markPaidManually($noDocs, 'REF-2');
+    $noDocs->refresh();
+
+    expect($noDocs->payout_status)->toBe('paid')
+        ->and($noDocs->financial_completed_at)->not->toBeNull()
+        // The stay was over and the hold had passed — this booking was only
+        // waiting on the invoice job, so it is NOT an early release.
+        ->and($noDocs->payout_forced_at)->toBeNull();
+
+    // The full document set exists, not just the voucher.
+    $subtypes = $noDocs->financialDocuments()->pluck('document_subtype')->all();
+    expect($subtypes)->toContain(FinancialDocument::GUEST_BOOKING_INVOICE)
+        ->toContain(FinancialDocument::HOST_COMMISSION_INVOICE)
+        ->toContain(FinancialDocument::HOST_PAYOUT_STATEMENT)
+        ->toContain(FinancialDocument::HOST_PAYOUT_VOUCHER);
+
+    // And the money trail is complete: withheld + payable(settled) + payout.
+    expect($noDocs->financialMovements()->where('movement_type', FinancialMovement::COMMISSION_WITHHELD)->count())->toBe(1)
+        ->and($noDocs->financialMovements()->where('movement_type', FinancialMovement::HOST_PAYOUT_PAYABLE)->sole()->status)->toBe('succeeded')
+        ->and($noDocs->financialMovements()->where('movement_type', FinancialMovement::HOST_PAYOUT)->sole()->provider)->toBe('bank');
+});
+
+it('records a cash payout with the cash provider and the admin who handed it over', function (): void {
+    Http::fake();
+    $admin = User::factory()->create(['role' => UserRole::Admin->value, 'phone' => '598300009']);
+    $booking = apoBooking($this->host, $this->guest);
+
+    app(HostPayoutService::class)->markPaidManually(
+        $booking, 'CASH-RCPT-14', 'cash', 'Paid in cash at the Riyadh office.', $admin,
+    );
+
+    $booking->refresh();
+    expect($booking->payout_status)->toBe('paid')
+        ->and($booking->payout_method)->toBe('cash')
+        ->and($booking->payout_note)->toBe('Paid in cash at the Riyadh office.')
+        ->and($booking->payout_settled_by)->toBe($admin->id);
+
+    // Cash still leaves a full paper trail: movement + سند صرف + host SMS.
+    $mov = $booking->financialMovements()->where('movement_type', FinancialMovement::HOST_PAYOUT)->sole();
+    expect($mov->provider)->toBe('cash')
+        ->and($mov->provider_reference)->toBe('CASH-RCPT-14');
+    expect($booking->financialDocuments()->where('document_subtype', FinancialDocument::HOST_PAYOUT_VOUCHER)->count())->toBe(1);
+    expect(UserNotification::query()->where('user_id', $this->host->id)->where('type', 'host_payout_paid')->count())->toBe(1);
+
+    Http::assertNothingSent();
+});
+
+it('never pays out a booking the guest has not paid for', function (): void {
+    Http::fake();
+    $service = app(HostPayoutService::class);
+
+    $unpaid = apoBooking($this->host, $this->guest, [
+        'payment_status' => 'unpaid',
+        'financial_completed_at' => null,
+    ]);
+
+    expect(fn () => $service->markPaidManually($unpaid, 'REF-X', 'cash'))
+        ->toThrow(ValidationException::class);
+    expect($unpaid->refresh()->payout_status)->toBe('not_paid')
+        ->and($unpaid->financialDocuments()->count())->toBe(0);
 });
 
 it('prefers the bank account holder name over the profile name as beneficiary', function (): void {
@@ -390,4 +455,77 @@ it('prefers the bank account holder name over the profile name as beneficiary', 
     Http::assertSent(fn ($request): bool => str_ends_with($request->url(), '/payouts')
         && $request['destination']['name'] === 'MOHAMMED ABDULLAH ALQAHTANI');
     // The golden-path test covers the fallback: no holder name → profile name.
+});
+
+it('lets an admin release a payout early via Moyasar, issuing the documents first', function (): void {
+    autoPayoutsOn();
+    Http::fake(['api.moyasar.com/v1/payouts' => Http::response(['id' => 'po_early', 'status' => 'queued'], 201)]);
+
+    $admin = User::factory()->create(['role' => UserRole::Admin->value, 'phone' => '598300003']);
+    // Stay still running, nothing invoiced — the automatic sweep would skip it.
+    $early = apoBooking($this->host, $this->guest, [
+        'booking_status' => BookingStatus::Confirmed->value,
+        'start_date' => '2026-07-02', 'end_date' => '2026-07-20',
+        'financial_completed_at' => null,
+    ]);
+    expect($early->isPayable())->toBeFalse();
+
+    $this->actingAs($admin, 'api')
+        ->post("/admin/bookings/{$early->id}/payout/pay-now", ['note' => 'Host needs the cash for repairs.'])
+        ->assertRedirect("/admin/bookings/{$early->id}");
+
+    $early->refresh();
+    expect($early->payout_status)->toBe('processing')
+        ->and($early->payout_id)->toBe('po_early')
+        ->and($early->payout_forced_at)->not->toBeNull()
+        ->and($early->payout_settled_by)->toBe($admin->id)
+        ->and($early->payout_note)->toBe('Host needs the cash for repairs.')
+        // Documents were issued before the money left.
+        ->and($early->financial_completed_at)->not->toBeNull();
+
+    $subtypes = $early->financialDocuments()->pluck('document_subtype')->all();
+    expect($subtypes)->toContain(FinancialDocument::GUEST_BOOKING_INVOICE)
+        ->toContain(FinancialDocument::HOST_COMMISSION_INVOICE)
+        ->toContain(FinancialDocument::HOST_PAYOUT_STATEMENT);
+});
+
+it('records a cash settlement through the admin screen with its full paper trail', function (): void {
+    config()->set('moyasar.payouts_mode', 'manual');
+    Http::fake();
+
+    $admin = User::factory()->create(['role' => UserRole::Admin->value, 'phone' => '598300004']);
+    $booking = apoBooking($this->host, $this->guest, ['financial_completed_at' => null]);
+
+    $this->actingAs($admin, 'api')
+        ->post("/admin/bookings/{$booking->id}/payout/mark-paid", [
+            'bank_reference' => 'CASH-0091',
+            'method' => 'cash',
+            'note' => 'Handed over at the office.',
+        ])
+        ->assertRedirect("/admin/bookings/{$booking->id}");
+
+    $booking->refresh();
+    expect($booking->payout_status)->toBe('paid')
+        ->and($booking->payout_method)->toBe('cash')
+        ->and($booking->payout_settled_by)->toBe($admin->id);
+
+    expect($booking->financialMovements()->where('movement_type', FinancialMovement::HOST_PAYOUT)->sole()->provider)->toBe('cash');
+    expect($booking->financialDocuments()->where('document_subtype', FinancialDocument::HOST_PAYOUT_VOUCHER)->count())->toBe(1);
+    Http::assertNothingSent();
+});
+
+it('keeps both admin payout actions admin-only', function (): void {
+    Http::fake();
+    $booking = apoBooking($this->host, $this->guest);
+    $notAdmin = User::factory()->create(['phone' => '519300005']);
+
+    // EnsureAdmin bounces a signed-in non-admin off the admin area (web
+    // requests redirect; only api/JSON ones get a 403).
+    foreach (['pay-now', 'mark-paid'] as $action) {
+        $this->actingAs($notAdmin, 'api')
+            ->post("/admin/bookings/{$booking->id}/payout/{$action}", ['bank_reference' => 'X-1'])
+            ->assertRedirect(route('profile'));
+    }
+
+    expect($booking->refresh()->payout_status)->toBe('not_paid');
 });

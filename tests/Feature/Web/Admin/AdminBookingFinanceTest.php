@@ -14,6 +14,7 @@ use App\Models\Place;
 use App\Models\PlaceType;
 use App\Models\User;
 use App\Services\Finance\BookingFinanceFinalizer;
+use App\Services\Finance\HostPayoutService;
 use App\Services\Finance\QoyodSyncService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
@@ -153,4 +154,35 @@ it('is admin-only', function (): void {
         ->assertRedirect('/profile');
 
     expect($booking->fresh()->payout_status)->toBe('not_paid');
+});
+
+it('offers cash / early settlement on the panel and shows how a payout was settled', function (): void {
+    // Stay still running, nothing invoiced — the automatic sweep would skip it,
+    // but the admin can still settle it by hand.
+    $booking = finPanelBooking($this->host, $this->guest, [
+        'booking_status' => BookingStatus::Confirmed->value,
+        'end_date' => '2026-07-20',
+    ]);
+
+    $this->actingAs($this->admin, 'api')
+        ->get("/admin/bookings/{$booking->id}")
+        ->assertOk()
+        ->assertSee('تسجيل كمدفوع')
+        ->assertSee('نقداً')
+        // Early release is called out before the admin commits to it.
+        ->assertSee('لم يستحق التحويل بعد')
+        ->assertSee(route('admin.bookings.payout.mark-paid', $booking));
+
+    // Once settled in cash, the panel explains method, who and why.
+    app(HostPayoutService::class)->markPaidManually(
+        $booking, 'CASH-77', 'cash', 'Handed over in person.', $this->admin,
+    );
+
+    $this->actingAs($this->admin, 'api')
+        ->get("/admin/bookings/{$booking->id}")
+        ->assertOk()
+        ->assertSee('نقداً')
+        ->assertSee('صرف مبكر')
+        ->assertSee('Handed over in person.')
+        ->assertSee('CASH-77');
 });

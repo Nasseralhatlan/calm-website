@@ -199,6 +199,8 @@ Route::middleware(['auth:api', 'admin'])
         // transfer while automatic payouts aren't available.
         Route::post('/bookings/{booking}/payout/retry', [BookingsController::class, 'retryPayout'])->name('bookings.payout.retry');
         Route::post('/bookings/{booking}/payout/mark-paid', [BookingsController::class, 'markPayoutPaid'])->name('bookings.payout.mark-paid');
+        // Release the money early (admin judgement call) — documents first.
+        Route::post('/bookings/{booking}/payout/pay-now', [BookingsController::class, 'payoutNow'])->name('bookings.payout.pay-now');
         // Fresh expiring Qoyod PDF for a tax document (admin support view).
         Route::get('/finance-documents/{document}/pdf', FinanceDocumentPdfController::class)->name('finance-documents.pdf');
 

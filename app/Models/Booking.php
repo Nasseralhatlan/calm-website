@@ -81,6 +81,11 @@ class Booking extends Model
         'payout_id',
         'payout_failure',
         'payout_attempts',
+        // Admin-settled payouts (manual bank / cash, or released early).
+        'payout_method',
+        'payout_note',
+        'payout_settled_by',
+        'payout_forced_at',
         'expires_at',
         'confirmed_at',
         'canceled_at',
@@ -116,6 +121,7 @@ class Booking extends Model
             'confirmed_at' => 'datetime',
             'canceled_at' => 'datetime',
             'payout_paid_at' => 'datetime',
+            'payout_forced_at' => 'datetime',
             'stay_amount' => 'integer',
             'vat_rate' => 'float',
             'vat_amount' => 'integer',
@@ -144,6 +150,12 @@ class Booking extends Model
      * When this booking's host payout unlocks: checkout + the payout hold
      * window (Setting `payout_hold_hours`, default 24 — the dispute window).
      */
+    /** The admin who recorded a manual/early payout (null for automatic ones). */
+    public function payoutSettledBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'payout_settled_by');
+    }
+
     public function payableAt(): ?CarbonImmutable
     {
         $checkout = $this->checkoutAt();

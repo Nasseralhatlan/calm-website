@@ -7,6 +7,7 @@ namespace App\Services\Finance;
 use App\Enums\BookingStatus;
 use App\Integrations\Payment\MoyasarPayouts;
 use App\Models\Booking;
+use App\Models\User;
 use App\Services\Notification\NotificationService;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
@@ -240,42 +241,120 @@ final class HostPayoutService
     }
 
     /**
-     * Admin paid the host by hand (bank transfer from the company account,
-     * outside Moyasar) and records it here with the bank's reference. Same
-     * finance trail as an automatic settle — movement (provider 'bank'),
-     * payout voucher (سند صرف), host notification. Works in manual mode and
-     * on failed rows; the automatic queue/Retry behavior is untouched.
+     * Admin settles the payout by hand — a bank transfer from the company
+     * account or cash handed over — and records it with a reference. Same
+     * finance trail as an automatic settle (movement, سند صرف, host SMS), only
+     * the provider differs ('bank' | 'cash').
+     *
+     * Works ahead of the normal gates: if the documents have not been issued
+     * yet (early release, stay still running) they are force-issued first, so
+     * the books never lag the money. What it will NOT do is pay out money the
+     * guest never paid, or double-pay a transfer already in flight.
+     *
+     * @param  'bank'|'cash'  $method
      */
-    public function markPaidManually(Booking $booking, string $bankReference): void
+    public function markPaidManually(
+        Booking $booking,
+        string $reference,
+        string $method = 'bank',
+        ?string $note = null,
+        ?User $admin = null,
+    ): void {
+        $this->assertSettleable($booking);
+
+        // Documents first, always.
+        $this->finalizer->finalizeNow($booking);
+        $booking->refresh();
+
+        // Did this jump the queue? Judged AFTER issuing the documents, so a
+        // booking that was simply waiting on the invoice job isn't mislabelled
+        // as an early release — only a genuinely-not-due one is.
+        $forced = ! $booking->isPayable();
+
+        $booking->update([
+            'payout_status' => 'paid',
+            'payout_paid_at' => now(),
+            'payout_reference' => $reference,
+            'payout_method' => $method,
+            'payout_note' => $note,
+            'payout_settled_by' => $admin?->id,
+            'payout_forced_at' => $forced ? now() : null,
+            'payout_failure' => null,
+        ]);
+
+        $this->finalizer->recordPayoutPaid($booking->refresh(), $method);
+
+        $this->notifications->hostPayoutPaid($booking);
+    }
+
+    /**
+     * Admin releases the money NOW through Moyasar, ahead of the stay
+     * completing / the hold window closing. Issues the documents first, then
+     * fires the same transfer the automatic sweep would have.
+     *
+     * True = accepted by Moyasar (row goes `processing`, settles via
+     * reconciliation); false = failed locally, reason in payout_failure.
+     */
+    public function payoutNow(Booking $booking, ?string $note = null, ?User $admin = null): bool
+    {
+        if (! $this->autoModeEnabled()) {
+            throw ValidationException::withMessages([
+                'payout' => __('Automatic payouts are disabled — configure Moyasar payouts (mode + account), or settle this one by hand.'),
+            ]);
+        }
+
+        $this->assertSettleable($booking);
+
+        $this->finalizer->finalizeNow($booking);
+        $booking->refresh();
+
+        // See markPaidManually(): judged after the documents exist.
+        $forced = ! $booking->isPayable();
+
+        $booking->update([
+            'payout_note' => $note,
+            'payout_settled_by' => $admin?->id,
+            'payout_forced_at' => $forced ? now() : null,
+            // The admin is deliberately re-firing; clear any stale failure so
+            // execute() is not skipped by the queue's own guard.
+            'payout_failure' => null,
+        ]);
+
+        return $this->execute($booking->refresh());
+    }
+
+    /**
+     * Shared guards for any admin-initiated settlement. These are the money-real
+     * invariants — unlike the timing gates, none of them bend for an admin.
+     */
+    private function assertSettleable(Booking $booking): void
     {
         // Never while a Moyasar transfer is in flight — settling both would
         // pay the host twice. The reconciler owns `processing` rows.
         if ($booking->payout_status === 'processing') {
             throw ValidationException::withMessages([
-                'payout' => __('A Moyasar transfer is already in progress for this booking — wait for it to settle or fail before marking manually.'),
+                'payout' => __('A Moyasar transfer is already in progress for this booking — wait for it to settle or fail before settling by hand.'),
             ]);
         }
 
-        if (
-            $booking->booking_status !== BookingStatus::Completed
-            || $booking->financial_completed_at === null
-            || $booking->payout_status !== 'not_paid'
-        ) {
+        if ($booking->payout_status !== 'not_paid') {
             throw ValidationException::withMessages([
-                'payout' => __('Only completed, invoiced, unpaid bookings can be marked as paid.'),
+                'payout' => __('This payout is already settled.'),
             ]);
         }
 
-        $booking->update([
-            'payout_status' => 'paid',
-            'payout_paid_at' => now(),
-            'payout_reference' => $bankReference,
-            'payout_failure' => null,
-        ]);
+        // You cannot hand a host money the guest never paid.
+        if ($booking->payment_status !== 'paid') {
+            throw ValidationException::withMessages([
+                'payout' => __('The guest has not paid for this booking — there is nothing to pay out.'),
+            ]);
+        }
 
-        $this->finalizer->recordPayoutPaid($booking->refresh(), 'bank');
-
-        $this->notifications->hostPayoutPaid($booking);
+        if (! in_array($booking->booking_status, [BookingStatus::Confirmed, BookingStatus::Completed], true)) {
+            throw ValidationException::withMessages([
+                'payout' => __('Only confirmed or completed bookings can be paid out.'),
+            ]);
+        }
     }
 
     /**
@@ -290,6 +369,7 @@ final class HostPayoutService
             'payout_status' => 'paid',
             'payout_paid_at' => now(),
             'payout_reference' => (string) ($payout['sequence_number'] ?? $payout['id'] ?? $booking->payout_id),
+            'payout_method' => 'moyasar',
             'payout_failure' => null,
         ]);
 

@@ -43,17 +43,52 @@ final class BookingFinanceFinalizer
     }
 
     /**
+     * Can this booking be invoiced RIGHT NOW at an admin's request, ahead of
+     * the normal checkout+N hours gate? Same conditions as isDue() minus the
+     * timing — the money-real ones never bend: the guest must actually have
+     * paid, the booking must be live (cancelled/expired/unpaid are excluded
+     * by the status whitelist), and documents must not exist already.
+     */
+    public function canForceFinalize(Booking $booking): bool
+    {
+        return $booking->payment_status === 'paid'
+            && in_array($booking->booking_status, [BookingStatus::Confirmed, BookingStatus::Completed], true)
+            && $booking->financial_completed_at === null;
+    }
+
+    /**
      * Issue the full per-booking document set. Safe to call repeatedly and
      * from concurrent workers — the row lock + rechecks + idempotent document
      * creation make it single-shot.
      */
     public function finalize(Booking $booking): void
     {
-        DB::transaction(function () use ($booking): void {
-            /** @var Booking $locked */
+        $this->issue($booking, force: false);
+    }
+
+    /**
+     * Issue the same document set immediately, for an admin releasing a payout
+     * before the stay/invoice window closes. The books must never lag the
+     * money: whenever an admin pays a host early or in cash, this runs first so
+     * the invoices, statement and withheld/payable movements all exist (and
+     * mirror to Qoyod) before the payout is recorded.
+     */
+    public function finalizeNow(Booking $booking): void
+    {
+        $this->issue($booking, force: true);
+    }
+
+    private function issue(Booking $booking, bool $force): void
+    {
+        DB::transaction(function () use ($booking, $force): void {
+            /** @var Booking|null $locked */
             $locked = Booking::query()->whereKey($booking->id)->lockForUpdate()->first();
 
-            if ($locked === null || ! $this->isDue($locked)) {
+            if ($locked === null) {
+                return;
+            }
+
+            if (! ($force ? $this->canForceFinalize($locked) : $this->isDue($locked))) {
                 return;
             }
 

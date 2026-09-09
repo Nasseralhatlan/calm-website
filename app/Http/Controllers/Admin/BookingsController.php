@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\CancelBookingRequest;
+use App\Http\Requests\Admin\ForcePayoutRequest;
 use App\Http\Requests\Admin\MarkPayoutPaidRequest;
 use App\Models\Booking;
 use App\Services\Booking\BookingService;
@@ -33,15 +34,21 @@ class BookingsController extends Controller
         ]);
     }
 
-    public function show(Booking $booking): View
+    public function show(Booking $booking, HostPayoutService $payouts): View
     {
         $booking->load([
             'place.coverPhoto', 'place.cityArea.city', 'place.type', 'place.publishedReviews.guest', 'guest', 'host', 'unit',
             // The booking-centric finance panel: documents + money trail.
-            'financialDocuments', 'financialMovements',
+            'financialDocuments', 'financialMovements', 'payoutSettledBy',
         ]);
 
-        return view('admin.bookings.show', ['booking' => $booking]);
+        return view('admin.bookings.show', [
+            'booking' => $booking,
+            // Drives the "Pay now via Moyasar" button — pointless while
+            // payouts are in manual mode (execute() would only record a
+            // failure against an empty source account).
+            'payoutsAutoMode' => $payouts->autoModeEnabled(),
+        ]);
     }
 
     /**
@@ -59,16 +66,41 @@ class BookingsController extends Controller
     }
 
     /**
-     * The admin transferred the payout from the company bank by hand and
-     * records it here — full finance trail fires (movement, سند صرف, host SMS).
+     * Release the payout through Moyasar NOW, ahead of the stay completing or
+     * the hold window closing. Documents are issued first, so the books never
+     * lag the money.
      */
-    public function markPayoutPaid(MarkPayoutPaidRequest $request, Booking $booking, HostPayoutService $payouts): RedirectResponse
+    public function payoutNow(ForcePayoutRequest $request, Booking $booking, HostPayoutService $payouts): RedirectResponse
     {
-        $payouts->markPaidManually($booking, $request->bankReference());
+        $started = $payouts->payoutNow($booking, $request->note(), $request->user());
 
         return redirect()
             ->route('admin.bookings.show', $booking)
-            ->with('status', __('Payout for booking :ref recorded as paid manually.', ['ref' => $booking->reference]));
+            ->with('status', $started
+                ? __('Early transfer for booking :ref started via Moyasar — invoices were issued first.', ['ref' => $booking->reference])
+                : __('Early transfer for booking :ref could not be started — the reason is shown on this page.', ['ref' => $booking->reference]));
+    }
+
+    /**
+     * The admin settled the payout by hand — a company bank transfer or cash —
+     * and records it here. Full finance trail fires (invoices if they were not
+     * issued yet, movement, سند صرف, host SMS).
+     */
+    public function markPayoutPaid(MarkPayoutPaidRequest $request, Booking $booking, HostPayoutService $payouts): RedirectResponse
+    {
+        $payouts->markPaidManually(
+            $booking,
+            $request->bankReference(),
+            $request->method(),
+            $request->note(),
+            $request->user(),
+        );
+
+        return redirect()
+            ->route('admin.bookings.show', $booking)
+            ->with('status', $request->method() === 'cash'
+                ? __('Payout for booking :ref recorded as paid in cash.', ['ref' => $booking->reference])
+                : __('Payout for booking :ref recorded as paid manually.', ['ref' => $booking->reference]));
     }
 
     public function cancel(CancelBookingRequest $request, Booking $booking): RedirectResponse
