@@ -20,6 +20,7 @@
         "heic-to": "^1.5.2",
         "heic2any": "^0.0.4",
         "lottie-web": "^5.13.0",
+        "posthog-js": "^1.433.5",
         "sortablejs": "^1.15.7"
     }
 }

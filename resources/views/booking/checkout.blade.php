@@ -145,7 +145,17 @@ function calmCheckout(init) {
         quote: null, quoteError: '', quoteSeq: 0,
         submitting: false, submitError: '',
 
-        load() { this.fetchQuote(); },
+        load() {
+            window.calmTrack?.('view', 'checkout', {
+                place_id: init.placeId,
+                nights: this.stayNights(),
+            });
+            this.fetchQuote();
+        },
+
+        stayNights() {
+            return Math.round((parseD(this.checkOut) - parseD(this.checkIn)) / 86400000) + 1;
+        },
 
         fmtDay(dateStr) {
             if (!dateStr) return '';
@@ -190,6 +200,11 @@ function calmCheckout(init) {
 
         proceed() {
             if (!this.quote || this.submitting) return;
+            // click:pay — they committed; next stop is Moyasar (or the login modal).
+            window.calmTrack?.('click', 'pay', {
+                place_id: init.placeId,
+                total_sar: this.quote?.pricing?.total,
+            });
             if (!init.authed) {
                 // The login modal reloads this same URL — the flow resumes
                 // here already signed in, dates intact in the query string.

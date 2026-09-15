@@ -68,6 +68,9 @@ function fakeMoyasar(string $fetchStatus = 'initiated', int $fetchAmount = 0): v
         'api.moyasar.com/v1/payments/*/refund' => Http::response([
             'id' => 'pay_test', 'status' => 'refunded', 'amount' => $fetchAmount, 'refunded' => $fetchAmount,
         ]),
+        // Catch-all LAST: without it Laravel executes unmatched URLs for real,
+        // which would send analytics events to PostHog from the test suite.
+        '*' => Http::response([], 200),
     ]);
 }
 
@@ -263,6 +266,60 @@ it('confirms via the Moyasar webhook', function (): void {
     ])->assertOk();
 
     expect($booking->refresh()->booking_status)->toBe(BookingStatus::Confirmed);
+});
+
+it('sends payment_completed to analytics when the webhook confirms, and nothing otherwise', function (): void {
+    // The one analytics event the client is not trusted for. Server-side,
+    // fire-and-forget — see docs/feature-analytics.md.
+    config(['analytics.posthog.key' => 'phc_test', 'analytics.posthog.host' => 'https://eu.i.posthog.com']);
+    fakeMoyasar('paid', 230000);
+    $place = bookingPlace();
+    [$in, $out] = twoNightDates();
+    $guest = bookingGuest();
+
+    $this->actingAs($guest, 'api')
+        ->postJson("/api/places/{$place->id}/bookings", ['check_in' => $in, 'check_out' => $out, 'guests' => 2])
+        ->assertStatus(201);
+
+    $booking = Booking::query()->first();
+
+    $this->postJson('/api/payments/moyasar/webhook', [
+        'type' => 'invoice_paid',
+        'data' => ['id' => $booking->payment_id, 'status' => 'paid', 'metadata' => ['booking_id' => $booking->id]],
+    ])->assertOk();
+
+    Http::assertSent(function ($request) use ($booking, $guest): bool {
+        if (! str_contains($request->url(), 'posthog')) {
+            return false;
+        }
+
+        return $request['event'] === 'payment_completed'
+            // distinct_id is the guest's UUID, so this joins their client-side
+            // journey; never the phone number.
+            && $request['distinct_id'] === $guest->id
+            && $request['properties']['booking_reference'] === $booking->reference
+            && $request['properties']['total_sar'] === 2300.0;
+    });
+});
+
+it('does not send analytics when no PostHog key is configured', function (): void {
+    config(['analytics.posthog.key' => '']);
+    fakeMoyasar('paid', 230000);
+    $place = bookingPlace();
+    [$in, $out] = twoNightDates();
+
+    $this->actingAs(bookingGuest(), 'api')
+        ->postJson("/api/places/{$place->id}/bookings", ['check_in' => $in, 'check_out' => $out, 'guests' => 2])
+        ->assertStatus(201);
+
+    $booking = Booking::query()->first();
+    $this->postJson('/api/payments/moyasar/webhook', [
+        'type' => 'invoice_paid',
+        'data' => ['id' => $booking->payment_id, 'status' => 'paid', 'metadata' => ['booking_id' => $booking->id]],
+    ])->assertOk();
+
+    expect($booking->refresh()->booking_status)->toBe(BookingStatus::Confirmed);
+    Http::assertNotSent(fn ($request): bool => str_contains($request->url(), 'posthog'));
 });
 
 it('rejects a webhook with the wrong secret when one is configured', function (): void {

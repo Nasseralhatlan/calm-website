@@ -18,7 +18,9 @@
 @endsection
 
 @section('body')
-<div class="min-h-screen bg-white" x-data="calmHome()" x-init="init()"
+{{-- No x-init="init()": Alpine already auto-runs a component's init() method,
+     and having both ran it twice — double search fetch, double analytics event. --}}
+<div class="min-h-screen bg-white" x-data="calmHome()"
      x-on:calm-search-apply.window="onApply($event.detail)"
      x-on:calm-filters-apply.window="onFiltersApply($event.detail)"
      x-on:calm-search-state.window="searchState = $event.detail">
@@ -175,7 +177,7 @@
         </div>
 
         {{-- ══ Results mode — app: back + «أماكن فى {city} / N نتيجة» pill + filters ══ --}}
-        <div x-show="mode === 'results'" x-cloak>
+        <div x-show="mode === 'results'" x-cloak @scroll.window.passive="onResultsScroll()">
             {{-- App-style results bar — mobile/tablet only (desktop keeps the site header) --}}
             <div class="calm-hide-desktop sticky top-0 z-30 flex items-center justify-between"
                  style="gap: 10px; padding: 12px 20px; background-color: rgba(255,255,255,0.85); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);">
@@ -362,6 +364,14 @@
                     <span>{{ $isRtl ? 'عرض المزيد' : 'Load more' }}</span>
                 </button>
             </div>
+            {{-- end:results — they reached the bottom AND there are no more
+                 pages to load, i.e. they ran out of options. Binary flag. --}}
+            <div style="height: 1px;"
+                 x-init="new IntersectionObserver((entries) => {
+                     if (entries[0].isIntersecting && !hasMore && items.length > 0) {
+                         window.calmTrackOnce?.('end', 'results');
+                     }
+                 }, { threshold: 0.1 }).observe($el)"></div>
             </div>{{-- /.calm-results-main --}}
             </div>{{-- /.calm-results-wrap --}}
         </div>
@@ -487,8 +497,32 @@
                         checkOut: /^\d{4}-\d{2}-\d{2}$/.test(q.get('out') || '') ? q.get('out') : null,
                     };
                     this.mode = 'results';
-                    this.fetchPage(1, this.searchParams());
+                    this.fetchPage(1, this.searchParams()).then(() => this.trackResults());
+                } else {
+                    window.calmTrack?.('view', 'home');
                 }
+            },
+
+            /**
+             * view:results — fired once the fetch resolves, because
+             * results_count (the single most important property we collect)
+             * is only known then. See docs/feature-analytics.md.
+             */
+            /** scroll:results — binary flag, once per session (see the spec). */
+            onResultsScroll() {
+                if (this.mode !== 'results') return;
+                if (window.scrollY > 200) window.calmTrackOnce?.('scroll', 'results');
+            },
+
+            trackResults() {
+                const a = this.applied || {};
+                window.calmTrack?.('view', 'results', {
+                    city_id: a.cityId,
+                    check_in: a.checkIn,
+                    check_out: a.checkOut,
+                    guests: this.filters?.guests,
+                    results_count: this.total,
+                });
             },
 
             onApply(selection) {
@@ -496,7 +530,7 @@
                 // A fresh main search resets the advanced filters (app parity).
                 this.filters = { priceMin: null, priceMax: null, guests: null, amenityIds: [] };
                 this.mode = 'results';
-                this.fetchPage(1, this.searchParams());
+                this.fetchPage(1, this.searchParams()).then(() => this.trackResults());
                 this.syncUrl();
             },
 
@@ -520,7 +554,7 @@
                 };
                 // Keep the search sheet's chips in sync with the filter picks.
                 this.$dispatch('calm-filters-sync', { typeIds: detail.typeIds, areaIds: detail.areaIds });
-                this.fetchPage(1, this.searchParams());
+                this.fetchPage(1, this.searchParams()).then(() => this.trackResults());
                 this.syncUrl();
             },
 
