@@ -303,6 +303,27 @@
                     this.close();
                     const s = this.sel;
                     const selection = { cityId: s.cityId, areaIds: [...s.areaIds], typeIds: [...s.typeIds], checkIn: s.checkIn, checkOut: s.checkOut };
+                    // click:search — the criteria they actually asked for, at
+                    // the moment they asked. view:results follows with the
+                    // results_count. Names as well as ids: a UUID is unreadable
+                    // in the PostHog UI, and "which city did they want" is the
+                    // whole supply question.
+                    const nameOf = (list, id) => list.find((x) => x.id === id)?.name;
+                    window.calmTrack?.('click', 'search', {
+                        city_id: s.cityId,
+                        city_name: nameOf(this.cat.cities, s.cityId),
+                        area_ids: [...s.areaIds],
+                        area_names: s.areaIds.map((id) => nameOf(this.cityAreas(), id)).filter(Boolean),
+                        type_ids: [...s.typeIds],
+                        type_names: s.typeIds.map((id) => nameOf(this.cat.types, id)).filter(Boolean),
+                        check_in: s.checkIn,
+                        check_out: s.checkOut,
+                        nights: s.checkIn && s.checkOut
+                            ? Math.round((new Date(s.checkOut) - new Date(s.checkIn)) / 86400000) + 1
+                            : null,
+                        has_dates: !!s.checkIn,
+                    });
+
                     const q = new URLSearchParams({ city: selection.cityId });
                     if (selection.areaIds.length) q.set('area', selection.areaIds.join(','));
                     if (selection.typeIds.length) q.set('type', selection.typeIds.join(','));

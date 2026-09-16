@@ -55,12 +55,20 @@ carousels — the target says which.
 
 ## The events
 
-Twelve total. Eleven from the client, one from the server.
+Thirteen total. Twelve from the client, one from the server.
+
+`click:search` and `view:results` are deliberately BOTH kept: the click is what
+they asked for, the view is what they got. Only the view knows `results_count`,
+and only the click is guaranteed to fire (on desktop the results open in a new
+tab, so a failed load would otherwise leave no trace that they searched at all).
+Names as well as ids on the click, because a UUID is unreadable in the PostHog
+UI and "which city did they want" is the entire supply question.
 
 | Event | Properties | Web trigger | Mobile trigger |
 |---|---|---|---|
 | `view:home` | — | load of `/` | home screen shown |
-| `view:results` | `city_id`, `check_in`, `check_out`, `guests`, `results_count` | results mode / `/?city=…` | results screen shown |
+| `click:search` | `city_id`, `city_name`, `area_ids`, `area_names`, `type_ids`, `type_names`, `check_in`, `check_out`, `nights`, `has_dates` | «ابحث» in the search sheet | same |
+| `view:results` | `city_id`, `city_name`, `area_ids`, `type_ids`, `check_in`, `check_out`, `guests`, `results_count` | results mode / `/?city=…` | results screen shown |
 | `view:place` | `place_id`, `price_sar`, `source` | load of `/places/{id}` | listing screen shown |
 | `view:checkout` | `place_id`, `total_sar`, `nights` | load of `/book/{place}/checkout` | checkout screen shown |
 | `view:status` | `booking_reference` | load of `/book/status/{booking}` | payment-return screen |
@@ -81,6 +89,8 @@ it must never slow a webhook.
 
 - `click:place` — `view:place` fires on the page/screen itself, so it catches shared links and
   deep links too. A card tap that never lands is not interesting.
+- Any array passed straight out of Alpine's reactive proxy — spread it (`[...ids]`) or it
+  serialises as `{"0": …}` and is painful to query.
 - `click:dates` — confirming dates IS what produces `view:checkout`.
 - `view:login` — derivable: if the user was anonymous at `click:pay`, the login modal appeared.
 - `dates_unavailable` — that's a conclusion. `click:reserve` with no following `view:checkout`

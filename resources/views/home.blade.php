@@ -518,6 +518,14 @@
                 const a = this.applied || {};
                 window.calmTrack?.('view', 'results', {
                     city_id: a.cityId,
+                    // Only set once the search sheet has broadcast; the ids are
+                    // always present, the name is the readable convenience.
+                    city_name: this.searchState?.cityName,
+                    // Spread out of Alpine's reactive proxy — passed straight
+                    // through, an array serialises as {"0": …} and is painful
+                    // to query.
+                    area_ids: [...(a.areaIds || [])],
+                    type_ids: [...(a.typeIds || [])],
                     check_in: a.checkIn,
                     check_out: a.checkOut,
                     guests: this.filters?.guests,

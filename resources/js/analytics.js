@@ -54,7 +54,11 @@ export function initAnalytics() {
 /** Strip empties so a property is either meaningful or absent. */
 function clean(props) {
     return Object.fromEntries(
-        Object.entries(props).filter(([, v]) => v !== null && v !== undefined && v !== ''),
+        Object.entries(props).filter(([, v]) => {
+            if (v === null || v === undefined || v === '') return false;
+            if (Array.isArray(v) && v.length === 0) return false;
+            return true;
+        }),
     );
 }
 
