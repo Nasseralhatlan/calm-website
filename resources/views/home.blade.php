@@ -18,7 +18,9 @@
 @endsection
 
 @section('body')
-<div class="min-h-screen bg-white" x-data="calmHome()" x-init="init()"
+{{-- No x-init="init()": Alpine already auto-runs a component's init() method,
+     and having both ran it twice — double search fetch, double analytics event. --}}
+<div class="min-h-screen bg-white" x-data="calmHome()"
      x-on:calm-search-apply.window="onApply($event.detail)"
      x-on:calm-filters-apply.window="onFiltersApply($event.detail)"
      x-on:calm-search-state.window="searchState = $event.detail">
@@ -65,10 +67,53 @@
                 @endif
             </div>
 
+            {{-- Occasion services — lead capture for the events team. Sits right
+                 under the greeting like the app's card: copy at the inline
+                 start, fanned photo deck at the inline end. --}}
+            <a href="{{ route('occasions.show') }}"
+               class="calm-enter calm-press flex items-center bg-white"
+               style="margin: 22px 20px 0; padding: 16px; border-radius: 26px; corner-shape: squircle; -webkit-corner-shape: squircle; gap: 16px; box-shadow: 0 0 50px rgba(0,0,0,0.06); animation-delay: 120ms;">
+                <span style="flex: 1; min-width: 0;">
+                    <span class="flex items-center" style="gap: 8px;">
+                        <span class="font-bold text-black {{ $fa }}" style="font-size: 16px;">{{ $isRtl ? 'خدمة المناسبات' : 'Occasion services' }}</span>
+                        <span class="font-bold text-white {{ $fa }}" style="padding: 3px 9px; border-radius: 999px; font-size: 10px; background-color: #F88379;">{{ $isRtl ? 'جديد' : 'New' }}</span>
+                    </span>
+                    <span class="block {{ $fa }}" style="font-size: 12.5px; line-height: 1.55; margin-top: 5px; color: #AAAAAA;">
+                        {{ $isRtl ? 'نجهّز لك مناسبتك من الألف إلى الياء. أخبرنا بما تريد ونتكفّل بالباقي.' : 'We plan your whole occasion. Tell us what you want and we\'ll handle the rest.' }}
+                    </span>
+                    <span class="flex items-center font-bold {{ $fa }}" style="gap: 5px; margin-top: 8px; font-size: 13px; color: #F88379;">
+                        {{ $isRtl ? 'ابدأ' : 'Start' }}
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"
+                             style="{{ $isRtl ? 'transform: scaleX(-1);' : '' }}">
+                            <path d="M9 5l7 7-7 7"></path>
+                        </svg>
+                    </span>
+                </span>
+
+                {{-- Fanned photo deck — two cards peeking out behind the front one,
+                     like the app. Mirrored by locale so the fan always opens away
+                     from the copy, whichever side the deck lands on. --}}
+                @php $fan = $isRtl ? 1 : -1; @endphp
+                <span class="relative shrink-0 block" style="width: 92px; height: 88px;">
+                    @foreach([
+                        ['img' => '3.jpg', 'rot' => -13, 'x' => -13, 'z' => 1],
+                        ['img' => '2.jpg', 'rot' => 11,  'x' => 11,  'z' => 2],
+                        ['img' => '1.jpg', 'rot' => -2,  'x' => 0,   'z' => 3],
+                    ] as $ph)
+                        <img src="/assets/occasions/{{ $ph['img'] }}" alt="" loading="lazy" draggable="false"
+                             class="absolute object-cover"
+                             style="width: 66px; height: 74px; top: 50%; left: 50%; z-index: {{ $ph['z'] }};
+                                    border-radius: 18px; corner-shape: squircle; -webkit-corner-shape: squircle;
+                                    border: 2.5px solid #fff; box-shadow: 0 4px 14px rgba(0,0,0,0.12);
+                                    transform: translate(-50%, -50%) translateX({{ $ph['x'] * $fan }}px) rotate({{ $ph['rot'] * $fan }}deg);">
+                    @endforeach
+                </span>
+            </a>
+
             {{-- Type boxes (app: 3 white squares) — hidden on desktop --}}
             <div class="grid grid-cols-3 lg:hidden" style="gap: 14px; margin-top: 22px; padding-inline: 20px;">
                 @foreach($placeTypes->take(3) as $i => $t)
-                    <button type="button" @click="$dispatch('calm-open-search', { typeId: @js($t->id) })"
+                    <button type="button" @click="window.calmTrack?.('click', 'category', { type: @js($t->id) }); $dispatch('calm-open-search', { typeId: @js($t->id), source: 'category' })"
                             class="calm-enter calm-press flex flex-col items-center justify-center bg-white min-w-0"
                             style="aspect-ratio: 1 / 0.92; border-radius: 26px; corner-shape: squircle; -webkit-corner-shape: squircle; gap: 10px; padding: 10px; box-shadow: 0 0 50px rgba(0,0,0,0.06); animation-delay: {{ 140 + $i * 50 }}ms;">
                         <span class="text-[26px] sm:text-[34px]" style="line-height: 1;">{{ $t->icon ?: '🏠' }}</span>
@@ -86,7 +131,7 @@
                             {{ $isRtl ? $list->name_ar : $list->name_en }}@if($list->icon)&nbsp;{{ $list->icon }}@endif
                         </h2>
                         {{-- See-all: chevron circle on mobile, text link on desktop --}}
-                        <a href="{{ route('web.list', $list) }}" aria-label="{{ $isRtl ? 'عرض الكل' : 'See all' }}"
+                        <a href="{{ route('web.list', $list) }}" @click="window.calmTrack?.('click', 'view_all', { section: 'home_list' })" aria-label="{{ $isRtl ? 'عرض الكل' : 'See all' }}"
                            class="calm-press calm-round lg:hidden shrink-0 flex items-center justify-center text-black"
                            style="width: 36px; height: 36px; border-radius: 50%; background-color: #F5F5F5;">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"
@@ -94,7 +139,7 @@
                                 <path d="M9 5l7 7-7 7"></path>
                             </svg>
                         </a>
-                        <a href="{{ route('web.list', $list) }}"
+                        <a href="{{ route('web.list', $list) }}" @click="window.calmTrack?.('click', 'view_all', { section: 'home_list' })"
                            class="calm-press hidden lg:inline-flex items-center shrink-0 font-bold text-black hover:bg-[#F5F5F5] transition-colors {{ $fa }}"
                            style="gap: 5px; padding: 9px 16px; border-radius: 999px; font-size: 14px;">
                             <span>{{ $isRtl ? 'عرض الكل' : 'See all' }}</span>
@@ -111,7 +156,7 @@
 
                         {{-- «عرض الكل» — animated stacked photos → the list page --}}
                         @php $seeAllCovers = $list->places->skip(5)->concat($list->places)->map(fn ($sp) => $sp->coverPhoto?->url ?? $sp->visiblePhotos()->first()?->url)->filter()->unique()->take(2)->values(); @endphp
-                        <a href="{{ route('web.list', $list) }}"
+                        <a href="{{ route('web.list', $list) }}" @click="window.calmTrack?.('click', 'view_all', { section: 'home_list' })"
                            x-data="{ shown: false }"
                            x-init="new IntersectionObserver((entries) => { shown = entries[0].isIntersecting; }, { root: $el.parentElement, threshold: 0.55 }).observe($el)"
                            :class="shown ? 'is-open' : ''"
@@ -143,7 +188,7 @@
 
                         {{-- $seeAllCovers is built by the mobile row above (same
                              loop iteration) — reuse it, no extra photo lookups. --}}
-                        <a href="{{ route('web.list', $list) }}"
+                        <a href="{{ route('web.list', $list) }}" @click="window.calmTrack?.('click', 'view_all', { section: 'home_list' })"
                            x-data="{ shown: false }"
                            x-init="new IntersectionObserver((entries) => { shown = entries[0].isIntersecting; }, { threshold: 0.5 }).observe($el)"
                            :class="shown ? 'is-open' : ''"
@@ -175,7 +220,7 @@
         </div>
 
         {{-- ══ Results mode — app: back + «أماكن فى {city} / N نتيجة» pill + filters ══ --}}
-        <div x-show="mode === 'results'" x-cloak>
+        <div x-show="mode === 'results'" x-cloak @scroll.window.passive="onResultsScroll()">
             {{-- App-style results bar — mobile/tablet only (desktop keeps the site header) --}}
             <div class="calm-hide-desktop sticky top-0 z-30 flex items-center justify-between"
                  style="gap: 10px; padding: 12px 20px; background-color: rgba(255,255,255,0.85); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);">
@@ -362,6 +407,14 @@
                     <span>{{ $isRtl ? 'عرض المزيد' : 'Load more' }}</span>
                 </button>
             </div>
+            {{-- end:results — they reached the bottom AND there are no more
+                 pages to load, i.e. they ran out of options. Binary flag. --}}
+            <div style="height: 1px;"
+                 x-init="new IntersectionObserver((entries) => {
+                     if (entries[0].isIntersecting && !hasMore && items.length > 0) {
+                         window.calmTrackOnce?.('end', 'results');
+                     }
+                 }, { threshold: 0.1 }).observe($el)"></div>
             </div>{{-- /.calm-results-main --}}
             </div>{{-- /.calm-results-wrap --}}
         </div>
@@ -487,8 +540,34 @@
                         checkOut: /^\d{4}-\d{2}-\d{2}$/.test(q.get('out') || '') ? q.get('out') : null,
                     };
                     this.mode = 'results';
-                    this.fetchPage(1, this.searchParams());
+                    this.fetchPage(1, this.searchParams()).then(() => this.trackResults());
+                } else {
+                    window.calmTrack?.('view', 'home');
                 }
+            },
+
+            /**
+             * view:results — fired once the fetch resolves, because
+             * results_count (the single most important property we collect)
+             * is only known then. See docs/feature-analytics.md.
+             */
+            /** scroll:results — binary flag, once per session (see the spec). */
+            onResultsScroll() {
+                if (this.mode !== 'results') return;
+                if (window.scrollY > 200) window.calmTrackOnce?.('scroll', 'results');
+            },
+
+            // Property set is fixed by the shared web+mobile spec — the search
+            // criteria live on search:submit, this event carries the outcome.
+            trackResults() {
+                const a = this.applied || {};
+                window.calmTrack?.('view', 'results', {
+                    city_id: a.cityId,
+                    check_in: a.checkIn,
+                    check_out: a.checkOut,
+                    guests: this.filters?.guests,
+                    results_count: this.total,
+                });
             },
 
             onApply(selection) {
@@ -496,7 +575,7 @@
                 // A fresh main search resets the advanced filters (app parity).
                 this.filters = { priceMin: null, priceMax: null, guests: null, amenityIds: [] };
                 this.mode = 'results';
-                this.fetchPage(1, this.searchParams());
+                this.fetchPage(1, this.searchParams()).then(() => this.trackResults());
                 this.syncUrl();
             },
 
@@ -520,7 +599,7 @@
                 };
                 // Keep the search sheet's chips in sync with the filter picks.
                 this.$dispatch('calm-filters-sync', { typeIds: detail.typeIds, areaIds: detail.areaIds });
-                this.fetchPage(1, this.searchParams());
+                this.fetchPage(1, this.searchParams()).then(() => this.trackResults());
                 this.syncUrl();
             },
 
@@ -548,6 +627,7 @@
             },
 
             clearSearch() {
+                window.calmTrack?.('results', 'back');
                 this.applied = null;
                 this.items = []; this.total = 0; this.hasMore = false;
                 this.mode = 'browse';

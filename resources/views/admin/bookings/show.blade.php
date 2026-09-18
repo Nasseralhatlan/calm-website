@@ -28,7 +28,7 @@
         @include('partials._booking_detail', ['booking' => $booking, 'audience' => 'admin'])
 
         {{-- ── Finance: payout state, documents, money trail ── --}}
-        @include('admin.bookings._finance', ['booking' => $booking])
+        @include('admin.bookings._finance', ['booking' => $booking, 'payoutsAutoMode' => $payoutsAutoMode])
 
         {{-- ── Cancel actions (admin only) ── --}}
         <div style="background:#fff;border-radius:24px;padding:24px;box-shadow:0px 8px 24px 0px rgba(0,0,0,0.05);">

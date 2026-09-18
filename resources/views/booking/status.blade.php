@@ -25,7 +25,7 @@
         state: @js(in_array($statusValue, $confirmedStates, true) ? 'confirmed' : (in_array($statusValue, $deadStates, true) ? 'dead' : 'pending')),
         successLottie: '/assets/lottie/booking-success.json',
         pendingLottie: '/assets/lottie/booking-pending.json',
-     })" x-init="start()">
+     })" x-init="window.calmTrack?.('view', 'status', { booking_reference: @js($booking->reference) }); start()">
 
     <main class="flex-1 mx-auto w-full flex flex-col" style="max-width: 560px; padding: 40px 22px 120px;">
 

@@ -36,6 +36,7 @@
     <header class="sticky top-0 z-30" style="background-color: rgba(251,251,251,0.9); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);">
         <div class="relative mx-auto w-full flex items-center justify-center" style="max-width: 560px; padding: 16px 20px;">
             <a href="{{ route('places.show', $place) }}" aria-label="{{ $isRtl ? 'إغلاق' : 'Close' }}"
+               @click="window.calmTrack?.('checkout', 'cancel', { place_id: @js($place->id) })"
                class="calm-press calm-round absolute flex items-center justify-center bg-white text-black"
                style="inset-inline-start: 16px; width: 42px; height: 42px; border-radius: 50%; box-shadow: 0 0 25px rgba(0,0,0,0.08); font-size: 16px;">✕</a>
             <h1 class="font-bold text-black" style="font-size: 18px;">{{ $isRtl ? 'تأكيد و دفع' : 'Confirm & pay' }}</h1>
@@ -145,7 +146,21 @@ function calmCheckout(init) {
         quote: null, quoteError: '', quoteSeq: 0,
         submitting: false, submitError: '',
 
-        load() { this.fetchQuote(); },
+        load() {
+            // Fired once the quote lands, not on paint — total_sar is the whole
+            // point of the event and it doesn't exist until then.
+            this.fetchQuote().then(() => {
+                window.calmTrackOnce?.('view', 'checkout', {
+                    place_id: init.placeId,
+                    total_sar: this.quote?.pricing?.total ?? null,
+                    nights: this.stayNights(),
+                });
+            });
+        },
+
+        stayNights() {
+            return Math.round((parseD(this.checkOut) - parseD(this.checkIn)) / 86400000) + 1;
+        },
 
         fmtDay(dateStr) {
             if (!dateStr) return '';
@@ -190,6 +205,11 @@ function calmCheckout(init) {
 
         proceed() {
             if (!this.quote || this.submitting) return;
+            // click:pay — they committed; next stop is Moyasar (or the login modal).
+            window.calmTrack?.('click', 'pay', {
+                place_id: init.placeId,
+                total_sar: this.quote?.pricing?.total,
+            });
             if (!init.authed) {
                 // The login modal reloads this same URL — the flow resumes
                 // here already signed in, dates intact in the query string.

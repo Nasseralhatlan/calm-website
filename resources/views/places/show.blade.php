@@ -176,6 +176,10 @@
         description: false,
         openGallery(sectionKey) {
             this.gallery = true;
+            window.calmTrack?.('photo', 'open', { place_id: @js($place->id) });
+            // No section key = the «view all photos» tile rather than a jump
+            // into one attribute's photos.
+            if (!sectionKey) window.calmTrack?.('click', 'view_all', { section: 'photos' });
             document.body.style.overflow = 'hidden';
             this.$nextTick(() => {
                 const scroller = document.getElementById('gallery-scroll');
@@ -189,10 +193,16 @@
             if (el && scroller) scroller.scrollTo({ top: el.offsetTop - 180, behavior: 'smooth' });
         },
         closeGallery() { this.gallery = false; if (!this.sheet && !this.description) document.body.style.overflow = ''; },
-        openSheet(name) { this.sheet = name; document.body.style.overflow = 'hidden'; },
+        openSheet(name) {
+            this.sheet = name;
+            // Sheet names already match the spec's section labels.
+            window.calmTrack?.('click', 'view_all', { section: name });
+            document.body.style.overflow = 'hidden';
+        },
         closeSheet() { this.sheet = null; if (!this.gallery && !this.description) document.body.style.overflow = ''; },
         openDescription() {
             this.description = true;
+            window.calmTrack?.('click', 'view_all', { section: 'description' });
             document.body.style.overflow = 'hidden';
             this.$nextTick(() => {
                 const scroller = document.getElementById('description-scroll');
@@ -205,6 +215,7 @@
         toggleLike() {
             if (!this.signedIn) { window.dispatchEvent(new CustomEvent('calm-open-login')); return; }
             this.liked = !this.liked;
+            window.calmTrack?.('click', 'like', { place_id: @js($place->id), liked: this.liked });
             fetch('/api/places/{{ $place->id }}/like', { method: this.liked ? 'POST' : 'DELETE', headers: { 'Accept': 'application/json' }, credentials: 'same-origin' }).catch(() => {});
         },
         shareCopied: false,
@@ -223,6 +234,7 @@
             window.location.href = '{{ route('landing') }}';
         },
         sharePlace() {
+            window.calmTrack?.('click', 'share', { place_id: @js($place->id) });
             // Clean listing URL (no ?check_in etc.).
             const url = window.location.origin + window.location.pathname;
             // navigator.share/clipboard exist only in secure contexts (https or
@@ -245,6 +257,13 @@
         },
     }"
     @keydown.escape.window="closeGallery(); closeSheet(); closeDescription();"
+    {{-- view:place fires on the PAGE, not on the card that led here, so shared
+         WhatsApp links and direct URLs are captured too (docs/feature-analytics.md). --}}
+    x-init="window.calmTrack?.('view', 'place', {
+        place_id: @js($place->id),
+        price_sar: {{ (int) $place->price }},
+        source: window.calmSource?.(),
+    })"
 >
     <style>
         /* Mobile: the content column becomes an app-style sheet rising over
@@ -357,7 +376,11 @@
     <div class="sm:hidden fixed inset-x-0 top-0" style="z-index: 40; pointer-events: none;"
          x-data="{ sc: false, th: 220 }"
          x-init="th = Math.max(160, Math.round(window.innerHeight * 0.58) - 90)"
-         @scroll.window.passive="sc = window.scrollY > th">
+         @scroll.window.passive="sc = window.scrollY > th;
+            // end:place — they read the listing all the way down. Once a session.
+            if (window.scrollY + window.innerHeight >= document.body.scrollHeight - 80) {
+                window.calmTrackOnce?.('end', 'place', { place_id: @js($place->id) });
+            }">
         <div class="absolute inset-0"
              :style="'transition: opacity 0.25s; border-bottom: 1px solid #F1F1F1; background-color: rgba(255,255,255,0.92); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); opacity: ' + (sc ? 1 : 0) + ';'"></div>
         <div class="relative flex items-center justify-between" style="padding: 10px 16px; padding-top: calc(10px + env(safe-area-inset-top));">
@@ -486,7 +509,16 @@
             <div class="sm:hidden relative" style="margin-inline: -24px;"
                  x-data="{
                     idx: 0, total: {{ $imgCount }},
-                    onScroll(el) { const w = el.clientWidth; if (w) this.idx = Math.max(0, Math.min(this.total - 1, Math.round(Math.abs(el.scrollLeft) / w))); },
+                    onScroll(el) {
+                        const w = el.clientWidth;
+                        if (w) this.idx = Math.max(0, Math.min(this.total - 1, Math.round(Math.abs(el.scrollLeft) / w)));
+                        // Binary flags: they looked at the photos, and they saw
+                        // them all. Both once per session.
+                        window.calmTrackOnce?.('scroll', 'photos', { place_id: @js($place->id), surface: 'detail' });
+                        if (this.idx >= this.total - 1) {
+                            window.calmTrackOnce?.('end', 'photos', { place_id: @js($place->id) });
+                        }
+                    },
                  }">
                 <div class="flex calm-hide-scroll" dir="{{ $isRtl ? 'rtl' : 'ltr' }}"
                      style="overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; height: 58vh; min-height: 340px; max-height: 540px; background-color: #f7f7f7; touch-action: pan-x pan-y;"
@@ -794,7 +826,7 @@
                          x-text="hasRange() ? rangeTitle() : '{{ $isRtl ? 'اختر تاريخ الوصول والمغادرة' : 'Pick your arrival and departure' }}'"></div>
                     <p x-show="rangeError" x-cloak class="text-center {{ $fa }}" style="font-size: 12.5px; color: #dc2626; margin-top: 6px;" x-text="rangeError"></p>
 
-                    <button type="button" @click="next()" :disabled="!ready()"
+                    <button type="button" @click="window.calmTrack?.('click', 'reserve', { place_id: @js($place->id), price_sar: {{ (int) $place->price }} }); next()" :disabled="!ready()"
                             class="calm-press w-full font-medium text-white {{ $fa }}"
                             :style="'margin-top: 14px; padding: 15px; border-radius: 15px; font-size: 15px; transition: opacity 0.2s; background-color: #F88379; box-shadow: 0 6px 12px rgba(248,131,121,0.3); opacity: ' + (ready() ? 1 : 0.45) + ';'">
                         {{ $isRtl ? 'احجز الآن' : 'Reserve' }}
@@ -833,7 +865,7 @@
                     <div class="font-bold text-black tabular-nums" style="font-size: 20px; line-height: 24px;"><bdi dir="ltr">{{ number_format((int) $place->price) }} SR</bdi></div>
                     <div class="{{ $fa }}" style="font-size: 12px; line-height: 16px; margin-top: 3px; color: #AAAAAA;">{{ $isRtl ? 'لليلة الواحدة' : 'per night' }}</div>
                 </div>
-                <button type="button" @click="window.dispatchEvent(new CustomEvent('calm-open-booking'))"
+                <button type="button" @click="window.calmTrack?.('click', 'reserve', { place_id: @js($place->id), price_sar: {{ (int) $place->price }} }); window.dispatchEvent(new CustomEvent('calm-open-booking'))"
                         class="calm-press inline-flex items-center justify-center font-medium text-white bg-[#F88379] hover:bg-[#E66E64] transition-colors {{ $fa }}"
                         style="padding: 14px 48px; border-radius: 15px; font-size: 15px; line-height: 20px; box-shadow: 0 6px 12px rgba(248,131,121,0.3);">
                     {{ $isRtl ? 'احجز الآن' : 'Reserve' }}

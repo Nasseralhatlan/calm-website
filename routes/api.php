@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\HostPlaceController;
 use App\Http\Controllers\Api\HostUploadController;
 use App\Http\Controllers\Api\MoyasarWebhookController;
 // use App\Http\Controllers\Api\NotificationController; // notifications temporarily disabled
+use App\Http\Controllers\Api\OccasionRequestsController;
 use App\Http\Controllers\Api\PlaceAvailabilityController;
 use App\Http\Controllers\Api\PlaceLikesController;
 use App\Http\Controllers\Api\PlaceListsController;
@@ -162,6 +163,11 @@ Route::middleware(['auth:api', 'throttle:authenticated'])->group(function (): vo
     // PDF links are Qoyod-hosted and expire; fetch fresh each time.
     Route::get('/finance-documents', [FinanceDocumentsController::class, 'index']);
     Route::get('/finance-documents/{document}/pdf-url', [FinanceDocumentsController::class, 'pdfUrl']);
+
+    // Occasion requests — the events-team lead capture. POST records one and
+    // alerts the team; GET is the guest's own list so they can follow status.
+    Route::post('/occasion-requests', [OccasionRequestsController::class, 'store']);
+    Route::get('/occasion-requests', [OccasionRequestsController::class, 'index']);
 });
 
 // ─── Admin-only ──────────────────────────────────────────────────────────────

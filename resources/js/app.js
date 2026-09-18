@@ -1,7 +1,32 @@
 import imageCompression from 'browser-image-compression';
+import { initAnalytics, identify, resetIdentity, track, trackOnce, referrerSource, guestsRange } from './analytics';
 import Alpine from 'alpinejs';
 import sort from '@alpinejs/sort';
 import Sortable from 'sortablejs';
+
+// ── Analytics (docs/feature-analytics.md) ───────────────────────────────────
+// Exposed on window because the events fire from Blade/Alpine expressions.
+// No-ops entirely when VITE_POSTHOG_KEY is unset.
+initAnalytics();
+window.calmTrack = track;
+window.calmTrackOnce = trackOnce;
+window.calmSource = referrerSource;
+window.calmGuestsRange = guestsRange;
+window.calmIdentify = identify;
+
+// The signed-in user's UUID, rendered into a meta tag by layouts/app. Ties the
+// anonymous journey to the person, and keeps web + app as ONE person.
+identify(document.querySelector('meta[name="calm-user-id"]')?.content);
+
+// Logout must break the identity link, or the next person on this device
+// inherits the last one's distinct_id. Delegated because the logout button is
+// rendered in several layouts.
+document.addEventListener('submit', (e) => {
+    const form = e.target;
+    if (form instanceof HTMLFormElement && /\/logout$/.test(new URL(form.action, location.origin).pathname)) {
+        resetIdentity();
+    }
+}, true);
 
 window.Alpine = Alpine;
 // x-sort: reactive drag-and-drop reordering that plays nicely with x-for

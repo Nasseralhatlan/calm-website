@@ -13,6 +13,7 @@ use App\Models\Place;
 use App\Models\PlaceReview;
 use App\Models\Setting;
 use App\Models\User;
+use App\Services\Analytics\AnalyticsService;
 use App\Services\Finance\BookingFinanceFinalizer;
 use App\Services\Notification\NotificationService;
 use App\Services\Notification\OwnerNotifier;
@@ -928,6 +929,16 @@ final class BookingService
         }
 
         $this->fireBookingNotification($result, $transitionedTo);
+
+        // payment_completed — the one analytics event the client must not be
+        // trusted for. Fire-and-forget; see docs/feature-analytics.md.
+        if ($transitionedTo === BookingStatus::Confirmed) {
+            app(AnalyticsService::class)->capture('payment_completed', (string) $result->guest_user_id, [
+                'booking_reference' => $result->reference,
+                'place_id' => (string) $result->place_id,
+                'total_sar' => round($result->total_amount / 100, 2),
+            ]);
+        }
 
         return $result;
     }
