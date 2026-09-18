@@ -12,6 +12,7 @@ use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\FaqsController;
 // use App\Http\Controllers\Admin\NotificationsController; // notifications temporarily disabled
 use App\Http\Controllers\Admin\FinanceDocumentPdfController;
+use App\Http\Controllers\Admin\OccasionRequestsController as AdminOccasionRequestsController;
 use App\Http\Controllers\Admin\PlaceListsController;
 use App\Http\Controllers\Admin\PlaceReviewController;
 use App\Http\Controllers\Admin\PlacesController;
@@ -26,6 +27,7 @@ use App\Http\Controllers\Host\CalendarSyncController as HostCalendarSyncControll
 use App\Http\Controllers\Host\PlaceAvailabilityController as HostAvailabilityController;
 use App\Http\Controllers\Host\PlacesController as HostPlacesController;
 use App\Http\Controllers\LandingController;
+use App\Http\Controllers\OccasionsController;
 use App\Http\Controllers\PageController;
 use App\Http\Controllers\PaymentReturnController;
 use App\Http\Controllers\PlaceController;
@@ -69,6 +71,10 @@ Route::get('/community-standards', [PageController::class, 'community'])->name('
 Route::get('/support', [PageController::class, 'support'])->name('pages.support');
 // Public FAQ page — admin-curated Q&A, guests + hosts as two sections on one page.
 Route::get('/faqs', [PageController::class, 'faq'])->name('pages.faq');
+
+// Occasions wizard — public to browse and fill; only submitting needs an
+// account (the page opens the login modal and resumes the submit).
+Route::get('/occasions', [OccasionsController::class, 'show'])->name('occasions.show');
 
 // Per-place iCal export — polled anonymously by Airbnb/Gathern/Google after
 // the host pastes the URL there. The secret {token} is the whole credential;
@@ -188,6 +194,10 @@ Route::middleware(['auth:api', 'admin'])
         // Guest review moderation (under_review / published / blocked).
         Route::get('/reviews', [ReviewsController::class, 'index'])->name('reviews.index');
         Route::post('/reviews/{review}/status', [ReviewsController::class, 'updateStatus'])->name('reviews.status');
+
+        // Occasion leads — the events team's queue; status moves the pipeline.
+        Route::get('/occasion-requests', [AdminOccasionRequestsController::class, 'index'])->name('occasion-requests.index');
+        Route::post('/occasion-requests/{occasionRequest}/status', [AdminOccasionRequestsController::class, 'updateStatus'])->name('occasion-requests.status');
 
         // All bookings — search (guest/host phone, place/booking id), view, cancel.
         Route::get('/bookings', [BookingsController::class, 'index'])->name('bookings.index');

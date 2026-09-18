@@ -6,6 +6,7 @@ namespace App\Services\Notification;
 
 use App\Mail\OwnerAlert;
 use App\Models\Booking;
+use App\Models\OccasionRequest;
 use App\Models\Place;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -52,6 +53,25 @@ final class OwnerNotifier
             'Place: '.($place->title ?? '—'),
             'Place ID: '.$place->id,
             'Host: '.($place->host?->name ?? '—').' ('.($place->host?->phone ?? '—').')',
+        ]);
+    }
+
+    /** A guest shared an occasion idea — the events team must call back. */
+    public function occasionRequested(OccasionRequest $request): void
+    {
+        $details = $request->details ?? [];
+
+        $this->send('🎉 New occasion request — '.$request->occasion_type, [
+            'A guest shared an occasion idea. They were promised a call within minutes with suggestions.',
+            'Occasion: '.$request->occasion_type.($request->detail('occasion_type_other') !== null
+                ? ' ('.$request->detail('occasion_type_other').')'
+                : ''),
+            'Guests: '.($request->detail('guests') ?? '—'),
+            'Needs: '.(($details['needs'] ?? []) === [] ? '—' : implode(', ', $details['needs'])),
+            'Venue: '.($request->detail('venue_status') ?? '—'),
+            'Notes: '.($request->detail('notes') ?? '—'),
+            'Guest: '.($request->user?->name ?? '—').' ('.($request->user?->phone ?? '—').')',
+            'Request ID: '.$request->id,
         ]);
     }
 

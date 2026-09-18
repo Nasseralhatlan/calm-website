@@ -105,6 +105,7 @@
                     return;
                 }
                 p.is_liked = !p.is_liked;
+                window.calmTrack?.('click', 'like', { place_id: p.id, liked: p.is_liked });
                 fetch(`/api/places/${p.id}/like`, {
                     method: p.is_liked ? 'POST' : 'DELETE',
                     headers: { 'Accept': 'application/json' },

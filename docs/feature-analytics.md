@@ -30,131 +30,129 @@ people a week.
 
 Tracking exists mainly to answer **Selection** and **Appeal**, and to make all five continuous.
 
-## Design principles
 
-1. **Record observations, never conclusions.** `view:results { results_count: 0 }`, never
-   `search_failed`. The moment a property encodes an opinion (`results_were_few: true`) we've
-   frozen today's analysis into data we'll keep for years.
-2. **Properties are measurements, not judgements.**
-3. **Derive meaning at query time.** Most answers come from what follows what, not from single
-   events. That's the deliberate trade: more work per question, far more flexibility.
-4. **Never trust the client about money.** `payment_completed` is server-side only.
-5. **If tracking breaks, nothing breaks.** Fire-and-forget, short timeout, never block the UI.
+## Status
 
-## Vocabulary — 4 types
+**Web: implemented** (2026-09-18). Mobile emits the same names. If this doc and
+`resources/js/analytics.js` disagree, the code wins — update this doc.
 
-| Type | Meaning | Rule of thumb |
-|---|---|---|
-| `view` | a screen was shown | anything with its own URL / deep-linkable screen |
-| `click` | the user did something | actions inside a screen (buttons, modals) |
-| `scroll` | they scrolled a list at all | **binary flag**, no depth |
-| `end` | they reached the end of a list | **binary flag** |
+## The contract
 
-Event name = `type:target`, e.g. `view:place`. Works for both vertical lists and horizontal
-carousels — the target says which.
+Names and property names are **identical across web and mobile** — that's the
+whole point; different names mean two funnels and nothing to compare.
+
+- **SDK:** `posthog-js` · **Host:** `https://eu.i.posthog.com` (EU; the US endpoint rejects the key)
+- **Super property:** `platform = "web"` (mobile: `app_ios` / `app_android`). The only value that differs.
+- `person_profiles: 'identified_only'`, `autocapture: false`, `capture_pageview: false`
+- **Arrays are comma-joined strings** (`place_type_ids: "a,b"`). `clean()` in
+  `analytics.js` does this centrally — call sites pass real arrays.
+
+### Must-match funnel spine
+
+```
+view:home → search:submit → view:results → view:place → click:reserve → view:checkout → click:pay
+```
+
+plus the full `occasion:*` funnel.
 
 ## The events
 
-Thirteen total. Twelve from the client, one from the server.
+### Home / search / results
+| Event | Properties |
+|---|---|
+| `view:home` | — |
+| `click:category` | `type` |
+| `click:view_all` | `section` (`home_list`, `description`, `amenities`, `reviews`, `photos`) |
+| `search:open` | `source` (`nav`, `category`) |
+| `search:submit` | `city_id, place_type_ids, city_area_ids, amenity_ids, price_min, price_max, guests, check_in, check_out` |
+| `search:close` | — (suppressed when the sheet closed via apply) |
+| `view:results` | `city_id, check_in, check_out, guests, results_count` |
+| `results:back` | — |
+| `filter:open` / `filter:close` | — (close suppressed when it closed via apply) |
+| `filter:apply` | `city_id, place_type_ids, city_area_ids, amenity_ids, price_min, price_max, guests` |
+| `scroll:results` / `end:results` | — |
+| `click:like` | `place_id, liked` |
 
-`click:search` and `view:results` are deliberately BOTH kept: the click is what
-they asked for, the view is what they got. Only the view knows `results_count`,
-and only the click is guaranteed to fire (on desktop the results open in a new
-tab, so a failed load would otherwise leave no trace that they searched at all).
-Names as well as ids on the click, because a UUID is unreadable in the PostHog
-UI and "which city did they want" is the entire supply question.
+### Place / photos
+| Event | Properties |
+|---|---|
+| `view:place` | `place_id, price_sar, source` (`home` \| `results` \| `external`) |
+| `scroll:photos` | `place_id, surface` (`card`, `detail`) |
+| `end:photos` | `place_id` |
+| `photo:open` | `place_id` |
+| `click:share` | `place_id` |
+| `click:reserve` | `place_id, price_sar` |
+| `view:dates` | `place_id` |
+| `end:place` | `place_id` |
 
-| Event | Properties | Web trigger | Mobile trigger |
-|---|---|---|---|
-| `view:home` | — | load of `/` | home screen shown |
-| `click:search` | `city_id`, `city_name`, `area_ids`, `area_names`, `type_ids`, `type_names`, `check_in`, `check_out`, `nights`, `has_dates` | «ابحث» in the search sheet | same |
-| `view:results` | `city_id`, `city_name`, `area_ids`, `type_ids`, `check_in`, `check_out`, `guests`, `results_count` | results mode / `/?city=…` | results screen shown |
-| `view:place` | `place_id`, `price_sar`, `source` | load of `/places/{id}` | listing screen shown |
-| `view:checkout` | `place_id`, `total_sar`, `nights` | load of `/book/{place}/checkout` | checkout screen shown |
-| `view:status` | `booking_reference` | load of `/book/status/{booking}` | payment-return screen |
-| `click:reserve` | `place_id`, `price_sar` | «احجز الآن» opens the booking sheet | same |
-| `click:pay` | `booking_reference`, `total_sar` | «متابعة للدفع», leaving for Moyasar | same |
-| `scroll:results` | — | scrolled the results list | same |
-| `end:results` | — | reached the bottom / no more pages | same |
-| `scroll:photos` | `place_id` | swiped the photo carousel | same |
-| `end:photos` | `place_id` | reached the last photo | same |
-| `payment_completed` | `booking_reference`, `total_sar`, `place_id` | — | — |
+### Checkout / auth
+| Event | Properties |
+|---|---|
+| `view:checkout` | `place_id, total_sar, nights` — fired after the quote resolves, not on paint |
+| `checkout:cancel` | `place_id` |
+| `click:continue_checkout` | `place_id` |
+| `click:pay` | `booking_reference, total_sar` |
+| `login:open` | `reason` (`occasion`, `generic`) |
+| `login:otp_sent` / `login:otp_submit` | — |
 
-`payment_completed` fires **server-side** from the Moyasar webhook path in
-`app/Services/Booking/BookingService.php`, where the booking flips to Confirmed. Use the guest's
-user UUID as `distinct_id` so it joins the client journey. Fire-and-forget with a short timeout —
-it must never slow a webhook.
+### Tabs / lists
+| Event | Properties |
+|---|---|
+| `view:favorites` · `view:bookings` · `view:account` | — |
+| `view:status` | `booking_reference` |
+| `view:occasions_list` | — (only when the list is non-empty) |
 
-### Deliberately NOT events
+### Occasions wizard
+| Event | Properties |
+|---|---|
+| `occasion:start` | — |
+| `occasion:type` | `type` |
+| `occasion:needs` | `needs` |
+| `occasion:guests` | `range` (`1-10`, `11-25`, `26-50`, `51-100`, `101-200`, `201-500`, `500+`) |
+| `occasion:submit` | `occasion_type, needs, guests, guests_range, venue_status, has_notes` |
 
-- `click:place` — `view:place` fires on the page/screen itself, so it catches shared links and
-  deep links too. A card tap that never lands is not interesting.
-- Any array passed straight out of Alpine's reactive proxy — spread it (`[...ids]`) or it
-  serialises as `{"0": …}` and is painful to query.
-- `click:dates` — confirming dates IS what produces `view:checkout`.
-- `view:login` — derivable: if the user was anonymous at `click:pay`, the login modal appeared.
-- `dates_unavailable` — that's a conclusion. `click:reserve` with no following `view:checkout`
-  records the same fact without deciding the reason.
+### Deliberately not on web
+
+- `scroll:feed` — a mobile feed diagnostic; no equivalent surface.
+- `view:occasion_detail` — there is no occasion detail screen on web.
+- `payment_completed` — **backend only**, from the Moyasar webhook (the source
+  of truth). Never emit it from a client; a client can't know a payment settled.
+
+## Identity
+
+- `distinct_id` = **the Calm user UUID**, both platforms. Never a phone or email.
+- `identify(uuid)` on OTP verify **and** on every authenticated page load (from
+  the `calm-user-id` meta tag).
+- `reset()` on logout — otherwise the next person on a shared device inherits
+  the last one's identity. Wired as a delegated submit listener in `app.js`.
+- Web-browse-then-app-book must merge into **one** person. Only the shared UUID
+  makes that work.
+
+## Once-per-session flags
+
+`scroll:*` and `end:*` fire at most once per scroller per session, keyed on the
+qualifying properties (`place_id`, `surface`, `direction`), so two carousels each
+report once. Untamed, scroll alone would be most of our volume.
 
 ## `source` on `view:place`
 
 How they reached the listing. Web derives it from `document.referrer`; mobile from whether the
 screen came from a deep link or in-app navigation.
 
+Three values only, matching mobile — `direct` was dropped, since a cold open
+with no referrer is the same acquisition story as an external link.
+
 | Condition | `source` |
 |---|---|
-| Same origin, session already had a `view:results` | `results` |
-| Same origin, no results this session | `home` |
-| No referrer | `direct` |
-| Any other origin (wa.me, google…) | `external` |
+| Same-origin referrer carrying `?city=` | `results` |
+| Any other same-origin referrer | `home` |
+| Another origin (wa.me, google…), or no referrer at all | `external` |
 
 A session with `view:place { source: "external" }` and no `view:results` is a shared-link
 visitor who never searched — a completely different acquisition story, and possibly our best
 channel. The share button exists (`sharePlace()` in `resources/views/places/show.blade.php`), so
 this case is real.
 
-## Identity
-
-- `distinct_id` = **the Calm user UUID**, on both platforms. Never the phone number.
-- Anonymous before login; call `identify(uuid)` on OTP verify and on any authenticated page load.
-- `reset()` on logout.
-- A person who browses on web and books in the app must merge into **one** person. That only
-  works if both platforms identify with the same UUID.
-
-## Super properties
-
-Registered once at init, attached to every event automatically:
-
-```
-platform = web_desktop | web_mobile | app_ios | app_android
-```
-
-PostHog's own `$device_type: "Mobile"` covers both mobile-web AND the native app — conflating
-those would defeat the whole exercise, since the core question is app-vs-web conversion. Hence an
-explicit property.
-
-Identity is shared across platforms; **platform lives on the event**, so one person's timeline can
-read `view:place` on `web_mobile` → three days later → `click:pay` on `app_ios`.
-
-## Configuration
-
-| Setting | Value | Why |
-|---|---|---|
-| Region | **EU** | PDPL comfort |
-| `autocapture` | **off** | The single biggest cause of blown free tiers and unreadable data |
-| `capture_pageview` | off (manual) | The guest web behaves like an SPA |
-| `person_profiles` | `identified_only` | Anonymous events still record; no profile per bounce |
-| Session replay | **web only** | Mobile replay is newer, heavier on data/battery, and needs extra store disclosure |
-
-Free tier (~1M events/month) is many times our realistic volume.
-
-## Scroll throttling — required
-
-Scroll fires constantly, especially on photo carousels. Send **one** `scroll:<target>` per
-scroller per session — set a flag in the buffer on first scroll, flush once. Untamed, scroll alone
-would be most of our volume.
-
-Same for `end:<target>`: once per scroller per session.
 
 ## Privacy
 
@@ -196,30 +194,3 @@ rate. At ~30 listings that's one screen you can act on:
 > "40 views, 0 reserves" → that host's photos or price are wrong.
 > "8 views, 3 reserves" → clone whatever it's doing.
 
-## Naming discipline
-
-**Keep the event names and target strings in one constants file per platform, mirrored.** If web
-sends `view:place` and mobile sends `place_view`, there are two funnels and no way to compare
-them. This is the single most likely way this goes wrong.
-
-## Implementation order
-
-| Phase | Work | Rough effort |
-|---|---|---|
-| 1 | Web: PostHog init, masking, `identify`, session replay | ~1 hr |
-| 2 | Web: the eleven client events | ~2 hr |
-| 3 | Mobile: the same eleven events | ~half day |
-| 4 | Server: `payment_completed` from the Moyasar webhook | ~1 hr |
-
-Web has a shortcut: the guest UI already dispatches semantic window events
-(`calm-search-apply`, `calm-filters-apply`, `calm-open-booking`, `calm-open-login`), so one
-listener bridges several of these without touching call sites.
-
-## Open items
-
-- Mobile framework confirmed? (React Native / native / Flutter — affects SDK choice only; events
-  are supported everywhere.)
-- Whether to add `scroll:place` (how far down the listing they read) — same shape, easy to add later.
-- Whether to dual-write to our own `events` table for ownership. Not now; the calls should sit
-  behind a thin wrapper so the vendor isn't hard-coded across the app, which makes this a later
-  decision rather than a rewrite.

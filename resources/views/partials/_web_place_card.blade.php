@@ -53,7 +53,8 @@
                 {{-- Featured-photos carousel (scroll-snap + app-spec dots) --}}
                 <div class="flex overflow-x-auto calm-hide-scroll w-full h-full" style="scroll-snap-type: x mandatory; cursor: grab; touch-action: pan-x pan-y; overscroll-behavior-x: contain;"
                      x-init="window.calmDragScroll && calmDragScroll($el)"
-                     @scroll="ci = Math.min({{ $carousel->count() - 1 }}, Math.round(Math.abs($el.scrollLeft) / $el.clientWidth))">
+                     @scroll="ci = Math.min({{ $carousel->count() - 1 }}, Math.round(Math.abs($el.scrollLeft) / $el.clientWidth));
+                              window.calmTrackOnce?.('scroll', 'photos', { place_id: @js($p->id), surface: 'card' })">
                     @foreach($carousel as $u)
                         <img src="{{ $u }}" alt="{{ $p->localized_title }}" loading="lazy" draggable="false"
                              class="w-full h-full object-cover shrink-0"
@@ -86,7 +87,7 @@
     <div class="absolute" style="top: 12px; inset-inline-start: 12px;">
         @if($me)
             <button type="button" x-data="{ liked: @js($liked) }"
-                    @click.stop.prevent="liked = !liked; fetch('/api/places/{{ $p->id }}/like', { method: liked ? 'POST' : 'DELETE', headers: { 'Accept': 'application/json' }, credentials: 'same-origin' })"
+                    @click.stop.prevent="liked = !liked; window.calmTrack?.('click', 'like', { place_id: @js($p->id), liked }); fetch('/api/places/{{ $p->id }}/like', { method: liked ? 'POST' : 'DELETE', headers: { 'Accept': 'application/json' }, credentials: 'same-origin' })"
                     aria-label="{{ $isRtl ? 'إضافة إلى المفضلة' : 'Save to favorites' }}"
                     class="calm-press-like flex items-center justify-center" style="width: {{ $heartSize }}px; height: {{ $heartSize }}px;">
                 <svg width="{{ $heartSize - 6 }}" height="{{ $heartSize - 6 }}" viewBox="0 0 24 24" stroke="#fff" stroke-width="2"

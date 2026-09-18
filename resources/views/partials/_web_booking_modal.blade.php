@@ -123,6 +123,7 @@ function calmBookingModal(init) {
                 return;
             }
             this.open = true;
+            window.calmTrack?.('view', 'dates', { place_id: init.placeId });
             document.body.style.overflow = 'hidden';
             if (!this.availLoaded) {
                 this.availLoaded = true;
@@ -139,7 +140,9 @@ function calmBookingModal(init) {
         // resets to a valid one-day stay, which is still bookable.
         ready() { return !!(this.checkIn && this.checkOut); },
         next() {
-            if (this.ready()) window.location.href = this.checkoutHref();
+            if (!this.ready()) return;
+            window.calmTrack?.('click', 'continue_checkout', { place_id: init.placeId });
+            window.location.href = this.checkoutHref();
         },
 
         async loadAvail() {

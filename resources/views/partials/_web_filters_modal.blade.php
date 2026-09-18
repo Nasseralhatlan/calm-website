@@ -149,6 +149,7 @@
                     this.guests = f.guests || null;
                     this.amenityIds = [...(f.amenityIds || [])];
                     this.openState = true;
+                    window.calmTrack?.('filter', 'open');
                     document.body.style.overflow = 'hidden';
 
                     this.loading = true;
@@ -168,6 +169,10 @@
                     }
                 },
                 close() {
+                    // apply() closes too and has already sent filter:apply —
+                    // don't also count that as an abandon.
+                    if (this.openState && !this._applied) window.calmTrack?.('filter', 'close');
+                    this._applied = false;
                     this.openState = false;
                     document.body.style.overflow = '';
                 },
@@ -181,6 +186,20 @@
                 },
                 apply() {
                     if (!this.facets) { this.close(); return; }
+
+                    const priceMin = this.price[0] > this.facets.price.min ? this.price[0] : null;
+                    const priceMax = this.price[1] < this.facets.price.max ? this.price[1] : null;
+                    window.calmTrack?.('filter', 'apply', {
+                        city_id: this.cityId,
+                        place_type_ids: [...this.typeIds],
+                        city_area_ids: [...this.areaIds],
+                        amenity_ids: [...this.amenityIds],
+                        price_min: priceMin,
+                        price_max: priceMax,
+                        guests: this.guests,
+                    });
+
+                    this._applied = true; // suppress filter:close — see close()
                     this.close();
                     this.$dispatch('calm-filters-apply', {
                         typeIds: [...this.typeIds],

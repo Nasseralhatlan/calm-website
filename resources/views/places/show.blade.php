@@ -176,6 +176,10 @@
         description: false,
         openGallery(sectionKey) {
             this.gallery = true;
+            window.calmTrack?.('photo', 'open', { place_id: @js($place->id) });
+            // No section key = the «view all photos» tile rather than a jump
+            // into one attribute's photos.
+            if (!sectionKey) window.calmTrack?.('click', 'view_all', { section: 'photos' });
             document.body.style.overflow = 'hidden';
             this.$nextTick(() => {
                 const scroller = document.getElementById('gallery-scroll');
@@ -189,10 +193,16 @@
             if (el && scroller) scroller.scrollTo({ top: el.offsetTop - 180, behavior: 'smooth' });
         },
         closeGallery() { this.gallery = false; if (!this.sheet && !this.description) document.body.style.overflow = ''; },
-        openSheet(name) { this.sheet = name; document.body.style.overflow = 'hidden'; },
+        openSheet(name) {
+            this.sheet = name;
+            // Sheet names already match the spec's section labels.
+            window.calmTrack?.('click', 'view_all', { section: name });
+            document.body.style.overflow = 'hidden';
+        },
         closeSheet() { this.sheet = null; if (!this.gallery && !this.description) document.body.style.overflow = ''; },
         openDescription() {
             this.description = true;
+            window.calmTrack?.('click', 'view_all', { section: 'description' });
             document.body.style.overflow = 'hidden';
             this.$nextTick(() => {
                 const scroller = document.getElementById('description-scroll');
@@ -205,6 +215,7 @@
         toggleLike() {
             if (!this.signedIn) { window.dispatchEvent(new CustomEvent('calm-open-login')); return; }
             this.liked = !this.liked;
+            window.calmTrack?.('click', 'like', { place_id: @js($place->id), liked: this.liked });
             fetch('/api/places/{{ $place->id }}/like', { method: this.liked ? 'POST' : 'DELETE', headers: { 'Accept': 'application/json' }, credentials: 'same-origin' }).catch(() => {});
         },
         shareCopied: false,
@@ -223,6 +234,7 @@
             window.location.href = '{{ route('landing') }}';
         },
         sharePlace() {
+            window.calmTrack?.('click', 'share', { place_id: @js($place->id) });
             // Clean listing URL (no ?check_in etc.).
             const url = window.location.origin + window.location.pathname;
             // navigator.share/clipboard exist only in secure contexts (https or
@@ -364,7 +376,11 @@
     <div class="sm:hidden fixed inset-x-0 top-0" style="z-index: 40; pointer-events: none;"
          x-data="{ sc: false, th: 220 }"
          x-init="th = Math.max(160, Math.round(window.innerHeight * 0.58) - 90)"
-         @scroll.window.passive="sc = window.scrollY > th">
+         @scroll.window.passive="sc = window.scrollY > th;
+            // end:place — they read the listing all the way down. Once a session.
+            if (window.scrollY + window.innerHeight >= document.body.scrollHeight - 80) {
+                window.calmTrackOnce?.('end', 'place', { place_id: @js($place->id) });
+            }">
         <div class="absolute inset-0"
              :style="'transition: opacity 0.25s; border-bottom: 1px solid #F1F1F1; background-color: rgba(255,255,255,0.92); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); opacity: ' + (sc ? 1 : 0) + ';'"></div>
         <div class="relative flex items-center justify-between" style="padding: 10px 16px; padding-top: calc(10px + env(safe-area-inset-top));">
@@ -498,7 +514,7 @@
                         if (w) this.idx = Math.max(0, Math.min(this.total - 1, Math.round(Math.abs(el.scrollLeft) / w)));
                         // Binary flags: they looked at the photos, and they saw
                         // them all. Both once per session.
-                        window.calmTrackOnce?.('scroll', 'photos', { place_id: @js($place->id) });
+                        window.calmTrackOnce?.('scroll', 'photos', { place_id: @js($place->id), surface: 'detail' });
                         if (this.idx >= this.total - 1) {
                             window.calmTrackOnce?.('end', 'photos', { place_id: @js($place->id) });
                         }

@@ -5,8 +5,11 @@
      auth state catches up. Bottom sheet on mobile, centered fading modal on
      desktop. Open it from anywhere with:
 
-       $dispatch('calm-open-login')            → reload current page after login
-       $dispatch('calm-open-login', { next })  → redirect to `next` after login
+       $dispatch('calm-open-login')              → reload current page after login
+       $dispatch('calm-open-login', { next })    → redirect to `next` after login
+       $dispatch('calm-open-login', { reason })  → swap the welcome copy for one
+                                                   that names the job being
+                                                   interrupted (see REASONS)
 
      Included by layouts.app for guests; /login stays as the deep-link
      fallback. --}}
@@ -42,10 +45,13 @@
 
             {{-- ── Step 1: phone ── --}}
             <div x-show="step === 'phone'">
-                <h2 class="text-center font-bold text-black {{ $fa }}" style="font-size: 24px; line-height: 1.3;">
+                {{-- Copy follows the reason the modal was opened for (see REASONS). --}}
+                <h2 class="text-center font-bold text-black {{ $fa }}" style="font-size: 24px; line-height: 1.3;"
+                    x-text="copy.title">
                     {{ $isRtl ? 'حياك الله فى كالم' : 'Welcome to Calm' }}
                 </h2>
-                <p class="text-center {{ $fa }}" style="font-size: 14px; line-height: 1.6; margin-top: 8px; color: #AAAAAA;">
+                <p class="text-center {{ $fa }}" style="font-size: 14px; line-height: 1.6; margin-top: 8px; color: #AAAAAA;"
+                   x-text="copy.subtitle">
                     {{ $isRtl ? 'سجّل دخولك لاكتشاف أجمل الوجهات، وإدارة حجوزاتك بكل سهولة' : 'Sign in to discover the best destinations and manage your bookings with ease' }}
                 </p>
 
@@ -140,6 +146,26 @@
                 openState: false,
                 step: 'phone',
                 next: null,
+                // Why we're asking. Generic by default; a flow that interrupts
+                // something the guest already started should say so instead of
+                // the cold-open welcome. Add cases as flows need them.
+                reason: null,
+                REASONS: {
+                    occasion: {
+                        title: AR ? 'خطوة أخيرة' : 'One last step',
+                        subtitle: AR
+                            ? 'سجّل دخولك لإرسال طلب مناسبتك ومتابعته.'
+                            : 'Sign in to submit your occasion request and track it.',
+                    },
+                },
+                get copy() {
+                    return this.REASONS[this.reason] || {
+                        title: AR ? 'حياك الله فى كالم' : 'Welcome to Calm',
+                        subtitle: AR
+                            ? 'سجّل دخولك لاكتشاف أجمل الوجهات، وإدارة حجوزاتك بكل سهولة'
+                            : 'Sign in to discover the best destinations and manage your bookings with ease',
+                    };
+                },
                 countries: [],
                 countryId: null,
                 phone: '',
@@ -151,6 +177,10 @@
 
                 async open(detail) {
                     this.next = detail.next || null;
+                    this.reason = detail.reason || null;
+                    // No identifier on any login:* event — these are the screens
+                    // where PII is most tempting and least necessary.
+                    window.calmTrack?.('login', 'open', { reason: this.reason || 'generic' });
                     this.step = 'phone';
                     this.error = '';
                     this.openState = true;
@@ -217,6 +247,7 @@
                             this.error = json.data?.errors?.phone?.[0] || json.message || (AR ? 'حدث خطأ' : 'Something went wrong');
                             return;
                         }
+                        window.calmTrack?.('login', 'otp_sent');
                         this.step = 'otp';
                         this.otp = '';
                         this.startTimer(180);
@@ -230,6 +261,7 @@
                 async verifyOtp() {
                     if (!/^\d{6}$/.test(this.otp) || this.busy) return;
                     this.busy = true; this.error = '';
+                    window.calmTrack?.('login', 'otp_submit');
                     try {
                         const res = await fetch('/api/auth/otp/verify', {
                             method: 'POST',
@@ -240,6 +272,15 @@
                             this.error = AR ? 'رمز غير صحيح أو منتهي.' : 'Wrong or expired code.';
                             return;
                         }
+                        // Bind the anonymous journey to the person BEFORE the
+                        // reload, so the events already sent this session join up.
+                        // The reload re-identifies from the meta tag anyway; this
+                        // just closes the gap if a caller skips the reload.
+                        try {
+                            const body = await res.clone().json();
+                            window.calmIdentify?.(body?.data?.user?.id);
+                        } catch (e) { /* identity also resolves on reload */ }
+
                         // The JWT cookie is set by the response — refresh so the
                         // server-rendered auth state (hearts, tabs, حسابى) updates.
                         if (this.next) { window.location.href = this.next; } else { window.location.reload(); }

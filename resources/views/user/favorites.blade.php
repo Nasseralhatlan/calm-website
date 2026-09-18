@@ -10,6 +10,8 @@
 @section('title', ($isRtl ? 'المفضلة' : 'Wishlist').' — Calm')
 
 @section('body')
+{{-- Tab view — fires for guests too; the visit happened either way. --}}
+<script>document.addEventListener('DOMContentLoaded', () => window.calmTrack?.('view', 'favorites'));</script>
 <div class="min-h-screen bg-white" @if($me) x-data="calmFavorites()" x-init="fetchPage(1)" @endif>
 
     {{-- Fixed (sticky) page header --}}

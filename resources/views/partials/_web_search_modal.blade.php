@@ -272,9 +272,17 @@
                     this.active = map[detail.step]
                         || (detail.typeId && this.sel.cityId ? 'type' : 'where');
                     this.modalOpen = true;
+                    // `source` says which entry point opened it — a category tile
+                    // is a different intent from the header search bar.
+                    window.calmTrack?.('search', 'open', { source: detail.source || (detail.typeId ? 'category' : 'nav') });
                     document.body.style.overflow = 'hidden';
                 },
                 close() {
+                    // apply() closes too, but it has already sent search:submit —
+                    // this flag keeps an applied search from also counting as an
+                    // abandon.
+                    if (this.modalOpen && !this._applied) window.calmTrack?.('search', 'close');
+                    this._applied = false;
                     this.modalOpen = false;
                     document.body.style.overflow = '';
                 },
@@ -300,6 +308,7 @@
                 apply() {
                     if (!this.sel.cityId) { this.active = 'where'; return; }
                     this.broadcastState();
+                    this._applied = true; // suppress search:close — see close()
                     this.close();
                     const s = this.sel;
                     const selection = { cityId: s.cityId, areaIds: [...s.areaIds], typeIds: [...s.typeIds], checkIn: s.checkIn, checkOut: s.checkOut };
@@ -308,20 +317,16 @@
                     // results_count. Names as well as ids: a UUID is unreadable
                     // in the PostHog UI, and "which city did they want" is the
                     // whole supply question.
-                    const nameOf = (list, id) => list.find((x) => x.id === id)?.name;
-                    window.calmTrack?.('click', 'search', {
+                    window.calmTrack?.('search', 'submit', {
                         city_id: s.cityId,
-                        city_name: nameOf(this.cat.cities, s.cityId),
-                        area_ids: [...s.areaIds],
-                        area_names: s.areaIds.map((id) => nameOf(this.cityAreas(), id)).filter(Boolean),
-                        type_ids: [...s.typeIds],
-                        type_names: s.typeIds.map((id) => nameOf(this.cat.types, id)).filter(Boolean),
+                        place_type_ids: [...s.typeIds],
+                        city_area_ids: [...s.areaIds],
+                        amenity_ids: [],
+                        price_min: null,
+                        price_max: null,
+                        guests: this.sel.guests ?? null,
                         check_in: s.checkIn,
                         check_out: s.checkOut,
-                        nights: s.checkIn && s.checkOut
-                            ? Math.round((new Date(s.checkOut) - new Date(s.checkIn)) / 86400000) + 1
-                            : null,
-                        has_dates: !!s.checkIn,
                     });
 
                     const q = new URLSearchParams({ city: selection.cityId });

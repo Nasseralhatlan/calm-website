@@ -28,6 +28,8 @@
 @section('title', ($isRtl ? 'حسابى' : 'Account').' — Calm')
 
 @section('body')
+{{-- Tab view — fires for guests too; the visit happened either way. --}}
+<script>document.addEventListener('DOMContentLoaded', () => window.calmTrack?.('view', 'account'));</script>
 <div class="min-h-screen" style="background-color: #FBFBFB;">
 
     {{-- Fixed (sticky) page header --}}
