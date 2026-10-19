@@ -92,6 +92,36 @@
                 <span style="font-size: 14.5px; color: #AAAAAA;">{{ $isRtl ? 'الإقامة' : 'Stay' }} · <span x-text="stayLabel()"></span></span>
                 <span class="font-bold text-black tabular-nums" dir="ltr"><span x-text="fmtMoney(quote?.pricing.subtotal)"></span> SR</span>
             </div>
+            {{-- Promo code — Calm-funded discount off the stay (before VAT) --}}
+            <div x-show="quote?.pricing.discount > 0" x-cloak class="flex items-center justify-between" style="padding: 10px 0 4px;">
+                <span style="font-size: 14.5px; color: #AAAAAA;">
+                    {{ $isRtl ? 'خصم' : 'Promo' }} <bdi dir="ltr" class="font-bold" style="color: #059669;" x-text="appliedCode"></bdi>
+                    <button type="button" @click="removePromo()" class="calm-press underline" style="font-size: 12.5px; color: #AAAAAA; margin-inline-start: 6px;">{{ $isRtl ? 'إزالة' : 'Remove' }}</button>
+                </span>
+                <span class="font-bold tabular-nums" style="color: #059669;" dir="ltr">− <span x-text="fmtMoney(quote?.pricing.discount)"></span> SR</span>
+            </div>
+            <div x-show="quote?.pricing.discount > 0" x-cloak class="flex items-center justify-between" style="padding: 10px 0 4px;">
+                <span style="font-size: 14.5px; color: #AAAAAA;">{{ $isRtl ? 'بعد الخصم' : 'After discount' }}</span>
+                <span class="font-bold text-black tabular-nums" dir="ltr"><span x-text="fmtMoney(quote ? Math.round((quote.pricing.subtotal - quote.pricing.discount) * 100) / 100 : null)"></span> SR</span>
+            </div>
+            <div x-show="!appliedCode" style="padding: 10px 0 4px;">
+                <button type="button" x-show="!promoOpen" @click="promoOpen = true; $nextTick(() => $refs.promo.focus())"
+                        class="calm-press font-bold text-black underline" style="font-size: 13.5px;">
+                    {{ $isRtl ? 'لديك كود خصم؟' : 'Have a promo code?' }}
+                </button>
+                <form x-show="promoOpen" x-cloak @submit.prevent="applyPromo()" class="flex items-center" style="gap: 8px;">
+                    <input x-ref="promo" x-model="promoInput" type="text" maxlength="40" dir="ltr" autocomplete="off"
+                           placeholder="{{ $isRtl ? 'أدخل الكود' : 'Enter code' }}"
+                           class="flex-1 min-w-0 uppercase tracking-wider focus:outline-none"
+                           style="font-size: 14.5px; background-color: #F5F5F5; padding: 12px 14px; border-radius: 14px;">
+                    <button type="submit" :disabled="!promoInput.trim() || promoBusy"
+                            class="calm-press shrink-0 font-bold text-white"
+                            :style="'font-size: 13px; background-color: #1A1A1A; padding: 12px 18px; border-radius: 14px; opacity: ' + (promoInput.trim() && !promoBusy ? 1 : 0.4)">
+                        {{ $isRtl ? 'تطبيق' : 'Apply' }}
+                    </button>
+                </form>
+                <p x-show="promoError" x-cloak style="font-size: 12.5px; color: #dc2626; margin-top: 6px;" x-text="promoError"></p>
+            </div>
             <div class="flex items-center justify-between" style="padding: 10px 0 4px;">
                 <span style="font-size: 14.5px; color: #AAAAAA;">{{ $isRtl ? 'ضريبة القيمة المضافة' : 'VAT' }} (<span x-text="vatPct()"></span>%)</span>
                 <span class="font-bold text-black tabular-nums" dir="ltr"><span x-text="fmtMoney(quote?.pricing.vat)"></span> SR</span>
@@ -139,14 +169,40 @@ function calmCheckout(init) {
     // shifts a day for viewers west of UTC.
     const parseD = (s) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
     const gregFmt = new Intl.DateTimeFormat(init.isRtl ? 'ar' : 'en', { weekday: 'long', day: 'numeric', month: 'long' });
+    // The applied code survives the login-modal reload of this page.
+    const promoKey = `calm.promo.${init.placeId}`;
+    const store = {
+        get() { try { return sessionStorage.getItem(promoKey) || ''; } catch (e) { return ''; } },
+        set(v) { try { v ? sessionStorage.setItem(promoKey, v) : sessionStorage.removeItem(promoKey); } catch (e) {} },
+    };
+    const promoReasons = init.isRtl ? {
+        not_found: 'الكود غير صحيح.',
+        inactive: 'انتهت صلاحية هذا الكود.',
+        expired: 'انتهت صلاحية هذا الكود.',
+        not_started: 'هذا الكود غير مفعّل بعد.',
+        exhausted: 'تم استخدام هذا الكود بالكامل.',
+        already_used: 'سبق أن استخدمت هذا الكود.',
+        min_stay: 'قيمة الإقامة أقل من الحد الأدنى لهذا الكود',
+    } : {
+        not_found: "That code isn't valid.",
+        inactive: 'This code has expired.',
+        expired: 'This code has expired.',
+        not_started: "This code isn't active yet.",
+        exhausted: 'This code has been fully used.',
+        already_used: "You've already used this code.",
+        min_stay: "This stay is below the code's minimum",
+    };
 
     return {
         checkIn: init.checkIn,
         checkOut: init.checkOut,
         quote: null, quoteError: '', quoteSeq: 0,
         submitting: false, submitError: '',
+        promoOpen: false, promoInput: '', promoBusy: false, promoError: '', appliedCode: '',
 
         load() {
+            const saved = store.get();
+            if (saved) { this.promoInput = saved; this.promoOpen = true; this.appliedCode = saved; }
             // Fired once the quote lands, not on paint — total_sar is the whole
             // point of the event and it doesn't exist until then.
             this.fetchQuote().then(() => {
@@ -180,8 +236,32 @@ function calmCheckout(init) {
         },
         fmtMoney(v) { return v == null ? '…' : Number(v).toLocaleString(); },
         vatPct() {
-            if (!this.quote || !this.quote.pricing.subtotal) return 15;
-            return Math.round((this.quote.pricing.vat / this.quote.pricing.subtotal) * 100);
+            return this.quote?.pricing.vat_percentage ?? 15;
+        },
+
+        async applyPromo() {
+            const code = this.promoInput.trim().toUpperCase();
+            if (!code || this.promoBusy) return;
+            this.promoBusy = true;
+            this.appliedCode = code;
+            await this.fetchQuote();
+            this.promoBusy = false;
+        },
+        removePromo() {
+            this.appliedCode = ''; this.promoInput = ''; this.promoError = '';
+            store.set('');
+            this.fetchQuote();
+        },
+        // Settle the promo state from the quote's verdict.
+        readPromo(data) {
+            const promo = data.promo;
+            if (!promo) return;
+            if (promo.applied) { this.promoError = ''; store.set(promo.code); return; }
+            let msg = promoReasons[promo.reason] || promo.message || '';
+            if (promo.reason === 'min_stay' && promo.min_stay) msg += ` (${Number(promo.min_stay).toLocaleString()} SR).`;
+            this.promoError = msg;
+            this.appliedCode = '';
+            store.set('');
         },
 
         async fetchQuote() {
@@ -189,7 +269,8 @@ function calmCheckout(init) {
             this.quoteError = '';
             try {
                 const q = new URLSearchParams({ check_in: this.checkIn, check_out: this.checkOut, guests: init.guests });
-                const res = await fetch(`/api/places/${init.placeId}/quote?${q}`, { headers: { Accept: 'application/json' } });
+                if (this.appliedCode) q.set('promo_code', this.appliedCode);
+                const res = await fetch(`/api/places/${init.placeId}/quote?${q}`, { headers: { Accept: 'application/json' }, credentials: 'same-origin' });
                 const json = await res.json();
                 if (seq !== this.quoteSeq) return;
                 const data = json.data;
@@ -199,6 +280,7 @@ function calmCheckout(init) {
                     this.quoteError = init.isRtl ? 'التواريخ المختارة لم تعد متاحة.' : 'Those dates are no longer available.';
                     return;
                 }
+                this.readPromo(data);
                 this.quote = data;
             } catch (e) { if (seq === this.quoteSeq) this.quoteError = init.isRtl ? 'تعذر حساب السعر — حاول مجدداً.' : 'Could not fetch the price — try again.'; }
         },
@@ -224,9 +306,21 @@ function calmCheckout(init) {
                 const res = await fetch(init.submitUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-TOKEN': csrf },
-                    body: JSON.stringify({ check_in: this.checkIn, check_out: this.checkOut, guests: init.guests }),
+                    body: JSON.stringify({
+                        check_in: this.checkIn, check_out: this.checkOut, guests: init.guests,
+                        promo_code: this.appliedCode || null,
+                    }),
                 });
                 const json = await res.json();
+                if (!res.ok && json.data?.errors?.promo_code) {
+                    // The code stopped applying between quote and book (last
+                    // use taken, expired) — drop it and re-quote at full price.
+                    this.submitting = false;
+                    this.removePromo();
+                    this.promoOpen = true;
+                    this.promoError = init.isRtl ? 'لم يعد هذا الكود صالحاً — تم تحديث السعر.' : 'That code no longer applies — the price was updated.';
+                    return;
+                }
                 if (!res.ok) {
                     this.submitError = json.data?.errors
                         ? Object.values(json.data.errors).flat().join(' ')

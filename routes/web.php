@@ -10,13 +10,14 @@ use App\Http\Controllers\Admin\CityAreasController;
 use App\Http\Controllers\Admin\CountriesController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\FaqsController;
-// use App\Http\Controllers\Admin\NotificationsController; // notifications temporarily disabled
 use App\Http\Controllers\Admin\FinanceDocumentPdfController;
+// use App\Http\Controllers\Admin\NotificationsController; // notifications temporarily disabled
 use App\Http\Controllers\Admin\OccasionRequestsController as AdminOccasionRequestsController;
 use App\Http\Controllers\Admin\PlaceListsController;
 use App\Http\Controllers\Admin\PlaceReviewController;
 use App\Http\Controllers\Admin\PlacesController;
 use App\Http\Controllers\Admin\PlaceTypesController;
+use App\Http\Controllers\Admin\PromoCodesController;
 use App\Http\Controllers\Admin\ReviewsController;
 use App\Http\Controllers\Admin\SettingsController;
 use App\Http\Controllers\Admin\UsersController;
@@ -229,6 +230,12 @@ Route::middleware(['auth:api', 'admin'])
 
         // FAQs — admin-curated Q&A shown on the public /faq page.
         Route::resource('faqs', FaqsController::class)->except(['show']);
+
+        // Promo codes — Calm-funded discounts (come out of Calm's commission,
+        // never the host's payout). The form warns when a code exceeds it.
+        Route::resource('promo-codes', PromoCodesController::class)
+            ->except(['show'])
+            ->parameters(['promo-codes' => 'promoCode']);
 
         // Users — list + edit. Self-registration handles creation; deletion is
         // intentionally not exposed here.

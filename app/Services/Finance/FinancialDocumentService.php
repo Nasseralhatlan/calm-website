@@ -37,17 +37,23 @@ final class FinancialDocumentService
                 'direction' => 'sales',
                 'status' => $this->initialProviderStatus(),
                 'is_tax_document' => true,
-                'subtotal_amount' => (int) $booking->stay_amount,
+                // Taxable value is net of the Calm-funded promo discount.
+                'subtotal_amount' => (int) $booking->stay_amount - (int) $booking->discount_amount,
                 'vat_amount' => (int) $booking->vat_amount,
                 'total_amount' => (int) $booking->total_amount,
                 'issued_at' => now(),
             ]);
 
+            // One line: unit = the full stay, subtotal = after the discount
+            // (the code is named in the description so the paper explains it).
+            $promo = (int) $booking->discount_amount > 0
+                ? sprintf(' — promo %s −%s SAR · خصم', $booking->promo_code, number_format($booking->discount_amount / 100, 2, '.', ''))
+                : '';
             $document->lines()->create([
-                'description' => "Accommodation booking {$booking->reference} ({$booking->nights} nights) · حجز رقم {$booking->reference}",
+                'description' => "Accommodation booking {$booking->reference} ({$booking->nights} nights) · حجز رقم {$booking->reference}{$promo}",
                 'quantity' => 1,
                 'unit_amount' => (int) $booking->stay_amount,
-                'subtotal_amount' => (int) $booking->stay_amount,
+                'subtotal_amount' => (int) $booking->stay_amount - (int) $booking->discount_amount,
                 'vat_rate' => (float) $booking->vat_rate,
                 'vat_amount' => (int) $booking->vat_amount,
                 'total_amount' => (int) $booking->total_amount,

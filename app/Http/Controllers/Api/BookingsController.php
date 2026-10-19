@@ -80,6 +80,7 @@ class BookingsController extends Controller
             $request->validated('check_in'),
             $request->validated('check_out'),
             (int) $request->validated('guests'),
+            promoCode: $request->validated('promo_code'),
         );
 
         return ApiResponse::success(

@@ -18,12 +18,14 @@ use App\Services\Finance\BookingFinanceFinalizer;
 use App\Services\Notification\NotificationService;
 use App\Services\Notification\OwnerNotifier;
 use App\Services\Place\PlaceAvailabilityService;
+use App\Services\Promo\PromoCodeService;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 use RuntimeException;
 
 final class BookingService
@@ -34,6 +36,7 @@ final class BookingService
         private readonly NotificationService $notifications,
         private readonly OwnerNotifier $owner,
         private readonly BookingFinanceFinalizer $finance,
+        private readonly PromoCodeService $promos,
     ) {}
 
     /**
@@ -73,14 +76,16 @@ final class BookingService
      *                                                                                                                      (funnel bookings) instead of the app's /calm-*-payment routes: `return_url` on success,
      *                                                                                                                      `back_url` when the payer backs out of the hosted page (defaults to return_url).
      *                                                                                                                      Closures receive the created booking. Empty for app flow.
+     * @param  ?string  $promoCode  Optional Calm-funded promo code, re-validated here under a lock
+     *                              (422 on `promo_code` if it no longer applies).
      */
-    public function create(User $user, Place $place, string $checkIn, string $checkOut, int $guests, array $options = []): Booking
+    public function create(User $user, Place $place, string $checkIn, string $checkOut, int $guests, array $options = [], ?string $promoCode = null): Booking
     {
         // Single base instant for both the date-hold and the invoice expiry so
         // they can't drift apart.
         $holdExpiresAt = CarbonImmutable::now()->addMinutes((int) config('moyasar.hold_minutes', 10));
 
-        $booking = DB::transaction(function () use ($user, $place, $checkIn, $checkOut, $guests, $holdExpiresAt): Booking {
+        $booking = DB::transaction(function () use ($user, $place, $checkIn, $checkOut, $guests, $holdExpiresAt, $promoCode): Booking {
             // Serialise concurrent bookings for this place.
             $locked = Place::query()->whereKey($place->id)->lockForUpdate()->first();
             if ($locked === null) {
@@ -113,6 +118,19 @@ final class BookingService
 
             $pricing = $quote['pricing'];
 
+            // Promo: re-resolve under a row lock on the code (the last use
+            // can't be redeemed twice), then re-price with the discount. The
+            // commission and host payout stay on the full stay — Calm-funded.
+            $promo = null;
+            if ($promoCode !== null && trim($promoCode) !== '') {
+                $result = $this->promos->resolve($promoCode, $user, $pricing['subtotal_minor'], lock: true);
+                if (! $result['ok']) {
+                    throw ValidationException::withMessages(['promo_code' => [PromoCodeService::refusalMessage($result['reason'])]]);
+                }
+                $promo = $result['promo'];
+                $pricing = $this->availability->pricingFor($pricing['subtotal_minor'], $result['discount_minor']);
+            }
+
             // Multi-unit places: hand the booking the first unit no overlapping
             // active booking occupies (still under the place lock, so the last
             // free unit can't be double-assigned). Null for classic places.
@@ -133,6 +151,9 @@ final class BookingService
                 'guests' => $guests,
                 'nights' => $quote['days'],
                 'stay_amount' => $pricing['subtotal_minor'],
+                'promo_code_id' => $promo?->id,
+                'promo_code' => $promo?->code,
+                'discount_amount' => $pricing['discount_minor'],
                 'commission_rate' => $pricing['commission_rate'],
                 'commission_amount' => $pricing['commission_amount_minor'],
                 'vat_rate' => $pricing['vat_rate'],

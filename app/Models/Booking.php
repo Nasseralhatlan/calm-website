@@ -93,6 +93,11 @@ class Booking extends Model
         // guest pays stay + VAT; commission (+VAT on top) comes out of the
         // host's payout; host gets stay − commission_total.
         'stay_amount',
+        // Calm-funded promo: guest pays (stay − discount) + VAT on that;
+        // commission + payout ignore it (Calm absorbs the discount).
+        'promo_code_id',
+        'promo_code',
+        'discount_amount',
         'vat_rate',
         'vat_amount',
         'total_amount',
@@ -123,6 +128,7 @@ class Booking extends Model
             'payout_paid_at' => 'datetime',
             'payout_forced_at' => 'datetime',
             'stay_amount' => 'integer',
+            'discount_amount' => 'integer',
             'vat_rate' => 'float',
             'vat_amount' => 'integer',
             'total_amount' => 'integer',
@@ -144,6 +150,22 @@ class Booking extends Model
     public function hostNetMinor(): int
     {
         return (int) $this->host_payout_amount;
+    }
+
+    /**
+     * What Calm actually keeps (halalas, ex VAT): its commission minus the
+     * Calm-funded promo discount. Negative = the promo went past Calm's own
+     * cut and Calm paid the difference out of pocket.
+     */
+    public function calmNetMinor(): int
+    {
+        return (int) $this->commission_amount - (int) $this->discount_amount;
+    }
+
+    /** @return BelongsTo<PromoCode, $this> */
+    public function promoCode(): BelongsTo
+    {
+        return $this->belongsTo(PromoCode::class);
     }
 
     /**

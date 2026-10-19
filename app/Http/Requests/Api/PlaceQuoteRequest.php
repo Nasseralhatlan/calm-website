@@ -32,6 +32,8 @@ class PlaceQuoteRequest extends FormRequest
             'check_in' => ['required', 'date', 'date_format:Y-m-d', 'after_or_equal:today'],
             'check_out' => ['required', 'date', 'date_format:Y-m-d', 'after_or_equal:check_in'],
             'guests' => ['nullable', 'integer', 'min:1'],
+            // Optional Calm-funded promo code (case-insensitive).
+            'promo_code' => ['nullable', 'string', 'max:40'],
         ];
     }
 
