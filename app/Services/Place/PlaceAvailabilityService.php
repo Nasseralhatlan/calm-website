@@ -101,7 +101,7 @@ final class PlaceAvailabilityService
      * @param  string  $checkIn  Inclusive first day (Y-m-d).
      * @param  string  $checkOut  Inclusive last day (Y-m-d).
      * @param  int|null  $guests  Party size; when given, checked against max_guests.
-     * @return array{place_id: string, check_in: string, check_out: string, days: int, guests: int|null, max_guests: int|null, currency: string, dates_available: bool, guests_ok: bool, price_ok: bool, bookable: bool, unavailable_dates: list<string>, breakdown: list<array{date: string, weekday: string, price: int, available: bool}>, pricing: array{subtotal: float, subtotal_minor: int, commission_rate: float, commission_amount: float, commission_amount_minor: int, vat_rate: float, vat_amount: float, vat_amount_minor: int, total: float, total_minor: int}}|null
+     * @return array{place_id: string, check_in: string, check_out: string, days: int, guests: int|null, max_guests: int|null, currency: string, dates_available: bool, guests_ok: bool, price_ok: bool, bookable: bool, unavailable_dates: list<string>, breakdown: list<array{date: string, weekday: string, price: int, available: bool}>, pricing: array{subtotal: float, subtotal_minor: int, discount: float, discount_minor: int, commission_rate: float, commission_amount: float, commission_amount_minor: int, vat_rate: float, vat_amount: float, vat_amount_minor: int, total: float, total_minor: int}}|null
      */
     public function quote(Place $place, string $checkIn, string $checkOut, ?int $guests = null): ?array
     {
@@ -180,22 +180,41 @@ final class PlaceAvailabilityService
      * All maths runs in halalas (integer minor units) so there's no floating
      * point drift, and `total_minor` is exactly what the payment gateway charges.
      *
-     * @return array{subtotal: float, subtotal_minor: int, commission_rate: float, commission_amount: float, commission_amount_minor: int, vat_rate: float, vat_amount: float, vat_amount_minor: int, total: float, total_minor: int}
+     * A Calm-funded promo discount (halalas, ex VAT) comes off the stay on the
+     * guest side only: VAT is charged on (stay − discount) and the guest pays
+     * that plus VAT. The commission stays on the FULL stay — the host's payout
+     * never sees the discount; Calm absorbs it.
+     *
+     * @return array{subtotal: float, subtotal_minor: int, discount: float, discount_minor: int, commission_rate: float, commission_amount: float, commission_amount_minor: int, vat_rate: float, vat_amount: float, vat_amount_minor: int, total: float, total_minor: int}
      */
     private function computePricing(int $subtotal): array
+    {
+        return $this->pricingFor($subtotal * 100);
+    }
+
+    /**
+     * The same breakdown for a stay amount already in halalas, with an
+     * optional promo discount — used to re-price a quote once a code applies.
+     *
+     * @return array{subtotal: float, subtotal_minor: int, discount: float, discount_minor: int, commission_rate: float, commission_amount: float, commission_amount_minor: int, vat_rate: float, vat_amount: float, vat_amount_minor: int, total: float, total_minor: int}
+     */
+    public function pricingFor(int $bookingAmountMinor, int $discountMinor = 0): array
     {
         $rates = $this->settings->byKeys(['commission_percentage', 'vat_percentage']);
         $commissionRate = $this->rate($rates['commission_percentage'] ?? null, self::DEFAULT_COMMISSION_PERCENTAGE);
         $vatRate = $this->rate($rates['vat_percentage'] ?? null, self::DEFAULT_VAT_PERCENTAGE);
 
-        $bookingAmountMinor = $subtotal * 100;
+        $discountMinor = max(0, min($discountMinor, $bookingAmountMinor));
+        $taxableMinor = $bookingAmountMinor - $discountMinor;
         $commissionMinor = (int) round($bookingAmountMinor * $commissionRate / 100);
-        $vatMinor = (int) round($bookingAmountMinor * $vatRate / 100);
-        $totalMinor = $bookingAmountMinor + $vatMinor; // commission is host-side
+        $vatMinor = (int) round($taxableMinor * $vatRate / 100);
+        $totalMinor = $taxableMinor + $vatMinor; // commission is host-side
 
         return [
             'subtotal' => $bookingAmountMinor / 100,
             'subtotal_minor' => $bookingAmountMinor,
+            'discount' => $discountMinor / 100,
+            'discount_minor' => $discountMinor,
             'commission_rate' => $commissionRate,
             'commission_amount' => $commissionMinor / 100,
             'commission_amount_minor' => $commissionMinor,

@@ -10,11 +10,15 @@ use App\Http\Resources\Api\PlaceQuoteResource;
 use App\Http\Responses\ApiResponse;
 use App\Models\Place;
 use App\Services\Place\PlaceAvailabilityService;
+use App\Services\Promo\PromoCodeService;
 use Illuminate\Http\JsonResponse;
 
 class PlaceQuoteController extends Controller
 {
-    public function __construct(private readonly PlaceAvailabilityService $service) {}
+    public function __construct(
+        private readonly PlaceAvailabilityService $service,
+        private readonly PromoCodeService $promos,
+    ) {}
 
     /**
      * Availability + pricing quote for a stay — the source of truth the mobile
@@ -34,6 +38,27 @@ class PlaceQuoteController extends Controller
 
         if ($quote === null) {
             return ApiResponse::error('Place not found.', 404);
+        }
+
+        // Optional promo: re-price with the discount when it applies, or echo
+        // the refusal reason so the checkout can explain it. Public endpoint —
+        // the user is resolved only if a token came along (per-guest limits).
+        $code = trim((string) $request->validated('promo_code', ''));
+        $quote['promo'] = null;
+        if ($code !== '') {
+            $result = $this->promos->resolve($code, $request->user('api'), $quote['pricing']['subtotal_minor']);
+            if ($result['ok']) {
+                $quote['pricing'] = $this->service->pricingFor($quote['pricing']['subtotal_minor'], $result['discount_minor']);
+                $quote['promo'] = ['code' => $result['promo']->code, 'applied' => true, 'reason' => null];
+            } else {
+                $quote['promo'] = [
+                    'code' => mb_strtoupper($code),
+                    'applied' => false,
+                    'reason' => $result['reason'],
+                    'message' => PromoCodeService::refusalMessage($result['reason']),
+                    'min_stay' => isset($result['min_stay_minor']) ? $result['min_stay_minor'] / 100 : null,
+                ];
+            }
         }
 
         return ApiResponse::success(

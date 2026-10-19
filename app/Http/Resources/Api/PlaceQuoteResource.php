@@ -16,7 +16,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *   guests_ok /          isn't bookable.
  *   price_ok
  *   breakdown          → per-day rows for the price summary.
- *   pricing            → subtotal (sum of nights) → VAT → total. The guest pays
+ *   pricing            → subtotal (sum of nights) − discount → VAT → total. The guest pays
  *                        `total` (= subtotal + VAT); Calm's commission is taken
  *                        from the host and is NOT shown here. `total_minor` is
  *                        halalas, ready to hand to the payment gateway.
@@ -46,11 +46,16 @@ class PlaceQuoteResource extends JsonResource
             'breakdown' => $this->resource['breakdown'],
             'pricing' => [
                 'subtotal' => $this->resource['pricing']['subtotal'],
+                // Calm-funded promo discount off the stay (ex VAT); 0 without one.
+                'discount' => $this->resource['pricing']['discount'] ?? 0,
                 'vat_percentage' => $this->resource['pricing']['vat_rate'],
                 'vat' => $this->resource['pricing']['vat_amount'],
                 'total' => $this->resource['pricing']['total'],
                 'total_minor' => $this->resource['pricing']['total_minor'],
             ],
+            // Null when no code was sent; otherwise {code, applied, reason,
+            // message?, min_stay?}. `reason` is a stable key for localized copy.
+            'promo' => $this->resource['promo'] ?? null,
         ];
     }
 }

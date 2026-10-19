@@ -237,6 +237,12 @@
                 <span class="text-[#717171] tabular-nums" dir="ltr">{{ $sar($booking->vat_amount) }} {{ $cur }}</span>
             </div>
         @else
+            @if($booking->discount_amount > 0)
+                <div style="{{ $row }}">
+                    <span class="text-[#717171]">{{ $isRtl ? 'خصم' : 'Promo' }} <span class="font-semibold tracking-wider" dir="ltr">{{ $booking->promo_code }}</span></span>
+                    <span class="font-semibold text-[#059669] tabular-nums" dir="ltr">− {{ $sar($booking->discount_amount) }} {{ $cur }}</span>
+                </div>
+            @endif
             <div style="{{ $row }}">
                 <span class="text-[#717171]">{{ $isRtl ? 'ضريبة القيمة المضافة' : 'VAT' }} ({{ $rate($booking->vat_rate) }}%)</span>
                 <span class="font-semibold text-[#222] tabular-nums" dir="ltr">{{ $sar($booking->vat_amount) }} {{ $cur }}</span>
@@ -246,6 +252,20 @@
                     <span class="text-[#717171]">{{ $isRtl ? 'عمولة كالم' : 'Calm commission' }} ({{ $rate($booking->commission_rate) }}%)</span>
                     <span class="text-[#717171] tabular-nums" dir="ltr">{{ $sar($booking->commission_amount) }} {{ $cur }}</span>
                 </div>
+                @if($booking->discount_amount > 0)
+                    {{-- Calm-funded promo: what Calm keeps after the discount.
+                         Negative = the promo went past Calm's own cut. --}}
+                    @php $calmNet = $booking->calmNetMinor(); @endphp
+                    <div style="{{ $row }}">
+                        <span class="{{ $calmNet < 0 ? 'text-[#b91c1c] font-semibold' : 'text-[#717171]' }}">
+                            {{ $isRtl ? 'صافي كالم بعد الخصم' : 'Calm keeps after promo' }}
+                            @if($calmNet < 0)
+                                · ⚠ {{ $isRtl ? 'تجاوز العمولة' : 'exceeded commission' }}
+                            @endif
+                        </span>
+                        <span class="tabular-nums {{ $calmNet < 0 ? 'text-[#b91c1c] font-bold' : 'text-[#717171]' }}" dir="ltr">{{ $calmNet < 0 ? '− ' : '' }}{{ $sar(abs($calmNet)) }} {{ $cur }}</span>
+                    </div>
+                @endif
             @endif
             <div style="{{ $row }} border-top:1px solid #f0f0f0;margin-top:4px;">
                 <span class="font-bold text-[#222]">{{ $isRtl ? 'الإجمالي' : 'Total' }}</span>

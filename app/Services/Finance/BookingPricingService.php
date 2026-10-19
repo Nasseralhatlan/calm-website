@@ -37,7 +37,9 @@ final class BookingPricingService
         $vatRate = $vatEnabled ? (float) config('finance.vat.rate', 15.0) : 0.0;
 
         $guestVatAmount = (int) ($attributes['vat_amount'] ?? 0);
-        $guestTotal = (int) ($attributes['total_amount'] ?? ($stayAmount + $guestVatAmount));
+        // A Calm-funded promo discount lowers only the guest's side.
+        $discount = (int) ($attributes['discount_amount'] ?? 0);
+        $guestTotal = (int) ($attributes['total_amount'] ?? ($stayAmount - $discount + $guestVatAmount));
 
         // Commission side: VAT charged ON TOP of the commission, deducted from
         // the host's payout. Falls back to the booking's commission_rate when

@@ -30,7 +30,7 @@ final class BookingFunnelService
     }
 
     /**
-     * @param  array{check_in: string, check_out: string, guests: int, name?: ?string}  $data
+     * @param  array{check_in: string, check_out: string, guests: int, name?: ?string, promo_code?: ?string}  $data
      */
     public function book(User $guest, Place $place, array $data): Booking
     {
@@ -53,6 +53,7 @@ final class BookingFunnelService
                 // the hold instead of polling a payment that will never come.
                 'back_url' => fn (Booking $booking): string => route('book.status', ['booking' => $booking, 'back' => 1]),
             ],
+            promoCode: $data['promo_code'] ?? null,
         );
     }
 }

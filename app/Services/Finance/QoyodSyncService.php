@@ -210,6 +210,12 @@ final class QoyodSyncService
             'unit_price' => $this->sar((int) $booking->stay_amount),
             'tax_percent' => (float) $booking->vat_rate,
         ]];
+        // Calm-funded promo: a line-level amount discount, so Qoyod taxes
+        // (stay − discount) — matching the booking's vat_amount exactly.
+        if ((int) $booking->discount_amount > 0) {
+            $lineItems[0]['discount'] = $this->sar((int) $booking->discount_amount);
+            $lineItems[0]['discount_type'] = 'amount';
+        }
 
         $this->pushInvoice($document, $contactId, "{$booking->reference}-G", $lineItems, $booking, [
             'account_id' => (int) config('finance.qoyod.moyasar_account_id'),
